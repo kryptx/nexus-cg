@@ -57,13 +57,39 @@ local mockButton = {
     end
 }
 local mockGameService = { -- Base methods for the mock
+    currentPlayerIndex = 1,
     endTurn = function() return true, "Mock Turn Ended" end,
     discardCard = function() return true, "Mock Card Discarded" end,
-    attemptPlacement = function() return false, "Mock Placement Failed" end, -- Default mock behavior
-    attemptActivation = function() return false, "Mock Activation Failed" end
+    attemptPlacement = function() return false, "Mock Placement Failed" end,
+    attemptActivation = function() return false, "Mock Activation Failed" end,
+    initializeGame = function(self, playerCount)
+        -- Store the player count
+        self.playerCount = playerCount
+        -- Set initial player index
+        self.currentPlayerIndex = 1
+        -- Initialize any other game state needed
+        self.initialized = true
+        return true, "Game initialized successfully"
+    end,
+    getPlayers = function(self, count)
+        count = count or 2 -- Default to 2 if not specified
+        local players = {}
+        for i = 1, count do
+            local player = package.loaded['src.game.player'].new(i, "Player " .. i)
+            table.insert(players, player)
+            -- Create network for player
+            player.network = mockNetwork.new(player)
+        end
+        self.players = players -- Store for future reference
+        return players
+    end
 }
 mockGameService.new = function() -- Constructor returns a new instance based on the base
-    local instance = {}
+    local instance = {
+        initialized = false,
+        playerCount = 0,
+        players = {}
+    }
     setmetatable(instance, { __index = mockGameService })
     return instance
 end
@@ -73,16 +99,22 @@ end
 local created_players_capture = {} -- Use this to capture created players if needed outside state
 package.loaded['src.game.player'] = {
     new = function(id_num, name)
+        -- Create reactor card first
+        local reactorCard = package.loaded['src.game.card'].new({ id = "REACTOR_" .. id_num, title = "Reactor " .. id_num, type = "Reactor" })
+        
         local p = {
             id = id_num,
             name = name,
             resources = {},
-            hand = {},
+            hand = {},  -- Start with empty hand
             network = nil,
-            reactorCard = nil,
+            reactorCard = reactorCard,
             addResource_calls = {}, 
             addCardToHand_calls = {}
         }
+        -- Set reactor card owner
+        reactorCard.owner = p
+        
         -- Add methods directly to p
         p.addResource = function(self_p, type, amount)
             table.insert(p.addResource_calls, { type=type, amount=amount })
@@ -91,11 +123,15 @@ package.loaded['src.game.player'] = {
         p.addCardToHand = function(self_p, card)
             table.insert(p.addCardToHand_calls, card)
             table.insert(p.hand, card)
-            card.owner = p -- Assign the 'p' instance created by this function
-            -- print(string.format("[Table Mock Player %d] Added card '%s'. Owner set to: %s", p.id, card.id or 'N/A', tostring(card.owner))) -- Removed debug print
+            card.owner = p -- This is fine, we don't need to capture here
         end
-        -- print(string.format("[Table Mock Player Create] ID: %s, Type: %s, Value: %s", tostring(p.id), type(p.id), p.id)) -- Removed debug print
-        table.insert(created_players_capture, p) -- Capture if needed
+
+        -- Add initial cards to hand
+        p:addCardToHand(package.loaded['src.game.card'].new({ id = "CARD_" .. id_num .. "_1", title = "Card " .. id_num .. ".1", type = "Technology" }))
+        p:addCardToHand(package.loaded['src.game.card'].new({ id = "CARD_" .. id_num .. "_2", title = "Card " .. id_num .. ".2", type = "Culture" }))
+        
+        -- Capture the player exactly once
+        table.insert(created_players_capture, p)
         return p
     end
 }
@@ -131,48 +167,42 @@ local PlayState = require 'src.game.states.play_state'
 
 describe("PlayState Module", function()
     local state
+    local mockGameServiceInstance
 
     before_each(function()
-        -- Reset mocks or create new instances if needed
-        -- For now, assume mocks are simple enough not to need per-test reset
+        -- Reset capture tables for ALL tests
+        created_players_capture = {} -- Reset capture table
+        created_cards_capture = {} -- Reset card capture table
+        created_networks = {} -- Reset networks capture table
 
-        -- Create a new PlayState instance using its constructor
-        state = PlayState:new()
+        -- Create a new mockGameService instance first
+        mockGameServiceInstance = mockGameService.new()
 
-        -- We might call enter() explicitly in tests later if needed,
-        -- but :new() now calls :init(), which sets up some defaults.
-        -- Let's clear players array potentially added by init, as :enter() sets it up fully.
+        -- Create a new PlayState instance using its constructor, providing the mock
+        state = PlayState:new(mockGameServiceInstance)
+
+        -- Clear players array as :enter() will set it up fully
         state.players = {}
     end)
 
     describe(":enter()", function()
-        -- Define mocks and capture tables needed for :enter() tests
-        -- local created_players -- No longer need this here
-        local created_cards, created_networks
-
         before_each(function()
-            -- Reset capture tables for each test
-            created_players_capture = {} -- Reset capture table
-            created_cards_capture = {} -- RESET THIS CAPTURE TABLE
-            created_networks = {}
-
             -- Define mock implementations (consistent across these tests)
             mockCardDefinitions["REACTOR_BASE"] = { id = "REACTOR_BASE", type = "Reactor", title="Mock Reactor" }
             mockCardDefinitions["NODE_TECH_001"] = { id = "NODE_TECH_001", type = "Technology", title="Mock Tech" }
             mockCardDefinitions["NODE_CULT_001"] = { id = "NODE_CULT_001", type = "Culture", title="Mock Cult" }
 
-            -- Player mock is now handled by the function in package.loaded
-            -- mockPlayer.new = function(...) end -- REMOVE THIS
-
-            -- Card mock is now handled by the function in package.loaded
-            -- mockCard.new = function(...) end -- REMOVE THIS
-
             -- Network Mock (Keep previous structure)
             mockNetwork.new = function(player)
-                 local n = { owner = player }
-                 player.network = n -- Link back to player
-                 table.insert(created_networks, n)
-                 return n
+                local n = { 
+                    owner = player,
+                    cards = {} -- Add a cards table if needed by tests
+                }
+                if player then -- Only set network if player exists
+                    player.network = n -- Link back to player
+                end
+                table.insert(created_networks, n)
+                return n
             end
         end)
 
@@ -185,7 +215,7 @@ describe("PlayState Module", function()
             -- Assert: Check basic properties are set
             assert.is_table(state.players)
             assert.are.equal(2, #state.players) -- Assuming NUM_PLAYERS = 2
-            assert.are.equal(1, state.currentPlayerIndex)
+            assert.are.equal(1, state.gameService.currentPlayerIndex) -- Fix: currentPlayerIndex is in gameService
             assert.is_not_nil(state.renderer)
             assert.is_nil(state.selectedHandIndex)
             assert.is_table(state.handCardBounds)
@@ -213,13 +243,17 @@ describe("PlayState Module", function()
              -- Check ownership by comparing captured players and cards
              local player1 = created_players_capture[1]
              local player2 = created_players_capture[2]
+             local reactor_p1 = created_cards_capture[1]
              local card_p1_h1 = created_cards_capture[2]
              local card_p1_h2 = created_cards_capture[3]
+             local reactor_p2 = created_cards_capture[4]
              local card_p2_h1 = created_cards_capture[5]
              local card_p2_h2 = created_cards_capture[6]
 
+             assert.are.same(player1, reactor_p1.owner, "Player 1 should own its reactor card")
              assert.are.same(player1, card_p1_h1.owner, "Player 1 should own its first hand card")
              assert.are.same(player1, card_p1_h2.owner, "Player 1 should own its second hand card")
+             assert.are.same(player2, reactor_p2.owner, "Player 2 should own its reactor card")
              assert.are.same(player2, card_p2_h1.owner, "Player 2 should own its first hand card")
              assert.are.same(player2, card_p2_h2.owner, "Player 2 should own its second hand card")
 
@@ -413,6 +447,8 @@ describe("PlayState Module", function()
     end)
 
     describe(":keypressed()", function()
+        local mockManager = {} -- Simple mock manager table
+
         it("should call love.event.quit() when escape is pressed", function()
             -- Arrange
             state:enter()
@@ -421,7 +457,7 @@ describe("PlayState Module", function()
             love.event.quit = function() quit_called = quit_called + 1 end
 
             -- Act
-            state:keypressed('escape')
+            state:keypressed(mockManager, 'escape') -- Pass mock manager
 
             -- Assert
             assert.are.equal(1, quit_called, "love.event.quit should be called once")
@@ -438,8 +474,8 @@ describe("PlayState Module", function()
             love.event.quit = function() quit_called = quit_called + 1 end
 
             -- Act
-            state:keypressed('a')
-            state:keypressed('space')
+            state:keypressed(mockManager, 'a') -- Pass mock manager
+            state:keypressed(mockManager, 'space') -- Pass mock manager
 
             -- Assert
             assert.are.equal(0, quit_called, "love.event.quit should not be called")
@@ -447,6 +483,214 @@ describe("PlayState Module", function()
             -- Restore
             love.event.quit = original_quit
         end)
+    end)
+
+    describe(":mousepressed()", function()
+        local mockX, mockY, mockButton = 10, 10, 1 -- Mock click coordinates & button
+        local mockManager = {} -- Simple mock manager table
+
+        before_each(function()
+            -- Enter state to initialize players, UI elements etc.
+            state:enter()
+            -- Reset selected index before each mouse test
+            state.selectedHandIndex = nil
+            state.buttonDiscard:setEnabled(false)
+            -- Mock hand card bounds for selection tests
+            state.handCardBounds = {
+                { index = 1, x = 100, y = 500, w = 50, h = 80 },
+                { index = 2, x = 160, y = 500, w = 50, h = 80 },
+            }
+            -- Ensure game service mocks don't interfere unless intended
+            mockGameService.attemptPlacement = function() return false, "Mock Placement" end
+            mockGameService.attemptActivation = function() return false, "Mock Activation" end
+        end)
+
+        it("should prioritize UI elements and do nothing else if UI handles click", function()
+            -- Arrange
+            local ui_handled = false
+            local original_handleMousePress = state.buttonEndTurn.handleMousePress
+            state.buttonEndTurn.handleMousePress = function() 
+                ui_handled = true
+                return true -- Simulate UI handled the click
+            end
+            local original_status = state.statusMessage
+
+            -- Act
+            state:mousepressed(mockManager, mockX, mockY, mockButton) -- Pass mock manager
+
+            -- Assert
+            assert.is_true(ui_handled, "UI element handleMousePress should be called")
+            assert.is_nil(state.selectedHandIndex, "selectedHandIndex should remain nil")
+            assert.are.equal(original_status, state.statusMessage, "statusMessage should not change")
+            -- Could also spy on gameService methods to ensure they weren't called
+
+            -- Restore
+            state.buttonEndTurn.handleMousePress = original_handleMousePress
+        end)
+
+        it("should select a hand card if clicked within its bounds", function()
+             -- Arrange
+            local clickX, clickY = 125, 540 -- Coordinates within bounds of card 1
+            local original_handleMousePress = state.buttonEndTurn.handleMousePress
+            state.buttonEndTurn.handleMousePress = function() return false end -- Ensure UI doesn't handle
+            local original_discard_handleMousePress = state.buttonDiscard.handleMousePress
+            state.buttonDiscard.handleMousePress = function() return false end
+            local setEnabled_calls = {}
+            state.buttonDiscard.setEnabled = function(btn_self, enabled) table.insert(setEnabled_calls, enabled); btn_self.enabled = enabled end
+
+             -- Act
+            state:mousepressed(mockManager, clickX, clickY, 1) -- Pass mock manager, Left click
+
+             -- Assert
+            assert.are.equal(1, state.selectedHandIndex, "Card 1 should be selected")
+            assert.matches("Selected card:", state.statusMessage, nil, true)
+            assert.are.equal(1, #setEnabled_calls, "Discard button setEnabled should be called")
+            assert.is_true(setEnabled_calls[1], "Discard button should be enabled")
+
+             -- Restore
+            state.buttonEndTurn.handleMousePress = original_handleMousePress
+            state.buttonDiscard.handleMousePress = original_discard_handleMousePress
+        end)
+
+        it("should deselect a hand card if clicked again", function()
+             -- Arrange
+            local clickX, clickY = 125, 540 -- Card 1 bounds
+            state.selectedHandIndex = 1 -- Pre-select card 1
+            state.buttonDiscard:setEnabled(true)
+            local original_handleMousePress = state.buttonEndTurn.handleMousePress
+            state.buttonEndTurn.handleMousePress = function() return false end
+            local original_discard_handleMousePress = state.buttonDiscard.handleMousePress
+            state.buttonDiscard.handleMousePress = function() return false end
+            local setEnabled_calls = {}
+            state.buttonDiscard.setEnabled = function(btn_self, enabled) table.insert(setEnabled_calls, enabled); btn_self.enabled = enabled end
+
+             -- Act
+            state:mousepressed(mockManager, clickX, clickY, 1) -- Pass mock manager, Left click on already selected card 1
+
+             -- Assert
+            assert.is_nil(state.selectedHandIndex, "Card should be deselected")
+            assert.matches("deselected", state.statusMessage, nil, true)
+            assert.are.equal(1, #setEnabled_calls, "Discard button setEnabled should be called")
+            assert.is_false(setEnabled_calls[1], "Discard button should be disabled")
+
+             -- Restore
+            state.buttonEndTurn.handleMousePress = original_handleMousePress
+            state.buttonDiscard.handleMousePress = original_discard_handleMousePress
+        end)
+
+        it("should select a different card if another card is clicked", function()
+             -- Arrange
+            local clickX, clickY = 180, 540 -- Card 2 bounds
+            state.selectedHandIndex = 1 -- Pre-select card 1
+            state.buttonDiscard:setEnabled(true)
+            local original_handleMousePress = state.buttonEndTurn.handleMousePress
+            state.buttonEndTurn.handleMousePress = function() return false end
+            local original_discard_handleMousePress = state.buttonDiscard.handleMousePress
+            state.buttonDiscard.handleMousePress = function() return false end
+            local setEnabled_calls = {}
+            state.buttonDiscard.setEnabled = function(btn_self, enabled) table.insert(setEnabled_calls, enabled); btn_self.enabled = enabled end
+
+             -- Act
+            state:mousepressed(mockManager, clickX, clickY, 1) -- Pass mock manager, Left click on card 2
+
+             -- Assert
+            assert.are.equal(2, state.selectedHandIndex, "Card 2 should be selected")
+            assert.matches("Selected card:", state.statusMessage, nil, true)
+            -- Should still be enabled, setEnabled might not be called again or called with true
+            assert.is_true(state.buttonDiscard.enabled, "Discard button should remain enabled")
+            if #setEnabled_calls > 0 then
+                assert.is_true(setEnabled_calls[#setEnabled_calls], "If setEnabled called, it should be true")
+            end
+
+             -- Restore
+            state.buttonEndTurn.handleMousePress = original_handleMousePress
+            state.buttonDiscard.handleMousePress = original_discard_handleMousePress
+        end)
+
+        it("should call attemptPlacement if clicking outside hand/UI with card selected", function()
+             -- Arrange
+            local clickX, clickY = 300, 300 -- Assume coordinates outside hand/UI
+            state.selectedHandIndex = 1
+            local original_handleMousePress = state.buttonEndTurn.handleMousePress
+            state.buttonEndTurn.handleMousePress = function() return false end
+            local original_discard_handleMousePress = state.buttonDiscard.handleMousePress
+            state.buttonDiscard.handleMousePress = function() return false end
+            -- Spy on gameService.attemptPlacement
+            local gs_placement_calls = 0
+            local gs_placement_args = {}
+            local original_gs_placement = mockGameService.attemptPlacement
+            mockGameService.attemptPlacement = function(gs_self, state_arg, index_arg, gx_arg, gy_arg)
+                gs_placement_calls = gs_placement_calls + 1
+                gs_placement_args = { state=state_arg, index=index_arg, gx=gx_arg, gy=gy_arg }
+                return false, "Mock Placement Called" -- Simulate failure to prevent resetSelection call
+            end
+            -- Mock renderer coord conversion
+            local original_s2w = mockRenderer.screenToWorldCoords
+            mockRenderer.screenToWorldCoords = function() return 300, 300 end
+            local original_w2g = mockRenderer.worldToGridCoords
+            mockRenderer.worldToGridCoords = function() return 3, 3 end
+
+             -- Act
+            state:mousepressed(mockManager, clickX, clickY, 1) -- Pass mock manager, Left click
+
+             -- Assert
+            assert.are.equal(1, gs_placement_calls, "gameService:attemptPlacement should be called")
+            assert.are.same(state, gs_placement_args.state)
+            assert.are.equal(1, gs_placement_args.index)
+            assert.are.equal(3, gs_placement_args.gx)
+            assert.are.equal(3, gs_placement_args.gy)
+            assert.are.equal("Mock Placement Called", state.statusMessage)
+
+             -- Restore
+            state.buttonEndTurn.handleMousePress = original_handleMousePress
+            state.buttonDiscard.handleMousePress = original_discard_handleMousePress
+            mockGameService.attemptPlacement = original_gs_placement
+            mockRenderer.screenToWorldCoords = original_s2w
+            mockRenderer.worldToGridCoords = original_w2g
+        end)
+
+        it("should call attemptActivation with right mouse button", function()
+             -- Arrange
+            local clickX, clickY = 300, 300
+            local original_handleMousePress = state.buttonEndTurn.handleMousePress
+            state.buttonEndTurn.handleMousePress = function() return false end
+            local original_discard_handleMousePress = state.buttonDiscard.handleMousePress
+            state.buttonDiscard.handleMousePress = function() return false end
+            -- Spy on gameService.attemptActivation
+            local gs_activation_calls = 0
+            local gs_activation_args = {}
+            local original_gs_activation = mockGameService.attemptActivation
+            mockGameService.attemptActivation = function(gs_self, state_arg, gx_arg, gy_arg)
+                gs_activation_calls = gs_activation_calls + 1
+                gs_activation_args = { state=state_arg, gx=gx_arg, gy=gy_arg }
+                return false, "Mock Activation Called"
+            end
+            -- Mock renderer coord conversion
+            local original_s2w = mockRenderer.screenToWorldCoords
+            mockRenderer.screenToWorldCoords = function() return 300, 300 end
+            local original_w2g = mockRenderer.worldToGridCoords
+            mockRenderer.worldToGridCoords = function() return 3, 3 end
+
+             -- Act
+            state:mousepressed(mockManager, clickX, clickY, 2) -- Pass mock manager, Right click
+
+             -- Assert
+            assert.are.equal(1, gs_activation_calls, "gameService:attemptActivation should be called")
+            assert.are.same(state, gs_activation_args.state)
+            assert.are.equal(3, gs_activation_args.gx)
+            assert.are.equal(3, gs_activation_args.gy)
+            assert.are.equal("Mock Activation Called", state.statusMessage)
+
+             -- Restore
+            state.buttonEndTurn.handleMousePress = original_handleMousePress
+            state.buttonDiscard.handleMousePress = original_discard_handleMousePress
+            mockGameService.attemptActivation = original_gs_activation
+            mockRenderer.screenToWorldCoords = original_s2w
+            mockRenderer.worldToGridCoords = original_w2g
+        end)
+
+        -- TODO: Test middle mouse button panning state toggle
+
     end)
 
     -- Add describe blocks for other methods like input handlers etc.

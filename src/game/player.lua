@@ -72,6 +72,16 @@ function Player:addCardToHand(cardInstance)
     print(string.format("%s added card '%s' (%s) to hand.", self.name, cardInstance.title, cardInstance.id))
 end
 
+-- Get the number of cards in the player's hand
+function Player:getHandSize()
+    return #self.hand
+end
+
+-- Get the player's current victory points
+function Player:getVictoryPoints()
+    return self.vp
+end
+
 -- TODO: Add methods for playing cards, drawing cards, managing network, VP, convergence links
 
 return Player

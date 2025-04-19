@@ -2,19 +2,186 @@
 -- Provides an interface for executing core game actions and logic.
 
 local Card = require('src.game.card') -- Needed for checking card type
+local Rules = require('src.game.rules') -- Rules system for validating game actions
+local Vector = require('src.utils.vector') -- Vector utilities for spatial operations
+local AudioManager = require('src.audio.audio_manager') -- Audio manager for sound effects
+local Reactor = require('src.game.reactor') -- Reactor card implementation
 
 local GameService = {}
 GameService.__index = GameService
 
 function GameService:new()
     local instance = setmetatable({}, GameService)
+    instance.rules = Rules:new() -- Initialize rules system
+    instance.audioManager = AudioManager:new() -- Initialize audio manager
+    instance.audioManager:loadDefaultAssets() -- Load default sounds and music
+    instance.players = {} -- Will be populated during game initialization
+    instance.currentPlayerIndex = 1
+    instance.deck = {} -- Main card deck
+    instance.paradigmDeck = {} -- Paradigm shift cards
+    instance.currentParadigm = nil -- Active paradigm
+    instance.gameOver = false -- Game end flag
+    
     print("Game Service Initialized.")
     return instance
 end
 
+-- Initialize game with players
+function GameService:initializeGame(playerCount)
+    -- Create player objects
+    for i = 1, playerCount do
+        -- Create the player
+        local player = require('src.game.player'):new({
+            id = i,
+            name = "Player " .. i
+        })
+        
+        -- Set starting resources
+        player:addResource('energy', 5)  -- Starting energy
+        player:addResource('data', 5)    -- Starting data
+        player:addResource('material', 5) -- Starting material
+        
+        -- Create reactor card first
+        local CardDefinitions = require('src.game.data.card_definitions')
+        local reactorData = CardDefinitions["REACTOR_BASE"]
+        if not reactorData then
+            error("REACTOR_BASE definition not found!")
+        end
+        player.reactorCard = require('src.game.card'):new(reactorData)
+        player.reactorCard.owner = player
+        
+        -- Create network and initialize it with the reactor
+        local Network = require('src.game.network')
+        player.network = Network:new(player)
+        if not player.network then
+            error("Failed to create network for player " .. player.name)
+        end
+        player.network:initializeWithReactor(player.reactorCard)
+        
+        -- Add starting hand cards (seed cards)
+        local STARTING_HAND_CARD_IDS = { "NODE_TECH_001", "NODE_CULT_001" }
+        print(string.format("Adding starting hand for %s:", player.name))
+        for _, cardId in ipairs(STARTING_HAND_CARD_IDS) do
+            local cardData = CardDefinitions[cardId]
+            if cardData then
+                local cardInstance = require('src.game.card'):new(cardData)
+                cardInstance.owner = player
+                player:addCardToHand(cardInstance)
+                print(string.format("  Added %s to hand", cardInstance.title))
+            else
+                print(string.format("Warning: Seed card definition not found for ID: %s", cardId))
+            end
+        end
+        
+        -- Add to players list
+        table.insert(self.players, player)
+        print(string.format("Initialized Player %d with reactor and %d seed cards", i, #STARTING_HAND_CARD_IDS))
+    end
+    
+    -- Initialize decks (this would load from card definitions)
+    self:initializeDecks()
+    
+    -- Deal initial hands to players
+    self:dealInitialHands()
+    
+    -- Set the first player
+    self.currentPlayerIndex = 1
+    
+    -- Draw initial paradigm
+    self:drawInitialParadigm()
+    
+    print(string.format("Game initialized with %d players.", playerCount))
+    
+    -- Play menu music
+    self.audioManager:playMusic("menu")
+    
+    return true
+end
+
+-- Initialize card decks
+function GameService:initializeDecks()
+    print("[DEBUG] Starting deck initialization...")
+    -- Create a test deck with some basic cards
+    self.deck = {}
+    
+    -- Get the card definitions
+    local CardDefinitions = require('src.game.data.card_definitions')
+    
+    -- Add all non-reactor cards from definitions to the deck
+    -- We'll add multiple copies of each card
+    for cardId, cardData in pairs(CardDefinitions) do
+        if cardData.type ~= Card.Type.REACTOR then  -- Skip reactor cards
+            -- Add 3 copies of each card to ensure enough cards
+            for i = 1, 3 do
+                local card = Card:new(cardData)
+                table.insert(self.deck, card)
+                print(string.format("[DEBUG] Added card to deck: %s (ID: %s)", card.title, card.id))
+            end
+        end
+    end
+    
+    print(string.format("[DEBUG] Finished initializing deck with %d cards", #self.deck))
+end
+
+-- Deal initial hands to all players
+function GameService:dealInitialHands()
+    for _, player in ipairs(self.players) do
+        -- Draw up to minimum hand size
+        while player:getHandSize() < Rules.MIN_HAND_SIZE do
+            local card = self:drawCard()
+            if card then
+                player:addCardToHand(card)
+            else
+                break -- No more cards
+            end
+        end
+    end
+end
+
+-- Draw a card from the main deck
+function GameService:drawCard()
+    print(string.format("[DEBUG] Attempting to draw card. Current deck size: %d", #self.deck))
+    if #self.deck == 0 then
+        print("[DEBUG] Cannot draw: Deck is empty")
+        return nil -- Deck is empty
+    end
+    
+    local card = table.remove(self.deck, 1) -- Draw from top
+    print(string.format("[DEBUG] Drew card: %s (ID: %s). Remaining deck size: %d", card.title, card.id, #self.deck))
+    
+    -- Play sound effect
+    self.audioManager:playSound("card_draw")
+    
+    return card
+end
+
+-- Draw initial paradigm
+function GameService:drawInitialParadigm()
+    -- This would draw from a special "Genesis Paradigm" subset
+    -- For now, just a placeholder
+    print("Drawing initial paradigm...")
+end
+
+-- Check if the deck is empty (for game end condition)
+function GameService:isDeckEmpty()
+    local isEmpty = #self.deck == 0
+    print(string.format("[DEBUG] Checking if deck is empty. Deck size: %d, isEmpty: %s", #self.deck, tostring(isEmpty)))
+    return isEmpty
+end
+
+-- Get all players
+function GameService:getPlayers()
+    return self.players
+end
+
+-- Get the current player
+function GameService:getCurrentPlayer()
+    return self.players[self.currentPlayerIndex]
+end
+
 -- Attempt Placement
 function GameService:attemptPlacement(state, cardIndex, gridX, gridY)
-    local currentPlayer = state.players[state.currentPlayerIndex]
+    local currentPlayer = self.players[self.currentPlayerIndex]
     local selectedCard = currentPlayer.hand[cardIndex]
 
     if not selectedCard then
@@ -23,7 +190,8 @@ function GameService:attemptPlacement(state, cardIndex, gridX, gridY)
 
     print(string.format("[Service] Attempting placement of '%s' at (%d,%d)", selectedCard.title, gridX, gridY))
 
-    local isValid, reason = currentPlayer.network:isValidPlacement(selectedCard, gridX, gridY)
+    -- Use the rules system to validate placement
+    local isValid, reason = self.rules:isPlacementValid(selectedCard, currentPlayer.network, gridX, gridY)
 
     if isValid then
         local costM = selectedCard.buildCost.material
@@ -37,6 +205,10 @@ function GameService:attemptPlacement(state, cardIndex, gridX, gridY)
             currentPlayer:spendResource('data', costD)
             currentPlayer.network:placeCard(selectedCard, gridX, gridY)
             table.remove(currentPlayer.hand, cardIndex)
+            
+            -- Play card placement sound
+            self.audioManager:playSound("card_place")
+            
             -- Success! PlayState will handle resetting selection.
             return true, string.format("Placed '%s' at (%d,%d).", selectedCard.title, gridX, gridY)
         else
@@ -55,7 +227,7 @@ end
 
 -- Attempt Activation
 function GameService:attemptActivation(state, targetGridX, targetGridY)
-    local currentPlayer = state.players[state.currentPlayerIndex]
+    local currentPlayer = self.players[self.currentPlayerIndex]
     local targetCard = currentPlayer.network:getCardAt(targetGridX, targetGridY)
 
     if not targetCard then
@@ -68,9 +240,17 @@ function GameService:attemptActivation(state, targetGridX, targetGridY)
 
     print(string.format("[Service] Attempting activation targeting %s (%s) at (%d,%d)", targetCard.title, targetCard.id, targetGridX, targetGridY))
 
-    local path = currentPlayer.network:findPathToReactor(targetCard)
-
-    if path then
+    -- Find the reactor to trace path back from target
+    local reactor = currentPlayer.network:findReactor()
+    if not reactor then
+        return false, "Error: Reactor not found in network."
+    end
+    
+    -- Use rules system to validate activation path
+    local isValid, path, reason = self.rules:isActivationPathValid(
+        currentPlayer.network, reactor.id, targetCard.id)
+        
+    if isValid and path then
         local pathLength = #path
         local energyCost = pathLength
         print(string.format("  Path found! Length: %d, Cost: %d Energy.", pathLength, energyCost))
@@ -79,12 +259,16 @@ function GameService:attemptActivation(state, targetGridX, targetGridY)
              print("  Activation affordable.")
              currentPlayer:spendResource('energy', energyCost)
 
+             -- Play activation sound
+             self.audioManager:playSound("activation")
+
              -- Execute effects BACKWARDS along path (GDD 4.5)
              local activationMessages = {}
              table.insert(activationMessages, string.format("Activated path (Cost %d E):", energyCost))
              for i = 1, pathLength do -- Iterate from target (index 1) back towards reactor
-                local cardToActivate = path[i]
-                if cardToActivate.actionEffect then
+                local cardId = path[i]
+                local cardToActivate = currentPlayer.network:getCardById(cardId)
+                if cardToActivate and cardToActivate.actionEffect then
                     -- NOTE: actionEffect might return a status string in the future
                     cardToActivate:actionEffect(currentPlayer, currentPlayer.network)
                     table.insert(activationMessages, string.format("  - %s activated!", cardToActivate.title))
@@ -98,19 +282,23 @@ function GameService:attemptActivation(state, targetGridX, targetGridY)
         end
     else
         print("  Activation failed: No path found.")
-        return false, string.format("No valid activation path found to %s (%d,%d).", targetCard.title, targetGridX, targetGridY)
+        return false, string.format("No valid activation path: %s", reason or "Unknown reason")
     end
 end
 
 -- Discard Card
 function GameService:discardCard(state, cardIndex)
-    local currentPlayer = state.players[state.currentPlayerIndex]
+    local currentPlayer = self.players[self.currentPlayerIndex]
     local cardToRemove = currentPlayer.hand[cardIndex]
 
     if cardToRemove then
         print(string.format("[Service] Discarding '%s' for 1 Material.", cardToRemove.title))
         currentPlayer:addResource('material', 1)
         table.remove(currentPlayer.hand, cardIndex)
+        
+        -- Play discard sound
+        self.audioManager:playSound("card_draw") -- Reuse the draw sound for now
+        
         -- Success! PlayState handles resetting selection.
         return true, string.format("Discarded '%s' for 1 Material.", cardToRemove.title)
     else
@@ -120,13 +308,59 @@ end
 
 -- End Turn
 function GameService:endTurn(state)
-    local oldPlayerIndex = state.currentPlayerIndex
-    state.currentPlayerIndex = (state.currentPlayerIndex % #state.players) + 1
-    -- Note: PlayState will handle resetting selection via helper function
-    local nextPlayer = state.players[state.currentPlayerIndex]
-    print(string.format("[Service] Turn ended for Player %d. Starting turn for Player %d (%s).", oldPlayerIndex, state.currentPlayerIndex, nextPlayer.name))
-    -- TODO: Cleanup Phase logic (draw cards) would go here
-    return true, string.format("Player %d's turn.", state.currentPlayerIndex)
+    if not state or not state.players then
+        return false, "Invalid state provided"
+    end
+
+    local currentPlayer = self.players[self.currentPlayerIndex]
+    if not currentPlayer then
+        return false, "No current player found"
+    end
+    
+    -- Check for game end condition
+    if self.rules:isGameEndTriggered(self) then
+        self.gameOver = true
+        local scores = self.rules:calculateFinalScores(self)
+        print("Game over triggered! Final scores:")
+        for playerId, score in pairs(scores) do
+            print(string.format("  Player %d: %d points", playerId, score))
+        end
+        return true, "GAME_OVER"
+    end
+    
+    -- Store current index before advancing
+    local oldIndex = self.currentPlayerIndex
+    
+    -- Cleanup phase: Draw cards if hand is below minimum
+    if self.rules:shouldDrawCard(currentPlayer) then
+        local card = self:drawCard()
+        if card then
+            currentPlayer:addCardToHand(card)
+            print(string.format("  Player %d drew 1 card (Cleanup Phase).", oldIndex))
+        end
+    end
+    
+    -- Advance to next player (using modulo to wrap around)
+    self.currentPlayerIndex = (oldIndex % #self.players) + 1
+    -- Keep state in sync for backward compatibility
+    if state then
+        state.currentPlayerIndex = self.currentPlayerIndex
+    end
+    
+    print(string.format("[Service] Turn ended for Player %d. Starting turn for Player %d.", 
+        oldIndex, self.currentPlayerIndex))
+    
+    return true, string.format("Player %d's turn.", self.currentPlayerIndex)
+end
+
+-- Clean up resources during game shutdown
+function GameService:cleanup()
+    -- Clean up audio resources
+    if self.audioManager then
+        self.audioManager:cleanup()
+    end
+    
+    print("Game Service cleaned up.")
 end
 
 return GameService 

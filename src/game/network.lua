@@ -14,15 +14,30 @@ function Network:new(ownerPlayer)
     instance.grid = {} -- Stores card instances by position: grid[y][x] = cardInstance
     instance.cards = {} -- Stores all cards currently in the network { [card.id] = cardInstance } for quick lookup
 
-    -- Place the owner's reactor at the conceptual center (e.g., 0,0)
-    if ownerPlayer.reactorCard then
-        instance:placeCard(ownerPlayer.reactorCard, 0, 0)
-    else
-        error("Cannot initialize Network: Owner player does not have a reactorCard.")
-    end
-
-    print(string.format("Initialized Network for %s with Reactor at (0,0)", ownerPlayer.name))
+    print(string.format("Initialized Network for %s", ownerPlayer.name))
     return instance
+end
+
+-- Initialize the network with a reactor at the origin
+function Network:initializeWithReactor(reactorCard)
+    if not reactorCard then
+        error("Cannot initialize Network: No reactor card provided.")
+    end
+    
+    if reactorCard.type ~= require('src.game.card').Type.REACTOR then
+        error(string.format("Cannot initialize Network: Card %s is not a reactor", reactorCard.title))
+    end
+    
+    if self:getCardAt(0, 0) then
+        error("Cannot initialize Network: Origin (0,0) is already occupied.")
+    end
+    
+    print(string.format("[Network] Placing reactor '%s' at (0,0) for %s", reactorCard.title, self.owner.name))
+    local success = self:placeCard(reactorCard, 0, 0)
+    if not success then
+        error("Failed to place reactor card at origin")
+    end
+    print(string.format("[Network] Successfully initialized network with reactor for %s", self.owner.name))
 end
 
 -- Place a card instance onto the network grid at specified coordinates
@@ -99,12 +114,12 @@ end
 function Network:isValidPlacement(cardToPlace, x, y)
     -- 1. Check if target location is already occupied
     if self:getCardAt(x, y) then
-        return false, string.format("Target location (%d,%d) is occupied.", x, y)
+        return false, string.format("Position already occupied")
     end
 
     -- 2. Check Uniqueness Rule (GDD 4.3)
     if self.cards[cardToPlace.id] then
-        return false, string.format("Card '%s' (%s) already exists in the network.", cardToPlace.title, cardToPlace.id)
+        return false, string.format("Card already exists in network")
     end
 
     -- 3. Check Connectivity Rule (GDD 4.3): Must be adjacent to at least one existing card
@@ -118,7 +133,7 @@ function Network:isValidPlacement(cardToPlace, x, y)
     end
 
     if #adjacentCards == 0 then
-        return false, string.format("Placement at (%d,%d) is not adjacent to any existing card.", x, y)
+        return false, string.format("Must be adjacent to at least one card")
     end
 
     -- 4. Check Connection Point Matching Rule (GDD 4.3 - Simplified)
@@ -182,7 +197,7 @@ function Network:isValidPlacement(cardToPlace, x, y)
     ::found_connection::
 
     if not connectionRequirementMet then
-        return false, string.format("No valid connection found for placement at (%d,%d). Requires an open Input on this card matching an open Output on an adjacent card (Reactor provides universal Output).", x, y)
+        return false, string.format("No valid connection found")
     end
 
     -- All checks passed
@@ -289,6 +304,30 @@ function Network:findPathToReactor(targetCard)
 
     print("No valid path found to Reactor.")
     return nil -- No path found
+end
+
+-- Find the player's Reactor card in the network
+-- Returns: The reactor Card instance or nil if none found
+function Network:findReactor()
+    for id, card in pairs(self.cards) do
+        if card.type == Card.Type.REACTOR then
+            return card
+        end
+    end
+    return nil
+end
+
+-- Check if a card with the given ID exists in the network
+-- Returns: boolean indicating if the card exists
+function Network:hasCardWithId(cardId)
+    return self.cards[cardId] ~= nil
+end
+
+-- Check if the network is empty (has no cards)
+-- Returns: boolean indicating if the network is empty
+function Network:isEmpty()
+    -- Use next() to check if the cards table has any entries
+    return next(self.cards) == nil
 end
 
 -- TODO: Implement network iteration/visualization helpers

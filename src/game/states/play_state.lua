@@ -19,22 +19,19 @@ local STARTING_MATERIAL = 5 -- Placeholder - GDD 4.1 value TBD
 local STARTING_HAND_CARD_IDS = { "NODE_TECH_001", "NODE_CULT_001" } -- Placeholder - GDD 4.1 Seed Cards TBD
 local KEYBOARD_PAN_SPEED = 400 -- Base pixels per second at zoom 1.0
 
-function PlayState:new()
+function PlayState:new(gameService)
     local instance = setmetatable({}, { __index = PlayState })
-    instance:init()
+    instance:init(gameService)
     return instance
 end
 
-function PlayState:init()
+function PlayState:init(gameService)
     -- Initialize state variables
     self.players = {}
-    self.currentPlayerIndex = 1 -- Start with player 1
     self.renderer = Renderer:new() -- Create renderer instance
     self.selectedHandIndex = nil -- Track selected card in hand
     self.handCardBounds = {} -- Store bounding boxes returned by renderer
     self.statusMessage = "" -- For displaying feedback
-    -- Potentially store loaded definitions if needed elsewhere
-    -- self.cardDefs = CardDefinitions
 
     -- Camera State
     self.cameraX = -love.graphics.getWidth() / 2 -- Center initial view roughly
@@ -50,8 +47,8 @@ function PlayState:init()
     self.hoverGridX = nil
     self.hoverGridY = nil
 
-    -- Initialize Game Service (passing self)
-    self.gameService = GameService:new()
+    -- Initialize Game Service (either use injected or create new)
+    self.gameService = gameService or GameService:new()
 
     -- Create UI buttons (pass self for context in callbacks)
     local screenW = love.graphics.getWidth()
@@ -67,50 +64,15 @@ end
 
 function PlayState:enter()
     print("Entering Play State - Initializing Game...")
-    self:init() -- Reset state variables and create renderer
-
-    -- 1. Create Players
-    for i = 1, NUM_PLAYERS do
-        local player = Player:new(i, "Player " .. i)
-        table.insert(self.players, player)
-
-        -- 2. Set Starting Resources
-        player:addResource('energy', STARTING_ENERGY)
-        player:addResource('data', STARTING_DATA)
-        player:addResource('material', STARTING_MATERIAL)
-
-        -- 3. Create Reactor Card (before creating network)
-        local reactorData = CardDefinitions["REACTOR_BASE"]
-        if reactorData then
-            player.reactorCard = Card:new(reactorData)
-            player.reactorCard.owner = player -- Assign ownership early
-        else
-            error("REACTOR_BASE definition not found!")
-        end
-
-        -- 4. Create Network (which automatically places the reactor)
-        player.network = Network:new(player) -- Create network, passing the player
-        if not player.network then
-            error("Failed to create network for player " .. player.name)
-        end
-
-        -- 5. Create and Add Starting Hand Cards (Seed Cards)
-        print(string.format("Adding starting hand for %s:", player.name))
-        for _, cardId in ipairs(STARTING_HAND_CARD_IDS) do
-            local cardData = CardDefinitions[cardId]
-            if cardData then
-                local cardInstance = Card:new(cardData)
-                player:addCardToHand(cardInstance)
-            else
-                print(string.format("Warning: Seed card definition not found for ID: %s", cardId))
-            end
-        end
-        print("---")
-
-    end
-
+    
+    -- Initialize the game service first
+    self.gameService:initializeGame(NUM_PLAYERS)
+    
+    -- Sync our state with GameService
+    self.players = self.gameService:getPlayers()
+    
     -- Set initial status message
-    self.statusMessage = string.format("Player %d's turn.", self.currentPlayerIndex)
+    self.statusMessage = string.format("Player %d's turn.", self.gameService.currentPlayerIndex)
     print("Play State Initialization Complete.")
 end
 
@@ -118,7 +80,7 @@ end
 function PlayState:endTurn()
     local success, message = self.gameService:endTurn(self)
     if success then
-        -- Service already advanced player index, reset local state
+        -- Reset local state
         self:resetSelectionAndStatus(message)
     else
         -- Should not fail currently, but handle if it could
@@ -147,7 +109,7 @@ function PlayState:resetSelectionAndStatus(newStatus)
     self.statusMessage = newStatus or ""
 end
 
-function PlayState:update(dt)
+function PlayState:update(stateManager, dt)
     -- Update UI elements (buttons)
     local mx, my = love.mouse.getPosition()
     local mouseDown = love.mouse.isDown(1)
@@ -173,11 +135,11 @@ function PlayState:update(dt)
     end
 end
 
-function PlayState:draw()
+function PlayState:draw(stateManager)
     love.graphics.clear(0.3, 0.3, 0.3, 1)
     if not self.players or #self.players == 0 or not self.renderer then return end
 
-    local currentPlayer = self.players[self.currentPlayerIndex]
+    local currentPlayer = self.players[self.gameService.currentPlayerIndex]
     local screenW = love.graphics.getWidth()
     local screenH = love.graphics.getHeight()
 
@@ -205,7 +167,7 @@ function PlayState:draw()
 
     -- Draw turn indicator & Quit message
     love.graphics.setColor(1,1,1,1)
-    love.graphics.print(string.format("Current Turn: Player %d (%s)", self.currentPlayerIndex, currentPlayer.name), 10, 10)
+    love.graphics.print(string.format("Current Turn: Player %d (%s)", self.gameService.currentPlayerIndex, currentPlayer.name), 10, 10)
     love.graphics.print("MMB Drag / WASD: Pan | Wheel: Zoom", screenW / 2 - 100, screenH - 20)
     love.graphics.print("Press Esc to Quit", 10, screenH - 20)
 end
@@ -215,7 +177,7 @@ local function isPointInRect(px, py, rect)
     return px >= rect.x and px < rect.x + rect.w and py >= rect.y and py < rect.y + rect.h
 end
 
-function PlayState:mousepressed(x, y, button, istouch, presses)
+function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
     -- Store last mouse position for panning
     self.lastMouseX = x
     self.lastMouseY = y
@@ -227,7 +189,7 @@ function PlayState:mousepressed(x, y, button, istouch, presses)
         end
     end
 
-    local currentPlayer = self.players[self.currentPlayerIndex]
+    local currentPlayer = self.players[self.gameService.currentPlayerIndex]
 
     if button == 1 then -- Left mouse button
         -- 2. Check Hand Cards
@@ -283,14 +245,14 @@ function PlayState:mousepressed(x, y, button, istouch, presses)
     end
 end
 
-function PlayState:mousereleased(x, y, button, istouch)
+function PlayState:mousereleased(stateManager, x, y, button, istouch)
     if button == 3 then -- Middle mouse button: Stop panning
         self.isPanning = false
         love.mouse.setRelativeMode(false) -- Show cursor again
     end
 end
 
-function PlayState:mousemoved(x, y, dx, dy, istouch)
+function PlayState:mousemoved(stateManager, x, y, dx, dy, istouch)
     -- Update hover grid coordinates
     local worldX, worldY = self.renderer:screenToWorldCoords(x, y, self.cameraX, self.cameraY, self.cameraZoom)
     self.hoverGridX, self.hoverGridY = self.renderer:worldToGridCoords(worldX, worldY)
@@ -303,7 +265,7 @@ function PlayState:mousemoved(x, y, dx, dy, istouch)
     self.lastMouseY = y
 end
 
-function PlayState:wheelmoved(x, y)
+function PlayState:wheelmoved(stateManager, x, y)
     -- Zoom in/out based on scroll direction (y > 0 is scroll up/zoom in)
     local zoomFactor = 1.1
     local oldZoom = self.cameraZoom
@@ -329,7 +291,7 @@ function PlayState:wheelmoved(x, y)
     print(string.format("Zoom changed to: %.2f", self.cameraZoom))
 end
 
-function PlayState:keypressed(key)
+function PlayState:keypressed(stateManager, key)
     if key == "escape" then
         love.event.quit()
     end

@@ -1,0 +1,91 @@
+-- src/main.lua
+-- Main application entry point for NEXUS: The Convergence
+
+-- Setup package path for requiring local modules easily
+-- Assumes main.lua is in src/, adds parent dir (project root) to path
+package.path = package.path .. ';../?.lua'
+
+local StateManager = require 'src.core.state_manager'
+local MenuState = require 'src.game.states.menu_state' -- Assuming this exists
+local PlayState = require 'src.game.states.play_state'
+
+-- Global variable to hold the state manager
+local stateManager = nil -- Back to local
+
+function love.load()
+    print("love.load() - Initializing Game Manager")
+    stateManager = StateManager:new() -- Assign to local
+
+    -- Register game states
+    -- We need to create instances of the state tables
+    local menuStateInstance = setmetatable({}, { __index = MenuState })
+    local playStateInstance = PlayState:new() -- Use the constructor we added
+
+    stateManager:registerState('menu', menuStateInstance)
+    stateManager:registerState('play', playStateInstance)
+
+    -- Set the initial state
+    stateManager:changeState('menu') -- Start with the menu (assuming)
+
+    love.window.setTitle("NEXUS: The Convergence - Main Menu") -- Initial title
+    print("State Manager initialized.")
+end
+
+function love.update(dt)
+    if stateManager then
+        stateManager:update(dt)
+    end
+end
+
+function love.draw()
+    if stateManager then
+        stateManager:draw()
+    end
+end
+
+function love.keypressed(key, scancode, isrepeat)
+    if stateManager then
+        stateManager:keypressed(key, scancode, isrepeat)
+    end
+end
+
+function love.mousepressed(x, y, button, istouch, presses)
+    if stateManager then
+        stateManager:mousepressed(x, y, button, istouch, presses)
+    end
+end
+
+function love.mousereleased(x, y, button, istouch)
+     if stateManager then
+        stateManager:mousereleased(x, y, button, istouch)
+    end
+end
+
+function love.mousemoved(x, y, dx, dy, istouch)
+     if stateManager then
+        stateManager:mousemoved(x, y, dx, dy, istouch)
+    end
+end
+
+function love.wheelmoved(x, y)
+     if stateManager then
+        stateManager:wheelmoved(x, y)
+    end
+end
+
+-- Handle window resizing if needed
+function love.resize(w, h)
+    if stateManager and stateManager:respondsTo("resize") then
+        stateManager:resize(w, h)
+    end
+end
+
+-- Handle game exit
+function love.quit()
+    print("Shutting down NEXUS...")
+    if stateManager and stateManager:respondsTo("quit") then
+        stateManager:quit()
+    end
+    -- Perform any other cleanup here if necessary
+    print("Goodbye!")
+end 

@@ -29,8 +29,9 @@ describe("Network Module", function()
         player.reactorCard = reactorCard -- Assign reactor BEFORE creating network
         reactorCard.owner = player -- Set owner here, before Network:new uses the card
 
-        -- Create Network (implicitly places reactor at 0,0)
+        -- Create Network and initialize with reactor
         network = Network:new(player)
+        network:initializeWithReactor(reactorCard)
 
         -- Define Test Node Cards
         cardTechInputOnly = Card:new({ id = "NODE_T_IN", type = Card.Type.TECHNOLOGY, title = "Tech In",
@@ -54,31 +55,37 @@ describe("Network Module", function()
     end)
 
     describe("Network:new()", function()
-        it("should place the owner's reactor card at (0,0)", function()
-            local cardAtOrigin = network:getCardAt(0, 0)
+        it("should create an empty network", function()
+            local freshNetwork = Network:new(player)
+            assert.is_true(freshNetwork:isEmpty())
+        end)
+        
+        it("should initialize with reactor when initializeWithReactor is called", function()
+            local freshNetwork = Network:new(player)
+            freshNetwork:initializeWithReactor(reactorCard)
+            local cardAtOrigin = freshNetwork:getCardAt(0, 0)
             assert.is_not_nil(cardAtOrigin)
             assert.are.same(reactorCard, cardAtOrigin)
-            assert.are.same(network, cardAtOrigin.network)
+            assert.are.same(freshNetwork, cardAtOrigin.network)
             assert.is_table(cardAtOrigin.position)
             assert.are.equal(0, cardAtOrigin.position.x)
             assert.are.equal(0, cardAtOrigin.position.y)
-            assert.are.same(reactorCard, network.cards[reactorCard.id])
+            assert.are.same(reactorCard, freshNetwork.cards[reactorCard.id])
         end)
     end)
 
     describe("Network:isValidPlacement()", function()
-
         -- === Basic Rule Checks ===
         it("should return false for occupied location", function()
             local isValid, reason = network:isValidPlacement(cardTechInputOnly, 0, 0) -- Try placing on Reactor
             assert.is_false(isValid)
-            assert.matches("occupied", reason, nil, true) -- Case insensitive match
+            assert.matches("Position already occupied", reason, nil, true) -- Case insensitive match
         end)
 
         it("should return false for non-adjacent location", function()
             local isValid, reason = network:isValidPlacement(cardTechInputOnly, 2, 0) -- Not adjacent to (0,0)
             assert.is_false(isValid)
-            assert.matches("not adjacent", reason, nil, true)
+            assert.matches("Must be adjacent to at least one card", reason, nil, true)
         end)
 
         it("should return false if card ID already exists in network (Uniqueness)", function()
@@ -87,7 +94,7 @@ describe("Network Module", function()
             duplicateCard.owner = player -- Set owner before placement check
             local isValid, reason = network:isValidPlacement(duplicateCard, 1, 0) -- Try placing duplicate
             assert.is_false(isValid)
-            assert.matches("already exists", reason, nil, true)
+            assert.matches("already exists in network", reason, nil, true)
         end)
 
         -- === Connection Rule Checks (Adjacent to Reactor) ===
@@ -100,19 +107,13 @@ describe("Network Module", function()
         end)
 
         it("should be valid adjacent to Reactor if card has matching Input (Res In vs Reactor Right-Bot Output)", function()
-            -- Place ResInput card left of Reactor (-1,0).
-            -- Needs Input on its Right edge. Right-Bottom slot (8) is Res Input (Incorrect in card def! fixing).
-            local cardResourceInputOnly_local = Card:new({ id = "NODE_R_IN", type = Card.Type.RESOURCE, title = "Res In",
-                openSlots = { [Card.Slots.RIGHT_BOTTOM] = true } -- *Correct* Res Input slot is Rgt-Bot (8)
-            }) -- GDD Error? Left-Bot(6) is Res In. Okay let's test Left-Bot(6)
-            cardResourceInputOnly_local.owner = player -- Set owner
-            cardResourceInputOnly_local = Card:new({ id = "NODE_R_IN", type = Card.Type.RESOURCE, title = "Res In",
-                 openSlots = { [Card.Slots.LEFT_BOTTOM] = true } -- Left-Bottom(6) is Res Input
-             })
-            cardResourceInputOnly_local.owner = player -- Set owner again for the re-assigned variable
-            -- Place it Right of Reactor (1, 0)
-            -- Needs Input on its Left edge. Left-Bottom(6) is Res Input.
+            -- Place ResInput card right of Reactor (1,0).
+            -- Needs Input on its Left edge. Left-Bottom slot (6) is Res Input.
             -- Reactor's corresponding Right-Bottom slot (8) is Res Output & is open.
+            local cardResourceInputOnly_local = Card:new({ id = "NODE_R_IN", type = Card.Type.RESOURCE, title = "Res In",
+                openSlots = { [Card.Slots.LEFT_BOTTOM] = true } -- Left-Bottom(6) is Res Input
+            })
+            cardResourceInputOnly_local.owner = player -- Set owner
             local isValid, reason = network:isValidPlacement(cardResourceInputOnly_local, 1, 0)
             assert.is_true(isValid, reason)
         end)
@@ -122,7 +123,7 @@ describe("Network Module", function()
             -- Needs Input on its Top edge (Slots 1, 2). Card only has Cult Output (Slot 1 open).
             local isValid, reason = network:isValidPlacement(cardCultOutputOnly, 0, 1)
             assert.is_false(isValid)
-            assert.matches("No valid connection", reason, nil, true)
+            assert.matches("No valid connection found", reason, nil, true)
         end)
 
         -- === Connection Rule Checks (Adjacent to Node) ===
@@ -164,7 +165,7 @@ describe("Network Module", function()
             card_B_CultIn.owner = player -- Set owner
             local isValid, reason = network:isValidPlacement(card_B_CultIn, 0, 2)
             assert.is_false(isValid)
-            assert.matches("No valid connection", reason, nil, true)
+            assert.matches("No valid connection found", reason, nil, true)
         end)
 
         it("should be invalid adjacent to Node if required Input slot on new card is closed", function()
@@ -178,7 +179,7 @@ describe("Network Module", function()
             card_B_TechIn_Closed.owner = player -- Set owner
             local isValid, reason = network:isValidPlacement(card_B_TechIn_Closed, 0, 2)
             assert.is_false(isValid)
-            assert.matches("No valid connection", reason, nil, true)
+            assert.matches("No valid connection found", reason, nil, true)
         end)
 
         it("should be invalid adjacent to Node if matching Output slot on adjacent card is closed", function()
@@ -192,9 +193,8 @@ describe("Network Module", function()
             card_B_TechIn.owner = player -- Set owner
             local isValid, reason = network:isValidPlacement(card_B_TechIn, 0, 2)
             assert.is_false(isValid)
-            assert.matches("No valid connection", reason, nil, true)
+            assert.matches("No valid connection found", reason, nil, true)
         end)
-
     end)
 
     describe("Network:findPathToReactor()", function()
