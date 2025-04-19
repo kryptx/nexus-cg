@@ -16,6 +16,7 @@ definitions["REACTOR_BASE"] = {
     actionEffect = function() print("Reactor has no action.") end,
     convergenceEffect = function() print("Reactor has no convergence effect.") end,
     vpValue = 0,
+    imagePath = "assets/images/reactor-core.png",
     -- GDD 4.1: Reactor has all 8 slots open initially
     openSlots = {
         [CardSlots.TOP_LEFT] = true, [CardSlots.TOP_RIGHT] = true,
@@ -38,6 +39,7 @@ definitions["NODE_TECH_001"] = {
     actionEffect = function(player, network) print("Basic Processing Unit: +1 Data (Action).") end, -- Placeholder logic
     convergenceEffect = function(player, network) print("Basic Processing Unit: Opponent gets +1 Data (Convergence).") end, -- Placeholder logic
     vpValue = 0,
+    imagePath = "assets/images/basic-processing-unit.png",
     -- Example: Tech Output (Bottom Right), Tech Input (Top Right)
     openSlots = {
         [CardSlots.BOTTOM_RIGHT] = true, -- Tech Output
@@ -56,6 +58,7 @@ definitions["NODE_CULT_001"] = {
     actionEffect = function(player, network) print("Community Forum: Draw 1 card (Action).") end, -- Placeholder
     convergenceEffect = function(player, network) print("Community Forum: Opponent draws 1 card (Convergence).") end, -- Placeholder
     vpValue = 1,
+    imagePath = "assets/images/community-forum.png",
     -- Example: Culture Output (Top Left), Culture Input (Bottom Left)
     openSlots = {
         [CardSlots.TOP_LEFT] = true,    -- Culture Output

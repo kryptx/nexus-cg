@@ -1,9 +1,11 @@
 -- src/main.lua
 -- Main application entry point for NEXUS: The Convergence
 
+--[[ No longer needed when running from project root via bootstrap main.lua
 -- Setup package path for requiring local modules easily
 -- Assumes main.lua is in src/, adds parent dir (project root) to path
 package.path = package.path .. ';../?.lua'
+]]--
 
 local StateManager = require 'src.core.state_manager'
 local MenuState = require 'src.game.states.menu_state' -- Assuming this exists
@@ -14,6 +16,10 @@ local stateManager = nil -- Back to local
 
 function love.load()
     print("love.load() - Initializing Game Manager")
+
+    -- Improve font scaling sharpness
+    love.graphics.setDefaultFilter("nearest", "nearest", 1)
+
     stateManager = StateManager:new() -- Assign to local
 
     -- Register game states

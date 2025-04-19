@@ -15,22 +15,19 @@ local TEXT_COLOR = { 0, 0, 0, 1 } -- Black text
 local DISABLED_TEXT_COLOR = { 0.7, 0.7, 0.7, 1 }
 local BORDER_COLOR = { 0.1, 0.1, 0.1, 1 }
 
-function Button:new(x, y, text, onClick, width, height)
+function Button:new(x, y, text, onClick, width, height, fonts, styleGuide)
     local instance = setmetatable({}, Button)
     instance.x = x
     instance.y = y
     instance.text = text or "Button"
     instance.onClick = onClick or function() print("Button '" .. instance.text .. "' clicked, but no action defined.") end
-
-    -- Calculate dimensions based on text if not provided
-    local font = love.graphics.getFont()
-    instance.width = width or (font:getWidth(instance.text) + PADDING_X * 2)
-    instance.height = height or (font:getHeight() + PADDING_Y * 2)
-
+    instance.width = width or 100
+    instance.height = height or 30
+    instance.fonts = fonts -- Store fonts table
+    instance.styleGuide = styleGuide -- Store style guide
     instance.isHovered = false
     instance.isPressed = false
     instance.isEnabled = true
-
     return instance
 end
 
@@ -63,29 +60,46 @@ end
 
 -- Draw the button
 function Button:draw()
-    local bgColor = BG_COLOR
-    local textColor = TEXT_COLOR
+    -- Draw background and border based on state
+    if not self.isEnabled then love.graphics.setColor(0.5, 0.5, 0.5, 0.8) -- Disabled BG
+    elseif self.isPressed then love.graphics.setColor(0.7, 0.7, 0.7, 1) -- Pressed BG
+    elseif self.isHovered then love.graphics.setColor(0.9, 0.9, 0.9, 1) -- Hover BG
+    else love.graphics.setColor(0.8, 0.8, 0.8, 1) end -- Normal BG
+    love.graphics.rectangle('fill', self.x, self.y, self.width, self.height)
+    love.graphics.setColor(0, 0, 0, 1) -- Border color
+    love.graphics.rectangle('line', self.x, self.y, self.width, self.height)
 
+    -- Set text style based on enabled status
+    local style
     if not self.isEnabled then
-        bgColor = DISABLED_BG_COLOR
-        textColor = DISABLED_TEXT_COLOR
-    elseif self.isPressed then
-        bgColor = PRESSED_BG_COLOR
-    elseif self.isHovered then
-        bgColor = HOVER_BG_COLOR
+        style = self.styleGuide.BUTTON_TEXT_DIS
+    else
+        style = self.styleGuide.BUTTON_TEXT
     end
 
-    -- Draw background
-    love.graphics.setColor(bgColor)
-    love.graphics.rectangle("fill", self.x, self.y, self.width, self.height)
+    -- Get font object from stored fonts table
+    local font = self.fonts[style.fontName]
+    if not font then -- Fallback if font name is wrong in style guide
+        print("Warning: Button font not found: " .. style.fontName .. ". Using default.")
+        font = love.graphics.getFont()
+    end
 
-    -- Draw border
-    love.graphics.setColor(BORDER_COLOR)
-    love.graphics.rectangle("line", self.x, self.y, self.width, self.height)
+    -- Set font and color from style
+    local originalFont = love.graphics.getFont()
+    local originalColor = {love.graphics.getColor()}
+    love.graphics.setFont(font)
+    love.graphics.setColor(style.color)
 
-    -- Draw text centered
-    love.graphics.setColor(textColor)
-    love.graphics.printf(self.text, self.x + PADDING_X, self.y + PADDING_Y, self.width - PADDING_X * 2, "center")
+    -- Calculate text position for centering
+    local textWidth = font:getWidth(self.text)
+    local textHeight = font:getHeight()
+    local textX = self.x + (self.width - textWidth) / 2
+    local textY = self.y + (self.height - textHeight) / 2
+    love.graphics.print(self.text, textX, textY)
+
+    -- Restore original font and color
+    love.graphics.setFont(originalFont)
+    love.graphics.setColor(originalColor)
 end
 
 function Button:setEnabled(enabled)

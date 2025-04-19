@@ -74,7 +74,7 @@ function Card:new(data)
     instance.openSlots = data.openSlots or {}
 
     -- Visual/Flavor
-    instance.art = data.art -- Path to image asset (TBD)
+    instance.imagePath = data.imagePath -- Use the correct key from definitions
     instance.flavorText = data.flavorText or ""
 
     -- Runtime State (will be added when card is in play/hand)

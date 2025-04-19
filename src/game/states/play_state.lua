@@ -8,6 +8,7 @@ local CardDefinitions = require('src.game.data.card_definitions')
 local Renderer = require('src.rendering.renderer')
 local Button = require('src.ui.button') -- Require the Button module
 local GameService = require('src.game.game_service') -- Require GameService
+local StyleGuide = require('src.rendering.styles') -- Require the styles
 
 local PlayState = {}
 
@@ -30,6 +31,7 @@ function PlayState:init(gameService)
     self.players = {}
     self.renderer = Renderer:new() -- Create renderer instance
     self.selectedHandIndex = nil -- Track selected card in hand
+    self.hoveredHandIndex = nil -- Add this
     self.handCardBounds = {} -- Store bounding boxes returned by renderer
     self.statusMessage = "" -- For displaying feedback
 
@@ -55,9 +57,11 @@ function PlayState:init(gameService)
     local screenH = love.graphics.getHeight()
     local buttonY = screenH - 50
     local buttonWidth = 150
+    local uiFonts = self.renderer.fonts -- Get the fonts table
+    local uiStyleGuide = self.renderer.styleGuide -- Get the style guide
 
-    self.buttonEndTurn = Button:new(screenW - buttonWidth - 10, buttonY, "End Turn", function() self:endTurn() end, buttonWidth)
-    self.buttonDiscard = Button:new(10, buttonY, "Discard Selected", function() self:discardSelected() end, buttonWidth)
+    self.buttonEndTurn = Button:new(screenW - buttonWidth - 10, buttonY, "End Turn", function() self:endTurn() end, buttonWidth, nil, uiFonts, uiStyleGuide) -- Pass fonts & styles
+    self.buttonDiscard = Button:new(10, buttonY, "Discard Selected", function() self:discardSelected() end, buttonWidth, nil, uiFonts, uiStyleGuide) -- Pass fonts & styles
     self.buttonDiscard:setEnabled(false)
     self.uiElements = { self.buttonEndTurn, self.buttonDiscard }
 end
@@ -104,6 +108,7 @@ end
 -- Helper to reset selection state and update status
 function PlayState:resetSelectionAndStatus(newStatus)
     self.selectedHandIndex = nil
+    self.hoveredHandIndex = nil -- Reset hover too
     self.handCardBounds = {} -- Clear bounds
     self.buttonDiscard:setEnabled(false) -- Disable discard button
     self.statusMessage = newStatus or ""
@@ -143,24 +148,64 @@ function PlayState:draw(stateManager)
     local screenW = love.graphics.getWidth()
     local screenH = love.graphics.getHeight()
 
-    -- Draw game elements, passing camera state
+    -- Draw game elements
     self.renderer:drawNetwork(currentPlayer.network, self.cameraX, self.cameraY, self.cameraZoom)
-    self.handCardBounds = self.renderer:drawHand(currentPlayer, self.selectedHandIndex)
-    self.renderer:drawUI(currentPlayer)
 
-    -- Draw hover highlight (after network, before UI/buttons)
-    self.renderer:drawHoverHighlight(self.hoverGridX, self.hoverGridY, self.cameraX, self.cameraY, self.cameraZoom)
+    -- Draw grid hover highlight (conditionally, pass selected card) - BEFORE HAND & UI
+    local selectedCard = self.selectedHandIndex and currentPlayer.hand[self.selectedHandIndex] or nil
+    if selectedCard then
+        self.renderer:drawHoverHighlight(self.hoverGridX, self.hoverGridY, self.cameraX, self.cameraY, self.cameraZoom, selectedCard)
+    end
+
+    -- Now draw the actual hand (will draw over the grid highlight and preview)
+    self.handCardBounds = self.renderer:drawHand(currentPlayer, self.selectedHandIndex)
+    
+    -- Draw hovered hand card preview near the mouse
+    if self.hoveredHandIndex then
+        local hoveredCard = currentPlayer.hand[self.hoveredHandIndex]
+        if hoveredCard then
+            local mouseX, mouseY = love.mouse.getPosition()
+            local cardW = self.renderer.CARD_WIDTH or 100
+            local cardH = self.renderer.CARD_HEIGHT or 140
+            local previewScale = 2.0 -- Define scale factor
+            local previewCardW = cardW * previewScale
+            local previewCardH = cardH * previewScale
+
+            -- Calculate position centered above cursor
+            local gap = 15
+            local previewX = mouseX - previewCardW / 2 -- Center using scaled width
+            local previewY = mouseY - previewCardH - gap -- Position above using scaled height
+
+            -- Clamp position to stay within screen bounds using scaled dimensions
+            if previewX + previewCardW > screenW then
+                previewX = screenW - previewCardW
+            end
+            if previewY + previewCardH > screenH then
+                previewY = screenH - previewCardH
+            end
+            previewX = math.max(0, previewX)
+            previewY = math.max(0, previewY)
+
+            self.renderer:drawHoveredHandCard(hoveredCard, previewX, previewY, previewScale) -- Pass scale
+        end
+    end
+
+    self.renderer:drawUI(currentPlayer)
 
     -- Draw UI elements (buttons)
     for _, element in ipairs(self.uiElements) do
         element:draw()
     end
 
+    -- Set UI font for status/debug text
+    local originalFont = love.graphics.getFont()
+    love.graphics.setFont(self.renderer.fonts.uiStandard) -- Access via fonts sub-table
+
     -- Draw status message (Top Center)
-    love.graphics.setColor(1, 1, 0, 1)
+    love.graphics.setColor(1, 1, 1, 1)
     -- Calculate position for top-center display
     local statusText = self.statusMessage or ""
-    local statusWidth = love.graphics.getFont():getWidth(statusText)
+    local statusWidth = love.graphics.getFont():getWidth(statusText) -- Uses currently set font
     local statusX = (screenW - statusWidth) / 2
     local statusY = 10 -- Position near the top
     love.graphics.print(statusText, statusX, statusY)
@@ -170,6 +215,9 @@ function PlayState:draw(stateManager)
     love.graphics.print(string.format("Current Turn: Player %d (%s)", self.gameService.currentPlayerIndex, currentPlayer.name), 10, 10)
     love.graphics.print("MMB Drag / WASD: Pan | Wheel: Zoom", screenW / 2 - 100, screenH - 20)
     love.graphics.print("Press Esc to Quit", 10, screenH - 20)
+
+    -- Restore original font
+    love.graphics.setFont(originalFont)
 end
 
 -- Helper function to check if point (px, py) is inside a rectangle {x, y, w, h}
@@ -256,6 +304,16 @@ function PlayState:mousemoved(stateManager, x, y, dx, dy, istouch)
     -- Update hover grid coordinates
     local worldX, worldY = self.renderer:screenToWorldCoords(x, y, self.cameraX, self.cameraY, self.cameraZoom)
     self.hoverGridX, self.hoverGridY = self.renderer:worldToGridCoords(worldX, worldY)
+
+    -- Check for hand hover
+    local currentlyHovering = nil
+    for _, bounds in ipairs(self.handCardBounds) do
+        if isPointInRect(x, y, bounds) then
+            currentlyHovering = bounds.index
+            break
+        end
+    end
+    self.hoveredHandIndex = currentlyHovering -- Update hovered index (nil if none)
 
     if self.isPanning then
         self.cameraX = self.cameraX - (dx / self.cameraZoom)
