@@ -64,8 +64,40 @@ function Card:new(data)
         material = cost.material or 0,
         data = cost.data or 0
     }
-    instance.activationEffect = data.activationEffect or function(player, network) print(instance.title .. " Activation Effect triggered.") end
-    instance.convergenceEffect = data.convergenceEffect or function(player, network) print(instance.title .. " Convergence Effect triggered.") end
+    
+    -- Handle the two formats for effects:
+    -- 1. Legacy format: function(player, network)
+    -- 2. New format: { description = string, activate = function(player, network) }
+    if type(data.activationEffect) == "function" then
+        instance.activationEffect = {
+            description = "[Legacy Effect]",
+            activate = data.activationEffect
+        }
+    elseif type(data.activationEffect) == "table" and data.activationEffect.activate then
+        instance.activationEffect = data.activationEffect
+    else
+        -- Default effect
+        instance.activationEffect = {
+            description = "No effect.",
+            activate = function(player, network) print(instance.title .. " Activation Effect triggered.") end
+        }
+    end
+    
+    if type(data.convergenceEffect) == "function" then
+        instance.convergenceEffect = {
+            description = "[Legacy Effect]",
+            activate = data.convergenceEffect
+        }
+    elseif type(data.convergenceEffect) == "table" and data.convergenceEffect.activate then
+        instance.convergenceEffect = data.convergenceEffect
+    else
+        -- Default effect
+        instance.convergenceEffect = {
+            description = "No effect.",
+            activate = function(player, network) print(instance.title .. " Convergence Effect triggered.") end
+        }
+    end
+    
     instance.vpValue = data.vpValue or 0 -- End-game VP value
 
     -- Connection Slots (which of the 8 are open)
@@ -86,6 +118,36 @@ function Card:new(data)
     instance.connections = {}
 
     return instance
+end
+
+-- Helper function to get the activation effect description
+function Card:getActivationDescription()
+    if self.activationEffect and self.activationEffect.description then
+        return self.activationEffect.description
+    end
+    return "[No Description]"
+end
+
+-- Helper function to get the convergence effect description
+function Card:getConvergenceDescription()
+    if self.convergenceEffect and self.convergenceEffect.description then
+        return self.convergenceEffect.description
+    end
+    return "[No Description]"
+end
+
+-- Execute the activation effect
+function Card:activateEffect(player, network)
+    if self.activationEffect and self.activationEffect.activate then
+        return self.activationEffect.activate(player, network)
+    end
+end
+
+-- Execute the convergence effect
+function Card:activateConvergence(player, network)
+    if self.convergenceEffect and self.convergenceEffect.activate then
+        return self.convergenceEffect.activate(player, network)
+    end
 end
 
 -- Helper function to check if a specific slot is open

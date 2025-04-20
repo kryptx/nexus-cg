@@ -51,6 +51,21 @@ function Network:getSize()
     return count
 end
 
+-- Add a mock findPathToReactor to the mock Network for testing Rules
+function Network:findPathToReactor(targetCard)
+    -- Simulate the specific case we're testing: BPU adjacent to Reactor
+    -- The real function checks Current(Output) -> Neighbor(Input)
+    -- Path BPU -> Reactor: Check BPU(Output) -> Reactor(Input). Fails.
+    if targetCard.id == "BPU_TEST" and targetCard.position.x == 0 and targetCard.position.y == 1 then
+        -- In this specific test setup, BPU is below Reactor.
+        -- BPU Top edge (Input) faces Reactor Bottom edge (Output). No path.
+        return nil
+    end
+    -- Add other specific mock path results here if needed for more tests
+    -- Default to nil for unhandled cases in this mock
+    return nil
+end
+
 describe("Rules Module", function()
     local rules
     local network
@@ -132,6 +147,49 @@ describe("Rules Module", function()
         end)
         
         -- More extensive connection validation would be tested here...
+    end)
+    
+    describe("isActivationPathValid()", function()
+        local bpuCard -- Basic Processing Unit mock
+
+        before_each(function() 
+            -- Add reactor to network
+            network:addCard(reactorCard, 0, 0)
+
+            -- Define BPU mock (Tech Input top-right)
+            bpuCard = {
+                id = "BPU_TEST",
+                type = Card.Type.TECHNOLOGY,
+                position = { x = 0, y = 1 }, -- Pre-set position for mock logic
+                openSlots = {
+                    [Card.Slots.TOP_RIGHT] = true,     -- Tech Input
+                    [Card.Slots.BOTTOM_RIGHT] = true   -- Tech Output (not relevant for this test)
+                },
+                isSlotOpen = function(self, slot) return self.openSlots[slot] == true end
+            }
+            -- Add BPU below reactor
+            network:addCard(bpuCard, 0, 1)
+        end)
+
+        it("should return false when target adjacent to reactor has no valid departing Output", function() 
+            -- Path BPU -> Reactor requires BPU(Output) -> Reactor(Input).
+            -- BPU has Input on top edge, Reactor has Output on bottom edge. Fails.
+            local isValid, path, reason = rules:isActivationPathValid(network, reactorCard.id, bpuCard.id)
+            
+            assert.is_false(isValid)
+            assert.is_nil(path)
+            assert.is_string(reason)
+            assert.are.equal("No valid activation path exists", reason)
+        end)
+
+        it("should return false if target is the reactor", function() 
+            local isValid, path, reason = rules:isActivationPathValid(network, reactorCard.id, reactorCard.id)
+            assert.is_false(isValid)
+            assert.is_nil(path)
+            assert.matches("Cannot activate the Reactor itself", reason)
+        end)
+
+        -- TODO: Add a test case for a path that *should* be valid under the new rules.
     end)
     
     describe("shouldDrawCard()", function()

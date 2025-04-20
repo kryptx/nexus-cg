@@ -27,8 +27,10 @@ describe("Reactor Card", function()
             assert.are.equal(baseData.buildCost.material, reactor.buildCost.material)
             assert.are.equal(baseData.buildCost.data, reactor.buildCost.data)
             assert.are.equal(baseData.vpValue, reactor.vpValue)
-            assert.is_function(reactor.activationEffect)
-            assert.is_function(reactor.convergenceEffect)
+            assert.is_table(reactor.activationEffect)
+            assert.is_function(reactor.activationEffect.activate)
+            assert.is_table(reactor.convergenceEffect)
+            assert.is_function(reactor.convergenceEffect.activate)
             assert.are.same(mockPlayer, reactor.owner) -- Check owner is set
         end)
         
@@ -70,16 +72,18 @@ describe("Reactor Card", function()
         end)
 
         it("activationEffect should grant 1 Energy to activating player", function()
-            assert.is_function(reactor.activationEffect, "Reactor activationEffect is not a function")
-            reactor.activationEffect(activatingPlayer, network) -- Function call syntax
+            assert.is_table(reactor.activationEffect, "Reactor activationEffect should be a table")
+            assert.is_function(reactor.activationEffect.activate, "Reactor activationEffect.activate should be a function")
+            reactor.activationEffect.activate(activatingPlayer, network) -- Function call syntax
             assert.are.equal(1, activatingPlayer.resources.energy)
         end)
 
         it("convergenceEffect should grant 1 Energy to owner player", function()
-             assert.is_function(reactor.convergenceEffect, "Reactor convergenceEffect is not a function")
-             reactor.convergenceEffect(activatingPlayer, network) -- Function call syntax
-             assert.are.equal(1, mockPlayer.resources.energy) -- Owner gets energy
-             assert.are.equal(0, activatingPlayer.resources.energy) -- Activator does not
+            assert.is_table(reactor.convergenceEffect, "Reactor convergenceEffect should be a table")
+            assert.is_function(reactor.convergenceEffect.activate, "Reactor convergenceEffect.activate should be a function")
+            reactor.convergenceEffect.activate(activatingPlayer, network) -- Function call syntax
+            assert.are.equal(1, mockPlayer.resources.energy) -- Owner gets energy
+            assert.are.equal(0, activatingPlayer.resources.energy) -- Activator does not
         end)
     end)
     

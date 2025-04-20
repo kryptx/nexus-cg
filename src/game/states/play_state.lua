@@ -151,10 +151,13 @@ function PlayState:draw(stateManager)
     -- Draw game elements
     self.renderer:drawNetwork(currentPlayer.network, self.cameraX, self.cameraY, self.cameraZoom)
 
-    -- Draw grid hover highlight (conditionally, pass selected card) - BEFORE HAND & UI
+    -- Draw grid hover highlight (conditionally, pass selected card and validity)
     local selectedCard = self.selectedHandIndex and currentPlayer.hand[self.selectedHandIndex] or nil
-    if selectedCard then
-        self.renderer:drawHoverHighlight(self.hoverGridX, self.hoverGridY, self.cameraX, self.cameraY, self.cameraZoom, selectedCard)
+    -- Only draw highlight if a card is selected AND we are hovering over the grid
+    if selectedCard and self.hoverGridX ~= nil and self.hoverGridY ~= nil then
+        -- Check placement validity using the game service (ensure this function exists!)
+        local isValid = self.gameService:isPlacementValid(self.gameService.currentPlayerIndex, selectedCard, self.hoverGridX, self.hoverGridY)
+        self.renderer:drawHoverHighlight(self.hoverGridX, self.hoverGridY, self.cameraX, self.cameraY, self.cameraZoom, selectedCard, isValid)
     end
 
     -- Now draw the actual hand (will draw over the grid highlight and preview)

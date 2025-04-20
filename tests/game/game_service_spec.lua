@@ -6,22 +6,52 @@ local Card = require 'src.game.card' -- For card types
 local CardSlots = require('src.game.card').Slots
 
 -- Helper to create basic mock objects
-local function createMockCard(id, title, costM, costD, activationEffect, convergenceEffect, vpValue)
+local function createMockCard(id, title, materialCost, dataCost, activationFunc)
     local card = {
-        id = id, title = title,
-        buildCost = { material = costM or 0, data = costD or 0 },
-        activationEffect = activationEffect or function() end,
-        convergenceEffect = convergenceEffect or function() end,
-        vpValue = vpValue or 0,
-        type = Card.Type.TECHNOLOGY, -- Default type for simplicity
-        -- For Reactor tests
-        getSlotProperties = function() 
-            return {type = Card.Type.TECHNOLOGY, is_output = true}
+        id = id or "MOCK_CARD",
+        title = title or "Mock Card",
+        type = Card.Type.TECHNOLOGY, -- Default type
+        buildCost = {
+            material = materialCost or 0,
+            data = dataCost or 0
+        },
+        openSlots = {},
+        position = { x = 0, y = 0 }, -- Default position
+        
+        -- New format of activation effect
+        activationEffect = {
+            description = "Mock activation effect",
+            activate = activationFunc or function() end
+        },
+        
+        -- New format of convergence effect
+        convergenceEffect = {
+            description = "Mock convergence effect",
+            activate = function() end
+        },
+        
+        -- Add the new method that Card now has
+        activateEffect = function(self, player, network)
+            if self.activationEffect and self.activationEffect.activate then
+                return self.activationEffect.activate(player, network)
+            end
         end,
-        isSlotOpen = function() return true end
+        
+        getActivationDescription = function(self)
+            return self.activationEffect and self.activationEffect.description or "[No Description]"
+        end,
+        
+        getConvergenceDescription = function(self)
+            return self.convergenceEffect and self.convergenceEffect.description or "[No Description]"
+        end,
+        
+        -- Add activateConvergence method to the card mock
+        activateConvergence = function(self, player, network)
+            if self.convergenceEffect and self.convergenceEffect.activate then
+                return self.convergenceEffect.activate(player, network)
+            end
+        end,
     }
-    -- Simulate Card metatable for type checks if necessary (not needed currently)
-    -- setmetatable(card, Card)
     return card
 end
 
@@ -73,11 +103,14 @@ local function createMockNetwork(cards, validPlacementResult, pathResult)
     local mockReactor = createMockCard("REACTOR_BASE", "Reactor Core", 0, 0)
     mockReactor.type = Card.Type.REACTOR
     -- Override the activation effect with the correct one for a reactor
-    mockReactor.activationEffect = function(player, network)
-        if player and player.addResource then
-            player:addResource("energy", 1)
+    mockReactor.activationEffect = {
+        description = "Grants 1 Energy to the activator.",
+        activate = function(player, network)
+            if player and player.addResource then
+                player:addResource("energy", 1)
+            end
         end
-    end
+    }
     cardLookup["REACTOR_BASE"] = mockReactor
     
     local network = {

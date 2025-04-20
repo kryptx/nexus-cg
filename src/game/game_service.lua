@@ -180,6 +180,27 @@ function GameService:getCurrentPlayer()
     return self.players[self.currentPlayerIndex]
 end
 
+-- Check if a placement is valid according to rules (without checking cost)
+function GameService:isPlacementValid(playerIndex, card, gridX, gridY)
+    local player = self.players[playerIndex]
+    if not player then
+        print("Warning: isPlacementValid called with invalid playerIndex: " .. tostring(playerIndex))
+        return false
+    end
+    if not card then
+        print("Warning: isPlacementValid called with nil card.")
+        return false
+    end
+    if not player.network then
+        print("Warning: isPlacementValid - Player has no network object.")
+        return false
+    end
+
+    -- Delegate the core rule check to the Rules object
+    local isValid, _ = self.rules:isPlacementValid(card, player.network, gridX, gridY)
+    return isValid
+end
+
 -- Attempt Placement
 function GameService:attemptPlacement(state, cardIndex, gridX, gridY)
     local currentPlayer = self.players[self.currentPlayerIndex]
@@ -264,8 +285,8 @@ function GameService:attemptActivation(state, targetGridX, targetGridY)
               table.insert(activationMessages, string.format("Activated path (Cost %d E):", energyCost))
 
              -- Always activate the target card itself first, even if path is empty
-             if targetCard and targetCard.activationEffect and type(targetCard.activationEffect) == 'function' then
-                 targetCard.activationEffect(currentPlayer, currentPlayer.network)
+             if targetCard then
+                 targetCard:activateEffect(currentPlayer, currentPlayer.network)
                  table.insert(activationMessages, string.format("  - %s activated!", targetCard.title))
                  print(string.format("    Effect for %s executed.", targetCard.title))
              end
@@ -274,8 +295,8 @@ function GameService:attemptActivation(state, targetGridX, targetGridY)
              for i = 2, pathLength do -- Start from index 2 if path exists
                   local cardId = path[i]
                   local cardToActivate = currentPlayer.network:getCardById(cardId)
-                  if cardToActivate and cardToActivate.activationEffect and type(cardToActivate.activationEffect) == 'function' then
-                      cardToActivate.activationEffect(currentPlayer, currentPlayer.network)
+                  if cardToActivate then
+                      cardToActivate:activateEffect(currentPlayer, currentPlayer.network)
                       table.insert(activationMessages, string.format("  - %s activated!", cardToActivate.title))
                       print(string.format("    Effect for %s executed.", cardToActivate.title))
                   end

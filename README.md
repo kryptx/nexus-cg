@@ -45,11 +45,10 @@ nexus/
 │   ├── core/          # Core engine systems (state management, event handling)
 │   │   └── state_manager.lua # Manages game states (menu, play, etc.)
 │   ├── game/          # Gameplay logic and state representation
-│   │   ├── card.lua     # Card definitions, data, logic
+│   │   ├── card.lua     # Card definitions and logic for all card types (including Reactor)
 │   │   ├── player.lua   # Player state, hand, resources
 │   │   ├── network.lua  # Network representation, placement logic
 │   │   ├── rules.lua    # Core game rules validation, turn structure
-│   │   ├── reactor.lua # Reactor-specific logic
 │   │   ├── game_service.lua # Orchestrates game flow and actions
 │   │   └── states/      # Specific game states
 │   │       ├── menu_state.lua
@@ -123,4 +122,4 @@ obj:greet("Hello!") -- Implicitly passes 'obj' as self, "Hello!" as message
 -- obj:bad_greet("Hi!") -- 'self' inside bad_greet would receive "Hi!", message would be nil
 ```
 
-Consistent use of `function T:m(...)` for definition and `instance:m(...)` for calls ensures `self` is handled correctly. 
+Consistent use of `function T:m(...)` for definition and `instance:m(...)` for calls ensures `self` is handled correctly.

@@ -134,42 +134,42 @@ end
 -- ===================
 
 -- Validates if an activation path is legal
--- Returns: boolean, path (if successful), reason (if failed)
-function Rules:isActivationPathValid(network, startNodeId, targetNodeId)
-    -- If either node doesn't exist, the path is invalid
-    if not network:hasCardWithId(startNodeId) or not network:hasCardWithId(targetNodeId) then
-        return false, nil, "Start or target node doesn't exist"
+-- Returns: boolean, path (list of card IDs, target first), reason (if failed)
+function Rules:isActivationPathValid(network, reactorId, targetNodeId)
+    -- Get card objects
+    local targetCard = network:getCardById(targetNodeId)
+    local reactorCard = network:getCardById(reactorId)
+
+    if not targetCard then
+        return false, nil, "Target node not found in network"
     end
-    
-    -- The start node must be a Reactor
-    local startNode = network:getCardById(startNodeId)
-    if startNode.type ~= Card.Type.REACTOR then
+    if not reactorCard then
+        -- This shouldn't happen if GameService found it, but check anyway
+        return false, nil, "Reactor node not found in network"
+    end
+    if reactorCard.type ~= Card.Type.REACTOR then
         return false, nil, "Start node must be a Reactor"
     end
-    
-    -- Find a valid path from target back to start using Output -> Input connections
-    local path, success = self:findActivationPath(network, targetNodeId, startNodeId)
-    if not success then
+    if targetCard.type == Card.Type.REACTOR then
+        return false, nil, "Cannot activate the Reactor itself"
+    end
+
+    -- Use the network's pathfinding logic
+    local path_instances = network:findPathToReactor(targetCard)
+
+    if not path_instances then
         return false, nil, "No valid activation path exists"
     end
-    
-    return true, path, nil
-end
 
--- Finds a valid activation path from target node back to source node
--- Returns: path (list of node IDs in order), success (boolean)
-function Rules:findActivationPath(network, targetNodeId, sourceNodeId)
-    -- This would be implemented using a graph search algorithm
-    -- For simplicity, this is a placeholder
-    -- In a real implementation, you'd need to trace Output -> Input connections
-    
-    -- TODO: Implement proper path finding between nodes
-    -- For now, just return a mock success if the nodes exist
-    if network:hasCardWithId(targetNodeId) and network:hasCardWithId(sourceNodeId) then
-        return {targetNodeId, sourceNodeId}, true
+    -- Convert path of card instances to path of card IDs
+    -- The path returned by findPathToReactor is [target, intermediate1, ... intermediateN]
+    -- This is exactly what GameService needs (it activates target separately, then loops 2 to #path)
+    local path_ids = {}
+    for _, cardInstance in ipairs(path_instances) do
+        table.insert(path_ids, cardInstance.id)
     end
-    
-    return nil, false
+
+    return true, path_ids, nil
 end
 
 -- ===================

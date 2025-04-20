@@ -138,7 +138,9 @@ end
 
 -- Internal helper for drawing text with scaling baked into printf
 -- Assumes font was created at baseFontSize * fontMultiplier
-function Renderer:_drawTextScaled(text, x, y, limit, align, styleName, baseFontSize, targetScale)
+function Renderer:_drawTextScaled(text, x, y, limit, align, styleName, baseFontSize, targetScale, alphaOverride)
+    alphaOverride = alphaOverride or 1.0 -- Default to opaque
+
     local style = self.styleGuide[styleName]
     if not style then
         print("Warning: Invalid style name provided to _drawTextScaled: " .. tostring(styleName))
@@ -149,9 +151,11 @@ function Renderer:_drawTextScaled(text, x, y, limit, align, styleName, baseFontS
     if not font then
         print("Warning: Font not found for style '" .. styleName .. "': " .. style.fontName .. ". Using default.")
         font = love.graphics.getFont()
-        -- Cannot determine multiplier or base size, so draw without scaling
+        -- Apply alpha override to default color
+        local color = style.color or {0,0,0,1}
+        local r, g, b, a = love.math.colorFromBytes(color[1]*255, color[2]*255, color[3]*255, (color[4] or 1)*255)
+        love.graphics.setColor(r, g, b, a * alphaOverride)
         love.graphics.setFont(font)
-        love.graphics.setColor(style.color or {0,0,0,1})
         love.graphics.printf(text, x, y, limit, align)
         return
     end
@@ -179,9 +183,15 @@ function Renderer:_drawTextScaled(text, x, y, limit, align, styleName, baseFontS
         yOffset = -(baseFontSize * printfScale * 0.4)
     end
 
-    -- Set font and color, then draw
+    -- Set font and color (applying alpha override), then draw
+    local color = style.color or {0,0,0,1}
+    -- Ensure color components are in 0-1 range for setColor
+    local r = color[1] or 0
+    local g = color[2] or 0
+    local b = color[3] or 0
+    local a = color[4] or 1
     love.graphics.setFont(font)
-    love.graphics.setColor(style.color)
+    love.graphics.setColor(r, g, b, a * alphaOverride)
     love.graphics.printf(text, x, y + yOffset, scaledLimit, align, 0, printfScale, printfScale)
 end
 
@@ -231,11 +241,13 @@ local function getSlotInfo(slotIndex)
 end
 
 -- Helper function to draw the 8 connection slots for a card
-function Renderer:drawCardSlots(card, sx, sy)
+function Renderer:drawCardSlots(card, sx, sy, alphaOverride)
+    alphaOverride = alphaOverride or 1.0 -- Default to opaque
     if not card then return end
 
     local originalFont = love.graphics.getFont()
     local originalColor = {love.graphics.getColor()}
+    local r = SLOT_RADIUS -- Use radius for sizing
 
     for slotIndex = 1, 8 do
         local info = getSlotInfo(slotIndex)
@@ -246,13 +258,70 @@ function Renderer:drawCardSlots(card, sx, sy)
             local isOutput = info[4]
             local isOpen = card:isSlotOpen(slotIndex)
 
-            if isOpen then love.graphics.setColor(SLOT_COLORS[slotType] or {1,1,1,1}) else love.graphics.setColor(CLOSED_SLOT_COLOR) end
-            love.graphics.circle("fill", slotX, slotY, SLOT_RADIUS)
-            love.graphics.setColor(SLOT_BORDER_COLOR)
-            love.graphics.circle("line", slotX, slotY, SLOT_RADIUS)
+            -- Determine orientation based on slot index
+            local orientation
+            if slotIndex == Card.Slots.TOP_LEFT or slotIndex == Card.Slots.TOP_RIGHT then
+                orientation = "top"
+            elseif slotIndex == Card.Slots.BOTTOM_LEFT or slotIndex == Card.Slots.BOTTOM_RIGHT then
+                orientation = "bottom"
+            elseif slotIndex == Card.Slots.LEFT_TOP or slotIndex == Card.Slots.LEFT_BOTTOM then
+                orientation = "left"
+            elseif slotIndex == Card.Slots.RIGHT_TOP or slotIndex == Card.Slots.RIGHT_BOTTOM then
+                orientation = "right"
+            end
 
-            if isOpen and not isOutput then
-                love.graphics.circle("fill", slotX, slotY, SLOT_RADIUS * 0.3) -- Input marker
+            if isOpen then
+                 -- Apply alpha override to slot color
+                local baseColor = SLOT_COLORS[slotType] or {1,1,1,1}
+                love.graphics.setColor(baseColor[1], baseColor[2], baseColor[3], (baseColor[4] or 1) * alphaOverride)
+
+                local vertices
+                if isOutput then -- Draw rectangle
+                    if orientation == "top" then
+                        vertices = { slotX-r, slotY-r, slotX+r, slotY-r, slotX+r, slotY, slotX-r, slotY }
+                    elseif orientation == "bottom" then
+                        vertices = { slotX-r, slotY, slotX+r, slotY, slotX+r, slotY+r, slotX-r, slotY+r }
+                    elseif orientation == "left" then
+                        vertices = { slotX-r, slotY-r, slotX, slotY-r, slotX, slotY+r, slotX-r, slotY+r }
+                    elseif orientation == "right" then
+                        vertices = { slotX, slotY-r, slotX+r, slotY-r, slotX+r, slotY+r, slotX, slotY+r }
+                    end
+                else -- Draw triangle (input)
+                    if orientation == "top" then -- Points down
+                        vertices = { slotX-r, slotY-r, slotX+r, slotY-r, slotX, slotY+r }
+                    elseif orientation == "bottom" then -- Points up
+                        vertices = { slotX-r, slotY+r, slotX+r, slotY+r, slotX, slotY-r }
+                    elseif orientation == "left" then -- Points right
+                        vertices = { slotX-r, slotY-r, slotX-r, slotY+r, slotX+r, slotY }
+                    elseif orientation == "right" then -- Points left
+                        vertices = { slotX+r, slotY-r, slotX+r, slotY+r, slotX-r, slotY }
+                    end
+                end
+
+                if vertices then
+                    love.graphics.polygon("fill", vertices)
+                    -- Apply alpha override to border color
+                    local borderColor = SLOT_BORDER_COLOR
+                    love.graphics.setColor(borderColor[1], borderColor[2], borderColor[3], (borderColor[4] or 1) * alphaOverride)
+                    love.graphics.polygon("line", vertices)
+                else
+                    -- Fallback or error handling if orientation/type is unexpected
+                    love.graphics.circle("fill", slotX, slotY, r)
+                     -- Apply alpha override to border color
+                    local borderColor = SLOT_BORDER_COLOR
+                    love.graphics.setColor(borderColor[1], borderColor[2], borderColor[3], (borderColor[4] or 1) * alphaOverride)
+                    love.graphics.circle("line", slotX, slotY, r)
+                end
+
+            else -- Closed slot
+                 -- Apply alpha override to closed slot color
+                local closedColor = CLOSED_SLOT_COLOR
+                love.graphics.setColor(closedColor[1], closedColor[2], closedColor[3], (closedColor[4] or 1) * alphaOverride)
+                love.graphics.circle("fill", slotX, slotY, r * 0.8) -- Slightly smaller
+                -- Apply alpha override to border color
+                local borderColor = SLOT_BORDER_COLOR
+                love.graphics.setColor(borderColor[1], borderColor[2], borderColor[3], (borderColor[4] or 1) * alphaOverride)
+                love.graphics.circle("line", slotX, slotY, r * 0.8)
             end
         end
     end
@@ -262,7 +331,9 @@ function Renderer:drawCardSlots(card, sx, sy)
 end
 
 -- Internal utility function to draw a single card (now a method)
-function Renderer:_drawSingleCardInWorld(card, wx, wy)
+function Renderer:_drawSingleCardInWorld(card, wx, wy, alphaOverride, useInvalidBorder)
+    alphaOverride = alphaOverride or 1.0 -- Default to opaque
+    useInvalidBorder = useInvalidBorder or false -- Default to normal border
     -- print(string.format("DEBUG: _drawSingleCardInWorld ENTRY - self type: %s, card type: %s", type(self), type(card)))
     if not card or type(card) ~= 'table' then -- Added type check just in case
         print("Warning: _drawSingleCardInWorld received invalid card data.")
@@ -274,9 +345,13 @@ function Renderer:_drawSingleCardInWorld(card, wx, wy)
     --     return
     -- end
 
-    -- Base background
-    love.graphics.setColor(0.8, 0.8, 0.8, 1)
-    if card.type == Card.Type.REACTOR then love.graphics.setColor(1, 1, 0.5, 1) end
+    -- Store original color to restore before drawing slots/text that handle alpha internally
+    local originalColor = {love.graphics.getColor()}
+
+    -- Base background (Apply Alpha)
+    local baseR, baseG, baseB = 0.8, 0.8, 0.8
+    if card.type == Card.Type.REACTOR then baseR, baseG, baseB = 1, 1, 0.5 end
+    love.graphics.setColor(baseR, baseG, baseB, 1.0 * alphaOverride)
     love.graphics.rectangle("fill", wx, wy, CARD_WIDTH, CARD_HEIGHT)
 
     -- Define Layout Areas
@@ -291,21 +366,24 @@ function Renderer:_drawSingleCardInWorld(card, wx, wy)
     local targetScale = 1/3
 
     -- 1. Draw Header Area
-    local typeColor = SLOT_COLORS[card.type] or {0.5, 0.5, 0.5, 1}
-    love.graphics.setColor(typeColor)
+    local baseTypeColor = SLOT_COLORS[card.type] or {0.5, 0.5, 0.5, 1}
+    love.graphics.setColor(baseTypeColor[1], baseTypeColor[2], baseTypeColor[3], (baseTypeColor[4] or 1) * alphaOverride)
     love.graphics.rectangle("fill", wx + margin, wy + margin, iconSize, iconSize)
-    love.graphics.setColor(0,0,0,1)
+    love.graphics.setColor(0,0,0, 1.0 * alphaOverride) -- Black border with alpha
     love.graphics.rectangle("line", wx + margin, wy + margin, iconSize, iconSize)
 
-    -- Card Title (Use Helper - passing renderer)
+    -- Restore color before calling text helper (it handles alpha)
+    love.graphics.setColor(originalColor)
+    -- Card Title (Use Helper - passing alpha)
     local titleX = wx + margin + iconSize + margin - 2 -- Shift left by 2
     local titleY = wy + margin - 1 -- Reset Y position (consistent up 1)
     local titleLimit = CARD_WIDTH - (2*margin + iconSize + costW)
-    -- Remove specific scaling, use a base world scale (to be calculated)
     local targetScale_title = 0.416666667 -- Target effective size 10pt
-    self:_drawTextScaled(card.title or "Untitled", titleX, titleY, titleLimit, "left", "CARD_TITLE_NW", self.baseTitleFontSize, targetScale_title)
+    self:_drawTextScaled(card.title or "Untitled", titleX, titleY, titleLimit, "left", "CARD_TITLE_NW", self.baseTitleFontSize, targetScale_title, alphaOverride)
 
-    -- Build Cost (Use Helper - passing renderer)
+    -- Restore color before calling text helper (it handles alpha)
+    love.graphics.setColor(originalColor)
+    -- Build Cost (Use Helper - passing alpha)
     local costX = wx + CARD_WIDTH - costW - margin
     local costYBase = wy + margin - 1
     local costLimit = costW
@@ -319,8 +397,8 @@ function Renderer:_drawSingleCardInWorld(card, wx, wy)
     -- Use fixed pixel offset for consistent spacing
     local costY2 = costY1 + 9
     local targetScale_cost = 0.4 -- Target effective size 8pt
-    self:_drawTextScaled(matText, costX, costY1, costLimit, "right", "CARD_COST", costBaseFontSize, targetScale_cost)
-    self:_drawTextScaled(dataText, costX, costY2, costLimit, "right", "CARD_COST", costBaseFontSize, targetScale_cost)
+    self:_drawTextScaled(matText, costX, costY1, costLimit, "right", "CARD_COST", costBaseFontSize, targetScale_cost, alphaOverride)
+    self:_drawTextScaled(dataText, costX, costY2, costLimit, "right", "CARD_COST", costBaseFontSize, targetScale_cost, alphaOverride)
 
     -- 2. Draw Image Placeholder Area OR Card Art
     local image = self:_loadImage(card.imagePath)
@@ -338,48 +416,58 @@ function Renderer:_drawSingleCardInWorld(card, wx, wy)
         local drawX = wx + margin + (areaW - drawW) / 2
         local drawY = imageY + (areaH - drawH) / 2
 
-        love.graphics.setColor(1, 1, 1, 1) -- Ensure white color for drawing image
+        love.graphics.setColor(1, 1, 1, 1.0 * alphaOverride) -- Apply alpha to image draw
         love.graphics.draw(image, drawX, drawY, 0, scale, scale)
 
-        -- Draw border around the image area
-        love.graphics.setColor(0, 0, 0, 1)
+        -- Draw border around the image area (Apply alpha)
+        love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride)
         love.graphics.rectangle("line", wx + margin, imageY, areaW, areaH)
     else
-        -- Fallback: Draw placeholder
-        love.graphics.setColor(0.6, 0.6, 0.6, 1)
+        -- Fallback: Draw placeholder (Apply alpha)
+        love.graphics.setColor(0.6, 0.6, 0.6, 1.0 * alphaOverride)
         love.graphics.rectangle("fill", wx + margin, imageY, CARD_WIDTH - (2 * margin), imageH)
-        love.graphics.setColor(0, 0, 0, 1)
+        love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride) -- Border with alpha
         love.graphics.rectangle("line", wx + margin, imageY, CARD_WIDTH - (2 * margin), imageH)
-        -- ART Label (Use Helper - passing renderer)
+        -- ART Label (Use Helper - passing alpha)
         local artLimit = CARD_WIDTH - (2 * margin)
         local targetScale_art = 0.416666667 -- Target effective size 10pt
-        self:_drawTextScaled("ART", wx + margin, imageY + imageH/2, artLimit, "center", "CARD_ART_LABEL", self.baseStandardFontSize, targetScale_art)
+        -- Restore color before calling text helper
+        love.graphics.setColor(originalColor)
+        self:_drawTextScaled("ART", wx + margin, imageY + imageH/2, artLimit, "center", "CARD_ART_LABEL", self.baseStandardFontSize, targetScale_art, alphaOverride)
     end
 
-    -- 3. Draw Effects Box Area
-    love.graphics.setColor(0.9, 0.9, 0.9, 1)
+    -- 3. Draw Effects Box Area (Apply alpha)
+    love.graphics.setColor(0.9, 0.9, 0.9, 1.0 * alphaOverride)
     love.graphics.rectangle("fill", wx + margin, effectsY, CARD_WIDTH - (2 * margin), effectsH)
-    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride) -- Border with alpha
     love.graphics.rectangle("line", wx + margin, effectsY, CARD_WIDTH - (2 * margin), effectsH)
-    -- Effects Text (Use Helper - passing renderer)
+    -- Effects Text (Use Helper - passing alpha)
     local effectBaseFontSize = self.baseSmallFontSize
-    local actionText = "Action: " .. (type(card.activationEffect) == 'function' and "[Function]" or (card.activationEffect or "..."))
-    local convergenceText = "Convergence: " .. (type(card.convergenceEffect) == 'function' and "[Function]" or (card.convergenceEffect or "..."))
+    local actionText = "Action: " .. (card:getActivationDescription() or "No effect")
+    local convergenceText = "Convergence: " .. (card:getConvergenceDescription() or "No effect")
     local vpText = "VP: " .. tostring(card.vpValue or 0)
     local effectsLimit = (CARD_WIDTH - (2 * margin) - 4)
     local effectsTextYBase = effectsY + 2
     local effectFont = self.fonts["worldSmall"]
     local effectScaledLineHeight = effectFont:getHeight() / self.worldFontMultiplier
     local targetScale_effect = 0.4 -- Target effective size 8pt
-    self:_drawTextScaled(actionText, wx + margin + 2, effectsTextYBase, effectsLimit, "left", "CARD_EFFECT", effectBaseFontSize, targetScale_effect)
-    self:_drawTextScaled(convergenceText, wx + margin + 2, effectsTextYBase + effectScaledLineHeight * 0.9, effectsLimit, "left", "CARD_EFFECT", effectBaseFontSize, targetScale_effect)
+    -- Restore color before calling text helper
+    love.graphics.setColor(originalColor)
+    self:_drawTextScaled(actionText, wx + margin + 2, effectsTextYBase, effectsLimit, "left", "CARD_EFFECT", effectBaseFontSize, targetScale_effect, alphaOverride)
+    self:_drawTextScaled(convergenceText, wx + margin + 2, effectsTextYBase + effectScaledLineHeight * 0.9, effectsLimit, "left", "CARD_EFFECT", effectBaseFontSize, targetScale_effect, alphaOverride)
 
-    -- Draw Outer Border
-    love.graphics.setColor(0, 0, 0, 1)
+    -- Draw Outer Border (Apply alpha and conditional color)
+    if useInvalidBorder then
+        love.graphics.setColor(1, 0, 0, 1.0 * alphaOverride) -- Red border for invalid placement
+    else
+        love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride) -- Default black border
+    end
     love.graphics.rectangle("line", wx, wy, CARD_WIDTH, CARD_HEIGHT)
 
-    -- Draw Connection Slots (call as method on renderer)
-    self:drawCardSlots(card, wx, wy)
+    -- Restore color before drawing slots (they handle alpha internally)
+    love.graphics.setColor(originalColor)
+    -- Draw Connection Slots (call as method on renderer, passing alpha)
+    self:drawCardSlots(card, wx, wy, alphaOverride)
 end
 
 -- Draw a player's network grid, applying camera transform
@@ -429,29 +517,29 @@ function Renderer:drawNetwork(network, cameraX, cameraY, cameraZoom)
     love.graphics.pop() -- Restore previous transform state
 end
 
--- Draw highlight / card preview over the hovered grid cell
-function Renderer:drawHoverHighlight(gridX, gridY, cameraX, cameraY, cameraZoom, selectedCard)
+-- Draw highlight / card preview over the hovered grid cell, or red outline if invalid
+function Renderer:drawHoverHighlight(gridX, gridY, cameraX, cameraY, cameraZoom, selectedCard, isPlacementValid)
+    -- Default to valid if not provided, but caller should ideally check and pass the flag.
+    isPlacementValid = isPlacementValid == nil or isPlacementValid == true
+
     if gridX == nil or gridY == nil then return end
 
-    -- If a card is selected, draw it transparently
+    -- If a card is selected, draw highlight or preview
     if selectedCard then
         local wx, wy = self:gridToWorldCoords(gridX, gridY)
         love.graphics.push()
         love.graphics.translate(-cameraX * cameraZoom, -cameraY * cameraZoom)
         love.graphics.scale(cameraZoom, cameraZoom)
-        love.graphics.setLineWidth(1 / cameraZoom)
+        love.graphics.setLineWidth(1 / cameraZoom) -- Adjust line width based on zoom
 
         local originalFont = love.graphics.getFont()
         local originalColor = {love.graphics.getColor()}
 
-        love.graphics.setColor(1, 1, 1, 0.5) -- Transparency
-        -- Call as utility function, passing self
-        -- _drawSingleCardInWorld(self, selectedCard, wx, wy)
-        -- Call as method
-        self:_drawSingleCardInWorld(selectedCard, wx, wy)
+        -- Always draw the card preview, but pass whether to use the invalid border
+        local useInvalidBorder = not isPlacementValid
+        self:_drawSingleCardInWorld(selectedCard, wx, wy, 0.5, useInvalidBorder)
 
-        love.graphics.setColor(originalColor)
-        love.graphics.setFont(originalFont)
+        -- Restore state (pop restores color, font, line width, transforms)
         love.graphics.pop()
     end
     -- No else needed: Do nothing if no card is selected
@@ -565,8 +653,8 @@ function Renderer:drawHoveredHandCard(card, sx, sy, scale)
     love.graphics.rectangle("line", cardX + margin, effectsY, CARD_WIDTH - (2 * margin), effectsH)
     -- Effects Text (Use Helper)
     local effectBaseFontSize = self.uiBaseSmallSize
-    local actionText = "Action: " .. (type(card.activationEffect) == 'function' and "[Function]" or (card.activationEffect or "..."))
-    local convergenceText = "Convergence: " .. (type(card.convergenceEffect) == 'function' and "[Function]" or (card.convergenceEffect or "..."))
+    local actionText = "Action: " .. (card:getActivationDescription() or "No effect")
+    local convergenceText = "Convergence: " .. (card:getConvergenceDescription() or "No effect")
     local vpText = "VP: " .. tostring(card.vpValue or 0)
     local effectsLimit = CARD_WIDTH - (2 * margin) - 4
     local effectsTextYBase = effectsY + 2 -- Start 2px below top of effects box
@@ -602,9 +690,10 @@ function Renderer:drawHand(player, selectedIndex)
     local handStartY = love.graphics.getHeight() - BOTTOM_BUTTON_AREA_HEIGHT - HAND_CARD_HEIGHT
     local handBounds = {}
 
-    -- Store the font that was active before this function
+    -- Store the font/color/line width that was active before this function
     local originalFont = love.graphics.getFont()
     local originalColor = {love.graphics.getColor()}
+    local originalLineWidth = love.graphics.getLineWidth()
 
     -- Hand Label (Use StyleGuide)
     local labelStyle = self.styleGuide.UI_HAND_LABEL
@@ -661,16 +750,16 @@ function Renderer:drawHand(player, selectedIndex)
             love.graphics.setColor(0, 0, 0, 1)
             love.graphics.setLineWidth(3) -- Thicker border
             love.graphics.rectangle("line", sx, sy, HAND_CARD_WIDTH, HAND_CARD_HEIGHT)
-            love.graphics.setLineWidth(1) -- Reset line width
             -- Set color for title text
             love.graphics.setColor(cardTitleStyle.color)
             love.graphics.printf(card.title, sx + 3, sy + 3, HAND_CARD_WIDTH - 6, "left")
         end
     end
 
-    -- Restore original font/color
+    -- Restore original state
     love.graphics.setFont(originalFont)
     love.graphics.setColor(originalColor)
+    love.graphics.setLineWidth(originalLineWidth) -- Restore original line width
 
     return handBounds
 end

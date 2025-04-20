@@ -263,7 +263,7 @@ function Network:findPathToReactor(targetCard)
                     neighborCardSlotsToCheck = { Card.Slots.LEFT_TOP, Card.Slots.LEFT_BOTTOM }
                 end
 
-                -- Check for a valid Input <- Output link
+                -- Check for a valid Output -> Input link (Current -> Neighbor)
                 if currentCardSlotsToCheck then
                     for i = 1, #currentCardSlotsToCheck do
                         local currentSlotIdx = currentCardSlotsToCheck[i]
@@ -272,12 +272,12 @@ function Network:findPathToReactor(targetCard)
                         local currentProps = currentCard:getSlotProperties(currentSlotIdx)
                         local neighborProps = neighborCard:getSlotProperties(neighborSlotIdx)
 
-                        -- Is current slot an OPEN INPUT?
-                        if currentProps and not currentProps.is_output and currentCard:isSlotOpen(currentSlotIdx) then
-                            -- Is neighbor slot an OPEN OUTPUT of the same TYPE?
-                            if neighborProps and neighborProps.is_output and neighborCard:isSlotOpen(neighborSlotIdx) and currentProps.type == neighborProps.type then
-                                -- Valid Input <- Output link found!
-                                -- print(string.format("    Found valid link: Current Input Slot %d (%s) <- Neighbor Output Slot %d (%s) [%s]", currentSlotIdx, currentProps.type, neighborSlotIdx, neighborProps.type, neighborCard.title))
+                        -- Is current slot an OPEN OUTPUT?
+                        if currentProps and currentProps.is_output and currentCard:isSlotOpen(currentSlotIdx) then
+                            -- Is neighbor slot an OPEN INPUT of the same TYPE?
+                            if neighborProps and not neighborProps.is_output and neighborCard:isSlotOpen(neighborSlotIdx) and currentProps.type == neighborProps.type then
+                                -- Valid Output -> Input link found!
+                                -- print(string.format("    Found valid link: Current Output Slot %d (%s) -> Neighbor Input Slot %d (%s) [%s]", currentSlotIdx, currentProps.type, neighborSlotIdx, neighborProps.type, neighborCard.title))
 
                                 -- Check if neighbor is the Reactor
                                 if neighborCard.type == Card.Type.REACTOR then

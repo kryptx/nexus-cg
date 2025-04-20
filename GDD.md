@@ -87,17 +87,20 @@ A player's turn consists of the following phases, performed in order:
 
 *   **Initiation (Targeted Activation):** Player selects a target node they wish to serve as the endpoint of the activation sequence.
     *   The player identifies a specific node (the **target node**) in their network or an opponent's network (reachable via Convergence Link).
-    *   The player traces a single, contiguous path **backwards** from the target node's **incoming 'open' Input slot** to their Reactor.
-    *   This path **must** follow **Output -> Input** links at each step, moving from an 'open' Output slot on one card to a connected 'open' Input slot on the next card.
-    *   The path cannot branch.
-    *   The number of nodes in this path (including the target node, excluding the Reactor) is **M**.
-    *   The player must spend **M Energy** to initiate the activation along this path.
-*   **Activation Sequence (Furthest to Nearest):**
-    *   The activation begins at the chosen **target node**. Resolve its effect first based on the incoming Input slot used by the path trace:
+*   **Path Requirement for Activation:** For activation to be valid, there must exist a single, contiguous chain of connections originating from the target node and terminating at the player's Reactor. This chain must adhere to the following:
+    *   It starts by using an **'open' Output slot** on the **target node**.
+    *   Each subsequent step in the chain uses an **'open' Output slot** on the current node...
+    *   ...to connect to a corresponding **'open' Input slot** on the **next node** in the sequence leading towards the Reactor (following the established `Output -> Input` links).
+    *   The **final node** in the chain (the one whose Output connects directly to the Reactor's Input) must use an **'open' Output slot**...
+    *   ...to connect to a corresponding **'open' Input slot** on the **Reactor**.
+    *   The chain cannot branch.
+*   **Activation Path & Cost:** The sequence of nodes starting with the Target and ending with the node directly connected to the Reactor constitutes the **activation path**. Let the number of nodes in this path be **M**. The player must spend **M Energy** to activate this path.
+*   **Activation Sequence (Target to Reactor):**
+    *   Activation effects are resolved sequentially along the identified activation path, starting with the **target node**.
         *   If the target node belongs to the **current player**, resolve its "Action" effect.
-        *   If the target node belongs to an **opponent** *and* was targeted via a Convergence Link (respecting the Output->Input trace across the link), resolve its "Convergence Effect" for the current player. (Clarification needed: Does the node's owner also gain any benefit/effect?).
-    *   The activation then proceeds sequentially **backwards** along the traced path towards the Reactor, activating each node in turn (resolving its Action or Convergence effect as appropriate based on the Output->Input link used).
-    *   The Reactor itself is the final destination of the path trace but is not activated.
+        *   If the target node belongs to an **opponent** *and* was targeted via a Convergence Link (respecting the Output->Input chain), resolve its "Convergence Effect" for the current player.
+    *   The activation then proceeds node by node along the path towards the Reactor, resolving each node's appropriate effect (Action or Convergence) in turn.
+    *   The **Reactor** itself is the necessary endpoint for a valid path but **does not** have its own effect resolved as part of this sequence.
 *   **Limitations:** A specific node can only be activated **once** as part of a single activation sequence per turn, even if it has multiple open slots involved in the path.
 *   **Harvest Effects:** Some card Actions or Convergence Effects may be designated as "Harvest" effects, involving the conversion of network elements into VP or resources.
 
