@@ -21,6 +21,8 @@ local HAND_SPACING = 10
 local HAND_START_X = 50
 local BOTTOM_BUTTON_AREA_HEIGHT = 60 -- Space reserved for buttons at the bottom
 local SELECTED_CARD_RAISE = 15 -- How much to raise the selected card
+local UI_ICON_SIZE = 18      -- Size for UI resource icons
+local CARD_COST_ICON_SIZE = 9 -- Size for card cost icons (Reduced from 12)
 
 -- Slot Type Colors (Approximate, adjust as needed)
 local SLOT_COLORS = {
@@ -38,6 +40,7 @@ function Renderer:new()
     instance.styleGuide = StyleGuide
     instance.fonts = {} -- Table to hold font objects
     instance.images = {} -- Table to cache loaded image objects
+    instance.icons = {} -- Table to cache loaded icon image objects
 
     -- Store default offsets
     instance.defaultOffsetX = NETWORK_OFFSET_X
@@ -109,6 +112,17 @@ function Renderer:new()
     instance.worldFontMultiplier = worldFontMultiplier
     instance.uiFontMultiplier = uiFontMultiplier
 
+    -- Load Resource Icons
+    instance.icons.energy = instance:_loadImage("assets/images/energy.png")
+    instance.icons.data = instance:_loadImage("assets/images/data.png")
+    instance.icons.material = instance:_loadImage("assets/images/materials.png") -- Note: filename 'materials.png'
+
+    -- Load Card Type Icons
+    instance.icons[Card.Type.TECHNOLOGY] = instance:_loadImage("assets/images/technology-black.png")
+    instance.icons[Card.Type.CULTURE] = instance:_loadImage("assets/images/culture-black.png")
+    instance.icons[Card.Type.RESOURCE] = instance:_loadImage("assets/images/resource-black.png")
+    instance.icons[Card.Type.KNOWLEDGE] = instance:_loadImage("assets/images/knowledge-black.png")
+
     return instance
 end
 
@@ -118,7 +132,8 @@ function Renderer:_loadImage(path)
 
     -- Check cache first
     if self.images[path] then
-        return self.images[path]
+        -- If cached value is 'false', it means loading failed before
+        return self.images[path] ~= false and self.images[path] or nil
     end
 
     -- Attempt to load
@@ -153,7 +168,11 @@ function Renderer:_drawTextScaled(text, x, y, limit, align, styleName, baseFontS
         font = love.graphics.getFont()
         -- Apply alpha override to default color
         local color = style.color or {0,0,0,1}
-        local r, g, b, a = love.math.colorFromBytes(color[1]*255, color[2]*255, color[3]*255, (color[4] or 1)*255)
+        -- Ensure color components are in 0-1 range for setColor
+        local r = (color[1] or 0) / 255
+        local g = (color[2] or 0) / 255
+        local b = (color[3] or 0) / 255
+        local a = (color[4] or 255) / 255
         love.graphics.setColor(r, g, b, a * alphaOverride)
         love.graphics.setFont(font)
         love.graphics.printf(text, x, y, limit, align)
@@ -184,14 +203,14 @@ function Renderer:_drawTextScaled(text, x, y, limit, align, styleName, baseFontS
     end
 
     -- Set font and color (applying alpha override), then draw
-    local color = style.color or {0,0,0,1}
-    -- Ensure color components are in 0-1 range for setColor
+    local color = style.color or {0,0,0,1} -- Default to black if style missing color
+    -- Correction: Style guide is already 0-1 range
     local r = color[1] or 0
     local g = color[2] or 0
     local b = color[3] or 0
-    local a = color[4] or 1
+    local a = color[4] or 1 -- Default alpha to opaque if missing
     love.graphics.setFont(font)
-    love.graphics.setColor(r, g, b, a * alphaOverride)
+    love.graphics.setColor(r, g, b, (a * alphaOverride)) -- Apply alpha override correctly
     love.graphics.printf(text, x, y + yOffset, scaledLimit, align, 0, printfScale, printfScale)
 end
 
@@ -330,131 +349,189 @@ function Renderer:drawCardSlots(card, sx, sy, alphaOverride)
     love.graphics.setColor(originalColor)
 end
 
--- Internal utility function to draw a single card (now a method)
-function Renderer:_drawSingleCardInWorld(card, wx, wy, alphaOverride, useInvalidBorder)
-    alphaOverride = alphaOverride or 1.0 -- Default to opaque
-    useInvalidBorder = useInvalidBorder or false -- Default to normal border
-    -- print(string.format("DEBUG: _drawSingleCardInWorld ENTRY - self type: %s, card type: %s", type(self), type(card)))
-    if not card or type(card) ~= 'table' then -- Added type check just in case
-        print("Warning: _drawSingleCardInWorld received invalid card data.")
+-- Internal core function to draw a card's elements based on context
+function Renderer:_drawCardInternal(card, x, y, context)
+    if not card or type(card) ~= 'table' then
+        print("Warning: _drawCardInternal received invalid card data.")
         return
     end
-    -- No need to check self validity as it's guaranteed by method call
-    -- if not self or type(self) ~= 'table' then
-    --      print("Warning: _drawSingleCardInWorld received invalid renderer instance.")
-    --     return
-    -- end
 
-    -- Store original color to restore before drawing slots/text that handle alpha internally
     local originalColor = {love.graphics.getColor()}
+    local alphaOverride = context.alpha or 1.0
+    local useInvalidBorder = context.borderType == "invalid"
 
     -- Base background (Apply Alpha)
     local baseR, baseG, baseB = 0.8, 0.8, 0.8
     if card.type == Card.Type.REACTOR then baseR, baseG, baseB = 1, 1, 0.5 end
     love.graphics.setColor(baseR, baseG, baseB, 1.0 * alphaOverride)
-    love.graphics.rectangle("fill", wx, wy, CARD_WIDTH, CARD_HEIGHT)
+    love.graphics.rectangle("fill", x, y, CARD_WIDTH, CARD_HEIGHT)
 
-    -- Define Layout Areas
+    -- Define Layout Areas (Constants are shared)
     local margin = 5
     local headerH = 20
-    local costW = 20
-    local iconSize = 15
+    local costAreaW = 17 -- Keep the adjusted width
+    local iconSize = 15  -- Header type icon size
     local effectsH = 45
-    local imageY = wy + headerH + margin
+    local imageY = y + headerH + margin
     local imageH = CARD_HEIGHT - headerH - effectsH - (2 * margin)
-    local effectsY = wy + CARD_HEIGHT - effectsH - margin
-    local targetScale = 1/3
+    local effectsY = y + CARD_HEIGHT - effectsH - margin
 
     -- 1. Draw Header Area
     local baseTypeColor = SLOT_COLORS[card.type] or {0.5, 0.5, 0.5, 1}
+    local headerIconX = x + margin
+    local headerIconY = y + margin
     love.graphics.setColor(baseTypeColor[1], baseTypeColor[2], baseTypeColor[3], (baseTypeColor[4] or 1) * alphaOverride)
-    love.graphics.rectangle("fill", wx + margin, wy + margin, iconSize, iconSize)
+    love.graphics.rectangle("fill", headerIconX, headerIconY, iconSize, iconSize)
     love.graphics.setColor(0,0,0, 1.0 * alphaOverride) -- Black border with alpha
-    love.graphics.rectangle("line", wx + margin, wy + margin, iconSize, iconSize)
+    love.graphics.rectangle("line", headerIconX, headerIconY, iconSize, iconSize)
+
+    -- Draw Card Type Icon on top
+    local typeIcon = self.icons[card.type]
+    if typeIcon then
+        local typeIconScaleFactor = 0.8 -- Draw icon at 80% of the square size
+        local targetDrawSize = iconSize * typeIconScaleFactor
+        local iconDrawScale = targetDrawSize / typeIcon:getWidth() -- Scale needed for love.graphics.draw
+        local offset = (iconSize - targetDrawSize) / 2 -- Offset to center the smaller icon
+        local drawX = headerIconX + offset
+        local drawY = headerIconY + offset
+
+        love.graphics.setColor(1, 1, 1, alphaOverride) -- White with alpha (using black icon variants now)
+        love.graphics.draw(typeIcon, drawX, drawY, 0, iconDrawScale, iconDrawScale)
+    end
 
     -- Restore color before calling text helper (it handles alpha)
     love.graphics.setColor(originalColor)
-    -- Card Title (Use Helper - passing alpha)
-    local titleX = wx + margin + iconSize + margin - 2 -- Shift left by 2
-    local titleY = wy + margin - 1 -- Reset Y position (consistent up 1)
-    local titleLimit = CARD_WIDTH - (2*margin + iconSize + costW)
-    local targetScale_title = 0.416666667 -- Target effective size 10pt
-    self:_drawTextScaled(card.title or "Untitled", titleX, titleY, titleLimit, "left", "CARD_TITLE_NW", self.baseTitleFontSize, targetScale_title, alphaOverride)
+    -- Card Title (Use Helper - passing alpha and context)
+    local titleX = x + margin + iconSize + margin - 2
+    local titleY = y + margin - 1
+    local titleLimit = CARD_WIDTH - (2*margin + iconSize + costAreaW)
+    local titleStyle = context.stylePrefix .. "_TITLE_NW"
+    self:_drawTextScaled(card.title or "Untitled", titleX, titleY, titleLimit, "left", titleStyle, context.baseFontSizes.title, context.targetScales.title, alphaOverride)
 
-    -- Restore color before calling text helper (it handles alpha)
+    -- Restore color before drawing cost icons/text
     love.graphics.setColor(originalColor)
-    -- Build Cost (Use Helper - passing alpha)
-    local costX = wx + CARD_WIDTH - costW - margin
-    local costYBase = wy + margin - 1
-    local costLimit = costW
+    -- Build Cost (Using Icons and context - Right Aligned)
+    local costYBase = y + margin - 1 -- Include vertical adjustment
+    local costIconSize = CARD_COST_ICON_SIZE -- Use the constant
+    local costInnerSpacing = 2 -- Pixels between icon and text
+    local costLineHeight = 12
+
+    -- Define the target right edge for alignment
+    local artworkRightEdge = x + CARD_WIDTH - margin
+
     local matCost = card.buildCost and card.buildCost.material or 0
     local dataCost = card.buildCost and card.buildCost.data or 0
-    local matText = string.format("M: %d", matCost)
-    local dataText = string.format("D: %d", dataCost)
-    local costBaseFontSize = self.baseSmallFontSize
-    local costFont = self.fonts["worldSmall"]
-    local costY1 = costYBase
-    -- Use fixed pixel offset for consistent spacing
-    local costY2 = costY1 + 9
-    local targetScale_cost = 0.4 -- Target effective size 8pt
-    self:_drawTextScaled(matText, costX, costY1, costLimit, "right", "CARD_COST", costBaseFontSize, targetScale_cost, alphaOverride)
-    self:_drawTextScaled(dataText, costX, costY2, costLimit, "right", "CARD_COST", costBaseFontSize, targetScale_cost, alphaOverride)
+
+    local matIcon = self.icons.material
+    local dataIcon = self.icons.data
+
+    local costBaseFontSize = context.baseFontSizes.cost
+    local targetScale_cost = context.targetScales.cost
+    local costStyleName = context.stylePrefix .. "_COST"
+    local costFont = self.fonts[self.styleGuide[costStyleName].fontName] or love.graphics.getFont()
+    -- Determine font multiplier for width calculation
+    local costFontMultiplier = 1
+    if string.find(self.styleGuide[costStyleName].fontName, "world") then
+        costFontMultiplier = self.worldFontMultiplier
+    elseif string.find(self.styleGuide[costStyleName].fontName, "preview") then
+        costFontMultiplier = self.uiFontMultiplier
+    end
+
+    -- Draw Material Cost (Right-aligned)
+    if matIcon then
+        local text = tostring(matCost)
+        local textWidth = costFont:getWidth(text) / costFontMultiplier * targetScale_cost
+        local totalWidth = costIconSize + costInnerSpacing + textWidth
+        local overallStartX = artworkRightEdge - totalWidth
+        local iconX = overallStartX
+        local textX = iconX + costIconSize + costInnerSpacing
+
+        local iconScale = costIconSize / matIcon:getWidth()
+        love.graphics.setColor(1, 1, 1, alphaOverride) -- White, with alpha
+        love.graphics.draw(matIcon, iconX, costYBase, 0, iconScale, iconScale)
+        love.graphics.setColor(originalColor) -- Restore before text
+        self:_drawTextScaled(text, textX, costYBase, CARD_WIDTH, "left", costStyleName, costBaseFontSize, targetScale_cost, alphaOverride)
+    else -- Fallback: Simple text near right margin
+        love.graphics.setColor(originalColor)
+        self:_drawTextScaled(string.format("M:%d", matCost), x + margin, costYBase, CARD_WIDTH - 2*margin, "right", costStyleName, costBaseFontSize, targetScale_cost, alphaOverride)
+    end
+
+    -- Draw Data Cost (Right-aligned)
+    local dataY = costYBase + costLineHeight - 2 -- Include vertical adjustment
+    if dataIcon then
+        local text = tostring(dataCost)
+        local textWidth = costFont:getWidth(text) / costFontMultiplier * targetScale_cost
+        local totalWidth = costIconSize + costInnerSpacing + textWidth
+        local overallStartX = artworkRightEdge - totalWidth
+        local iconX = overallStartX
+        local textX = iconX + costIconSize + costInnerSpacing
+
+        local iconScale = costIconSize / dataIcon:getWidth()
+        love.graphics.setColor(1, 1, 1, alphaOverride) -- White, with alpha
+        love.graphics.draw(dataIcon, iconX, dataY, 0, iconScale, iconScale)
+        love.graphics.setColor(originalColor) -- Restore before text
+        self:_drawTextScaled(text, textX, dataY, CARD_WIDTH, "left", costStyleName, costBaseFontSize, targetScale_cost, alphaOverride)
+    else -- Fallback: Simple text near right margin
+        love.graphics.setColor(originalColor)
+        self:_drawTextScaled(string.format("D:%d", dataCost), x + margin, dataY, CARD_WIDTH - 2*margin, "right", costStyleName, costBaseFontSize, targetScale_cost, alphaOverride)
+    end
 
     -- 2. Draw Image Placeholder Area OR Card Art
     local image = self:_loadImage(card.imagePath)
     if image then
-        -- Calculate scaling to fit image into the area (imageH, CARD_WIDTH - 2*margin)
         local areaW = CARD_WIDTH - (2 * margin)
         local areaH = imageH
         local imgW, imgH = image:getDimensions()
         local scaleX = areaW / imgW
         local scaleY = areaH / imgH
-        local scale = math.min(scaleX, scaleY) -- Use 'contain' scaling
+        local scale = math.min(scaleX, scaleY)
         local drawW = imgW * scale
         local drawH = imgH * scale
-        -- Center the image within the area
-        local drawX = wx + margin + (areaW - drawW) / 2
+        local drawX = x + margin + (areaW - drawW) / 2
         local drawY = imageY + (areaH - drawH) / 2
-
-        love.graphics.setColor(1, 1, 1, 1.0 * alphaOverride) -- Apply alpha to image draw
+        love.graphics.setColor(1, 1, 1, 1.0 * alphaOverride)
         love.graphics.draw(image, drawX, drawY, 0, scale, scale)
-
-        -- Draw border around the image area (Apply alpha)
         love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride)
-        love.graphics.rectangle("line", wx + margin, imageY, areaW, areaH)
+        love.graphics.rectangle("line", x + margin, imageY, areaW, areaH)
     else
-        -- Fallback: Draw placeholder (Apply alpha)
         love.graphics.setColor(0.6, 0.6, 0.6, 1.0 * alphaOverride)
-        love.graphics.rectangle("fill", wx + margin, imageY, CARD_WIDTH - (2 * margin), imageH)
-        love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride) -- Border with alpha
-        love.graphics.rectangle("line", wx + margin, imageY, CARD_WIDTH - (2 * margin), imageH)
-        -- ART Label (Use Helper - passing alpha)
+        love.graphics.rectangle("fill", x + margin, imageY, CARD_WIDTH - (2 * margin), imageH)
+        love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride)
+        love.graphics.rectangle("line", x + margin, imageY, CARD_WIDTH - (2 * margin), imageH)
         local artLimit = CARD_WIDTH - (2 * margin)
-        local targetScale_art = 0.416666667 -- Target effective size 10pt
-        -- Restore color before calling text helper
+        local artStyleName = context.stylePrefix .. "_ART_LABEL"
         love.graphics.setColor(originalColor)
-        self:_drawTextScaled("ART", wx + margin, imageY + imageH/2, artLimit, "center", "CARD_ART_LABEL", self.baseStandardFontSize, targetScale_art, alphaOverride)
+        self:_drawTextScaled("ART", x + CARD_WIDTH/2, imageY + imageH/2, artLimit, "center", artStyleName, context.baseFontSizes.artLabel, context.targetScales.artLabel, alphaOverride)
     end
 
     -- 3. Draw Effects Box Area (Apply alpha)
     love.graphics.setColor(0.9, 0.9, 0.9, 1.0 * alphaOverride)
-    love.graphics.rectangle("fill", wx + margin, effectsY, CARD_WIDTH - (2 * margin), effectsH)
+    love.graphics.rectangle("fill", x + margin, effectsY, CARD_WIDTH - (2 * margin), effectsH)
     love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride) -- Border with alpha
-    love.graphics.rectangle("line", wx + margin, effectsY, CARD_WIDTH - (2 * margin), effectsH)
-    -- Effects Text (Use Helper - passing alpha)
-    local effectBaseFontSize = self.baseSmallFontSize
-    local actionText = "Action: " .. (card:getActivationDescription() or "No effect")
+    love.graphics.rectangle("line", x + margin, effectsY, CARD_WIDTH - (2 * margin), effectsH)
+    -- Effects Text (Use Helper - passing alpha and context)
+    local effectBaseFontSize = context.baseFontSizes.effect
+    local activationText = "Activation: " .. (card:getActivationDescription() or "No effect")
     local convergenceText = "Convergence: " .. (card:getConvergenceDescription() or "No effect")
-    local vpText = "VP: " .. tostring(card.vpValue or 0)
+    -- Removed VP text from here, maybe draw elsewhere or add to context?
     local effectsLimit = (CARD_WIDTH - (2 * margin) - 4)
     local effectsTextYBase = effectsY + 2
-    local effectFont = self.fonts["worldSmall"]
-    local effectScaledLineHeight = effectFont:getHeight() / self.worldFontMultiplier
-    local targetScale_effect = 0.4 -- Target effective size 8pt
+    local effectStyleName = context.stylePrefix .. "_EFFECT"
+    local targetScale_effect = context.targetScales.effect
+    -- Calculate line height based on context (font style + target scale)
+    local effectFont = self.fonts[self.styleGuide[effectStyleName].fontName] or love.graphics.getFont()
+    local fontMultiplier = 1 -- Placeholder, need to determine based on fontName
+    if string.find(self.styleGuide[effectStyleName].fontName, "world") then
+        fontMultiplier = self.worldFontMultiplier
+    elseif string.find(self.styleGuide[effectStyleName].fontName, "preview") then
+        fontMultiplier = self.uiFontMultiplier
+    end
+    local effectLineHeight = effectFont:getHeight() / fontMultiplier * targetScale_effect
+
     -- Restore color before calling text helper
     love.graphics.setColor(originalColor)
-    self:_drawTextScaled(actionText, wx + margin + 2, effectsTextYBase, effectsLimit, "left", "CARD_EFFECT", effectBaseFontSize, targetScale_effect, alphaOverride)
-    self:_drawTextScaled(convergenceText, wx + margin + 2, effectsTextYBase + effectScaledLineHeight * 0.9, effectsLimit, "left", "CARD_EFFECT", effectBaseFontSize, targetScale_effect, alphaOverride)
+    self:_drawTextScaled(activationText, x + margin + 2, effectsTextYBase, effectsLimit, "left", effectStyleName, effectBaseFontSize, targetScale_effect, alphaOverride)
+    self:_drawTextScaled(convergenceText, x + margin + 2, effectsTextYBase + effectLineHeight * 3, effectsLimit, "left", effectStyleName, effectBaseFontSize, targetScale_effect, alphaOverride) -- Increased multiplier from 1.1
 
     -- Draw Outer Border (Apply alpha and conditional color)
     if useInvalidBorder then
@@ -462,12 +539,41 @@ function Renderer:_drawSingleCardInWorld(card, wx, wy, alphaOverride, useInvalid
     else
         love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride) -- Default black border
     end
-    love.graphics.rectangle("line", wx, wy, CARD_WIDTH, CARD_HEIGHT)
+    love.graphics.rectangle("line", x, y, CARD_WIDTH, CARD_HEIGHT)
 
     -- Restore color before drawing slots (they handle alpha internally)
     love.graphics.setColor(originalColor)
-    -- Draw Connection Slots (call as method on renderer, passing alpha)
-    self:drawCardSlots(card, wx, wy, alphaOverride)
+    -- Draw Connection Slots (call as method on renderer, passing coordinates and alpha)
+    self:drawCardSlots(card, x, y, alphaOverride)
+end
+
+-- Internal utility function to draw a single card in the world
+function Renderer:_drawSingleCardInWorld(card, wx, wy, alphaOverride, useInvalidBorder)
+    -- Default alpha and border type
+    alphaOverride = alphaOverride or 1.0
+    useInvalidBorder = useInvalidBorder or false
+
+    -- Prepare context for world rendering
+    local context = {
+        stylePrefix = "CARD",
+        baseFontSizes = {
+            title = self.baseTitleFontSize,
+            cost = self.baseSmallFontSize,
+            effect = self.baseSmallFontSize,
+            artLabel = self.baseStandardFontSize
+        },
+        targetScales = {
+            title = 0.4375, -- 7px effective size (7/16)
+            cost = 0.4,     -- 8pt effective size (~12 * 1/3 -> base 16 * 0.4 = 6.4px)
+            effect = 0.4,   -- 8pt effective size
+            artLabel = 0.416666667 -- 10pt effective size
+        },
+        alpha = alphaOverride,
+        borderType = useInvalidBorder and "invalid" or "normal"
+    }
+
+    -- Call the core drawing function
+    self:_drawCardInternal(card, wx, wy, context)
 end
 
 -- Draw a player's network grid, applying camera transform
@@ -486,8 +592,6 @@ function Renderer:drawNetwork(network, cameraX, cameraY, cameraZoom)
     -- Build a queue of items to draw
     local drawQueue = {}
     for cardId, card in pairs(network.cards) do
-        -- print(string.format("DEBUG: drawNetwork loop - Key: %s, Card Type: %s", tostring(cardId), type(card))) -- REMOVE DEBUG
-        
         -- Process only if card is a valid table with a position
         if type(card) == "table" and card.position then
             local wx, wy = self:gridToWorldCoords(card.position.x, card.position.y)
@@ -519,7 +623,7 @@ end
 
 -- Draw highlight / card preview over the hovered grid cell, or red outline if invalid
 function Renderer:drawHoverHighlight(gridX, gridY, cameraX, cameraY, cameraZoom, selectedCard, isPlacementValid)
-    -- Default to valid if not provided, but caller should ideally check and pass the flag.
+    -- Default to valid if not provided
     isPlacementValid = isPlacementValid == nil or isPlacementValid == true
 
     if gridX == nil or gridY == nil then return end
@@ -532,17 +636,13 @@ function Renderer:drawHoverHighlight(gridX, gridY, cameraX, cameraY, cameraZoom,
         love.graphics.scale(cameraZoom, cameraZoom)
         love.graphics.setLineWidth(1 / cameraZoom) -- Adjust line width based on zoom
 
-        local originalFont = love.graphics.getFont()
-        local originalColor = {love.graphics.getColor()}
-
-        -- Always draw the card preview, but pass whether to use the invalid border
+        -- Use _drawSingleCardInWorld, passing alpha and validity flag
         local useInvalidBorder = not isPlacementValid
         self:_drawSingleCardInWorld(selectedCard, wx, wy, 0.5, useInvalidBorder)
 
         -- Restore state (pop restores color, font, line width, transforms)
         love.graphics.pop()
     end
-    -- No else needed: Do nothing if no card is selected
 end
 
 -- Function to draw a hand card preview (uses UI scale fonts and applies preview scale)
@@ -559,120 +659,27 @@ function Renderer:drawHoveredHandCard(card, sx, sy, scale)
     love.graphics.scale(scale, scale)
     love.graphics.setLineWidth(originalLineWidth / scale)
 
-    local cardX, cardY = 0, 0
+    -- Prepare context for preview rendering
+    local context = {
+        stylePrefix = "PREVIEW",
+        baseFontSizes = {
+            title = self.uiBaseStandardSize, -- 7pt base
+            cost = self.uiBaseSmallSize,     -- 6pt base
+            effect = self.uiBaseSmallSize,   -- 6pt base
+            artLabel = self.uiBaseStandardSize -- 7pt base
+        },
+        targetScales = {
+            title = 1.0,    -- Effective 7pt * 1.0 = 7px
+            cost = 1.0,     -- Effective 6pt * 1.0 = 6px
+            effect = 1.0,   -- Effective 6pt * 1.0 = 6px
+            artLabel = 1.0  -- Effective 7pt * 1.0 = 7px
+        },
+        alpha = 1.0, -- Preview is always opaque unless scaled externally
+        borderType = "normal"
+    }
 
-    -- Base background - Match world card background
-    love.graphics.setColor(0.8, 0.8, 0.8, 1)
-    -- Add reactor check - Match world card reactor check
-    if card.type == Card.Type.REACTOR then love.graphics.setColor(1, 1, 0.5, 1) end
-    love.graphics.rectangle("fill", cardX, cardY, CARD_WIDTH, CARD_HEIGHT)
-
-    -- Define Layout Areas
-    local margin = 5
-    local headerH = 20
-    local costW = 20
-    local iconSize = 15
-    local effectsH = 45
-    local imageY = cardY + headerH + margin
-    local imageH = CARD_HEIGHT - headerH - effectsH - (2 * margin)
-    local effectsY = cardY + CARD_HEIGHT - effectsH - margin
-
-    -- 1. Draw Header Area
-    local typeColor = SLOT_COLORS[card.type] or {0.5, 0.5, 0.5, 1}
-    love.graphics.setColor(typeColor)
-    love.graphics.rectangle("fill", cardX + margin, cardY + margin, iconSize, iconSize)
-    love.graphics.setColor(0,0,0,1)
-    love.graphics.rectangle("line", cardX + margin, cardY + margin, iconSize, iconSize)
-
-    -- Card Title (Use Helper)
-    local titleX = cardX + margin + iconSize + margin - 2 -- Shift left by 2
-    local titleY = cardY + margin - 2 -- Adjusted Y position (up 2)
-    local titleLimit = CARD_WIDTH - (2*margin + iconSize + costW)
-    -- Remove specific scaling, use base preview scale (1.0)
-    local targetScale_preview_title = 1.0
-    self:_drawTextScaled(card.title or "Untitled", titleX, titleY, titleLimit, "left", "PREVIEW_TITLE_NW", self.uiBaseStandardSize, targetScale_preview_title)
-
-    -- Build Cost (Use Helper)
-    local costX = cardX + CARD_WIDTH - costW - margin
-    local costYBase = cardY + margin - 1 -- Adjusted Y pos like world cost
-    local costLimit = costW
-    local matCost = card.buildCost and card.buildCost.material or 0
-    local dataCost = card.buildCost and card.buildCost.data or 0
-    local matText = string.format("M: %d", matCost)
-    local dataText = string.format("D: %d", dataCost)
-    -- Get base size for line height calculation - Use UI base size and PREVIEW font
-    local costBaseFontSize = self.uiBaseSmallSize
-    local costFont = self.fonts["previewSmall"] -- Use preview font for correct height calc
-    -- local scaledLineHeight = costFont:getHeight() / self.uiFontMultiplier -- Use UI multiplier
-    local costY1 = costYBase
-    -- Use fixed pixel offset for consistent spacing
-    local costY2 = costY1 + 9
-    -- Use PREVIEW_COST style and costBaseFontSize (uiBaseSmallSize)
-    local targetScale_preview_cost = 1.0 -- Use base UI scale
-    self:_drawTextScaled(matText, costX, costY1, costLimit, "right", "PREVIEW_COST", costBaseFontSize, targetScale_preview_cost)
-    self:_drawTextScaled(dataText, costX, costY2, costLimit, "right", "PREVIEW_COST", costBaseFontSize, targetScale_preview_cost)
-
-    -- 2. Draw Image Placeholder Area OR Card Art
-    local image_preview = self:_loadImage(card.imagePath)
-    if image_preview then
-         -- Calculate scaling to fit image into the area (imageH, CARD_WIDTH - 2*margin)
-        local areaW = CARD_WIDTH - (2 * margin)
-        local areaH = imageH
-        local imgW, imgH = image_preview:getDimensions()
-        local scaleX = areaW / imgW
-        local scaleY = areaH / imgH
-        local scale = math.min(scaleX, scaleY) -- Use 'contain' scaling
-        local drawW = imgW * scale
-        local drawH = imgH * scale
-        -- Center the image within the area
-        local drawX = cardX + margin + (areaW - drawW) / 2
-        local drawY = imageY + (areaH - drawH) / 2
-
-        love.graphics.setColor(1, 1, 1, 1) -- Ensure white color for drawing image
-        love.graphics.draw(image_preview, drawX, drawY, 0, scale, scale)
-
-        -- Draw border around the image area
-        love.graphics.setColor(0, 0, 0, 1)
-        love.graphics.rectangle("line", cardX + margin, imageY, areaW, areaH)
-    else
-        -- Fallback: Draw placeholder
-        love.graphics.setColor(0.6, 0.6, 0.6, 1)
-        love.graphics.rectangle("fill", cardX + margin, imageY, CARD_WIDTH - (2 * margin), imageH)
-        love.graphics.setColor(0, 0, 0, 1)
-        love.graphics.rectangle("line", cardX + margin, imageY, CARD_WIDTH - (2 * margin), imageH)
-        -- ART Label (Use Helper)
-        local artLimit = CARD_WIDTH - (2 * margin)
-        local targetScale_art_preview = 1.0 -- Base UI scale
-        self:_drawTextScaled("ART", cardX + margin, imageY + imageH/2, artLimit, "center", "PREVIEW_ART_LABEL", self.uiBaseStandardSize, targetScale_art_preview)
-    end
-
-    -- 3. Draw Effects Box Area
-    love.graphics.setColor(0.9, 0.9, 0.9, 1)
-    love.graphics.rectangle("fill", cardX + margin, effectsY, CARD_WIDTH - (2 * margin), effectsH)
-    love.graphics.setColor(0, 0, 0, 1)
-    love.graphics.rectangle("line", cardX + margin, effectsY, CARD_WIDTH - (2 * margin), effectsH)
-    -- Effects Text (Use Helper)
-    local effectBaseFontSize = self.uiBaseSmallSize
-    local actionText = "Action: " .. (card:getActivationDescription() or "No effect")
-    local convergenceText = "Convergence: " .. (card:getConvergenceDescription() or "No effect")
-    local vpText = "VP: " .. tostring(card.vpValue or 0)
-    local effectsLimit = CARD_WIDTH - (2 * margin) - 4
-    local effectsTextYBase = effectsY + 2 -- Start 2px below top of effects box
-    -- Use UI base size and PREVIEW font for line height
-    local effectFont = self.fonts["previewSmall"]
-    -- local effectScaledLineHeight = effectFont:getHeight() / self.uiFontMultiplier
-    -- Use PREVIEW_EFFECT style and effectBaseFontSize (uiBaseSmallSize)
-    local actionY = effectsTextYBase
-    local convY = effectsY + effectsH * 0.5 -- Position near vertical middle
-    self:_drawTextScaled(actionText, cardX + margin + 2, actionY, effectsLimit, "left", "PREVIEW_EFFECT", effectBaseFontSize, 1.0)
-    self:_drawTextScaled(convergenceText, cardX + margin + 2, convY, effectsLimit, "left", "PREVIEW_EFFECT", effectBaseFontSize, 1.0)
-
-    -- Draw Outer Border
-    love.graphics.setColor(0, 0, 0, 1)
-    love.graphics.rectangle("line", cardX, cardY, CARD_WIDTH, CARD_HEIGHT)
-
-    -- Draw Connection Slots relative to (0,0)
-    self:drawCardSlots(card, cardX, cardY)
+    -- Call the core drawing function with relative coordinates (0,0)
+    self:_drawCardInternal(card, 0, 0, context)
 
     love.graphics.pop()
 
@@ -773,14 +780,81 @@ function Renderer:drawUI(player)
 
     -- Use UI Label Style
     local style = self.styleGuide.UI_LABEL
-    assert(self.fonts[style.fontName], "UI Label font not found: " .. style.fontName)
-    love.graphics.setFont(self.fonts[style.fontName])
-    love.graphics.setColor(style.color)
+    local font = self.fonts[style.fontName]
+    if not font then
+        print("Warning: UI Label font not found: " .. style.fontName .. ". Using default.")
+        font = love.graphics.getFont()
+    end
+    -- Convert style color from bytes (0-255) to 0-1 range
+    local r = style.color[1] or 0 -- Use value directly
+    local g = style.color[2] or 0 -- Use value directly
+    local b = style.color[3] or 0 -- Use value directly
+    local a = style.color[4] or 1 -- Use value directly, default alpha to 1 (opaque)
+
+    love.graphics.setFont(font)
+    love.graphics.setColor(r, g, b, a)
 
     -- Print UI text
-    love.graphics.print(string.format("--- %s UI ---", player.name), 10, 30)
-    love.graphics.print(string.format("VP: %d", player.vp), 10, 50)
-    love.graphics.print(string.format("Res: E:%d D:%d M:%d", player.resources.energy, player.resources.data, player.resources.material), 10, 70)
+    local uiX = 10
+    local uiY_start = 30
+    local lineSpacing = 20
+    love.graphics.print(string.format("--- %s UI ---", player.name), uiX, uiY_start)
+    love.graphics.print(string.format("VP: %d", player.vp), uiX, uiY_start + lineSpacing)
+
+    -- Draw Resources with Icons
+    local resY = uiY_start + 2 * lineSpacing
+    local iconSize = UI_ICON_SIZE
+    local iconSpacing = 5 -- Space between icon and number
+    local resGroupSpacing = 25 -- Space between resource groups (icon + number)
+
+    local currentX = uiX
+
+    -- Energy
+    local energyIcon = self.icons.energy
+    if energyIcon then
+        local scale = iconSize / energyIcon:getWidth() -- Assume square icon for simplicity
+        love.graphics.setColor(1, 1, 1, 1) -- Set color to white for icon drawing
+        love.graphics.draw(energyIcon, currentX, resY, 0, scale, scale)
+        love.graphics.setColor(r, g, b, a) -- Restore text color
+        local energyText = tostring(player.resources.energy)
+        love.graphics.print(energyText, currentX + iconSize + iconSpacing, resY)
+        currentX = currentX + iconSize + iconSpacing + font:getWidth(energyText) + resGroupSpacing
+    else -- Fallback
+        local energyText = string.format("E:%d", player.resources.energy)
+        love.graphics.print(energyText, currentX, resY)
+        currentX = currentX + font:getWidth(energyText) + resGroupSpacing
+    end
+
+    -- Data
+    local dataIcon = self.icons.data
+    if dataIcon then
+        local scale = iconSize / dataIcon:getWidth()
+        love.graphics.setColor(1, 1, 1, 1) -- White for icon
+        love.graphics.draw(dataIcon, currentX, resY, 0, scale, scale)
+        love.graphics.setColor(r, g, b, a) -- Restore text color
+        local dataText = tostring(player.resources.data)
+        love.graphics.print(dataText, currentX + iconSize + iconSpacing, resY)
+        currentX = currentX + iconSize + iconSpacing + font:getWidth(dataText) + resGroupSpacing
+    else -- Fallback
+        local dataText = string.format("D:%d", player.resources.data)
+        love.graphics.print(dataText, currentX, resY)
+        currentX = currentX + font:getWidth(dataText) + resGroupSpacing
+    end
+
+    -- Material
+    local materialIcon = self.icons.material
+    if materialIcon then
+        local scale = iconSize / materialIcon:getWidth()
+        love.graphics.setColor(1, 1, 1, 1) -- White for icon
+        love.graphics.draw(materialIcon, currentX, resY, 0, scale, scale)
+        love.graphics.setColor(r, g, b, a) -- Restore text color
+        local materialText = tostring(player.resources.material)
+        love.graphics.print(materialText, currentX + iconSize + iconSpacing, resY)
+        -- No need to update currentX after the last one
+    else -- Fallback
+        local materialText = string.format("M:%d", player.resources.material)
+        love.graphics.print(materialText, currentX, resY)
+    end
 
     -- Restore
     love.graphics.setFont(originalFont)
