@@ -8,11 +8,13 @@ local Player = {}
 Player.__index = Player
 
 -- Constructor for a new Player instance
-function Player:new(id, name)
+-- Note: Player object creation is now handled within GameService:initializeGame
+-- to ensure network and reactor are set up correctly.
+function Player:new(config)
     local instance = setmetatable({}, Player)
 
-    instance.id = id or error("Player must have an ID")
-    instance.name = name or "Player " .. tostring(id)
+    instance.id = config.id or error("Player must have an ID")
+    instance.name = config.name or "Player " .. tostring(instance.id)
 
     -- Game State
     instance.resources = {
@@ -22,21 +24,53 @@ function Player:new(id, name)
     }
     instance.vp = 0 -- Victory Points
     instance.hand = {} -- List (table) of Card instances
-    instance.network = nil -- Reference to the player's Network object (to be created later)
+    instance.network = nil -- Reference to the player's Network object (set by GameService)
+    instance.reactorCard = nil -- Reference to the player's Reactor card (set by GameService)
 
     -- Convergence Links (GDD 4.1 & 4.6)
-    -- Track available link sets
-    instance.availableConvergenceLinks = {
-        [Card.Type.TECHNOLOGY] = 4, -- Assuming 4 sets initially based on GDD reading
-        [Card.Type.CULTURE] = 4,
-        [Card.Type.RESOURCE] = 4,
-        [Card.Type.KNOWLEDGE] = 4,
+    -- Tracks whether each of the player's four link *sets* has been used.
+    -- A set is consumed when initiating a link of that type.
+    instance.usedConvergenceLinkSets = {
+        [Card.Type.TECHNOLOGY] = false,
+        [Card.Type.CULTURE]    = false,
+        [Card.Type.RESOURCE]   = false,
+        [Card.Type.KNOWLEDGE]  = false,
     }
-    -- Track active links (more complex, maybe store pairs of {own_card_id, own_slot, target_player_id, target_card_id, target_slot})
-    instance.activeConvergenceLinks = {}
+    -- Track how many links this player has successfully initiated (for paradigm triggers)
+    instance.initiatedLinksCount = 0
 
     print(string.format("Created player: %s (ID: %s)", instance.name, instance.id))
     return instance
+end
+
+-- Checks if the player has the link set of the given type available (i.e., not used yet)
+function Player:hasLinkSetAvailable(linkType)
+    if self.usedConvergenceLinkSets[linkType] == nil then
+        print(string.format("Warning: Checking availability for unknown link type: %s", tostring(linkType)))
+        return false
+    end
+    return not self.usedConvergenceLinkSets[linkType]
+end
+
+-- Marks the link set of the given type as used and increments the count.
+function Player:useLinkSet(linkType)
+    if self.usedConvergenceLinkSets[linkType] == nil then
+        print(string.format("Warning: Attempting to use unknown link type: %s", tostring(linkType)))
+        return false
+    end
+    if self.usedConvergenceLinkSets[linkType] then
+        print(string.format("Warning: Player %s attempting to re-use already used %s link set.", self.name, tostring(linkType)))
+        return false -- Already used
+    end
+    self.usedConvergenceLinkSets[linkType] = true
+    self.initiatedLinksCount = self.initiatedLinksCount + 1
+    print(string.format("Player %s used their %s link set. (%d total initiated)", self.name, tostring(linkType), self.initiatedLinksCount))
+    return true
+end
+
+-- Returns the number of convergence links initiated by this player.
+function Player:getInitiatedLinksCount()
+    return self.initiatedLinksCount
 end
 
 -- Example methods (implement actual logic later)
@@ -82,6 +116,10 @@ function Player:getVictoryPoints()
     return self.vp
 end
 
--- TODO: Add methods for playing cards, drawing cards, managing network, VP, convergence links
+-- Add VP to the player's score
+function Player:addVP(amount)
+    self.vp = self.vp + (amount or 0)
+    print(string.format("%s VP changed by %d (Total: %d)", self.name, amount or 0, self.vp))
+end
 
 return Player

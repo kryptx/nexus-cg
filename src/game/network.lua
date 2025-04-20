@@ -109,6 +109,45 @@ function Network:hasAdjacentCard(x, y)
     return false
 end
 
+-- =====================
+-- SLOT HELPER METHODS --
+-- =====================
+
+-- Get the grid coordinates of the cell adjacent to a given slot
+-- Assumes slotIndex is 1-8 according to Card.Slots convention
+function Network:getAdjacentCoordForSlot(x, y, slotIndex)
+    if slotIndex == Card.Slots.TOP_LEFT or slotIndex == Card.Slots.TOP_RIGHT then
+        return { x = x, y = y - 1 } -- Cell Above
+    elseif slotIndex == Card.Slots.BOTTOM_LEFT or slotIndex == Card.Slots.BOTTOM_RIGHT then
+        return { x = x, y = y + 1 } -- Cell Below
+    elseif slotIndex == Card.Slots.LEFT_TOP or slotIndex == Card.Slots.LEFT_BOTTOM then
+        return { x = x - 1, y = y } -- Cell Left
+    elseif slotIndex == Card.Slots.RIGHT_TOP or slotIndex == Card.Slots.RIGHT_BOTTOM then
+        return { x = x + 1, y = y } -- Cell Right
+    end
+    print(string.format("Warning: getAdjacentCoordForSlot called with invalid slotIndex: %s", tostring(slotIndex)))
+    return nil
+end
+
+-- Get the slot index on an adjacent card that faces the given slotIndex
+function Network:getOpposingSlotIndex(slotIndex)
+    local mapping = {
+        [Card.Slots.TOP_LEFT] = Card.Slots.BOTTOM_LEFT,
+        [Card.Slots.TOP_RIGHT] = Card.Slots.BOTTOM_RIGHT,
+        [Card.Slots.BOTTOM_LEFT] = Card.Slots.TOP_LEFT,
+        [Card.Slots.BOTTOM_RIGHT] = Card.Slots.TOP_RIGHT,
+        [Card.Slots.LEFT_TOP] = Card.Slots.RIGHT_TOP,
+        [Card.Slots.LEFT_BOTTOM] = Card.Slots.RIGHT_BOTTOM,
+        [Card.Slots.RIGHT_TOP] = Card.Slots.LEFT_TOP,
+        [Card.Slots.RIGHT_BOTTOM] = Card.Slots.LEFT_BOTTOM,
+    }
+    local opposing = mapping[slotIndex]
+    if not opposing then
+        print(string.format("Warning: getOpposingSlotIndex called with invalid slotIndex: %s", tostring(slotIndex)))
+    end
+    return opposing
+end
+
 -- Check if placing cardToPlace at (x, y) is valid according to GDD 4.3
 -- Returns: boolean (isValid), string (reason for failure or success message)
 function Network:isValidPlacement(cardToPlace, x, y)
@@ -170,20 +209,20 @@ function Network:isValidPlacement(cardToPlace, x, y)
                 local newProps = cardToPlace:getSlotProperties(newSlotIdx)
                 local adjProps = adjCard:getSlotProperties(adjSlotIdx)
 
-                -- Check if the slot on the card being placed is an OPEN INPUT
-                if newProps and not newProps.is_output and cardToPlace:isSlotOpen(newSlotIdx) then
+                -- Check if the slot on the card being placed is an AVAILABLE INPUT
+                if newProps and not newProps.is_output and cardToPlace:isSlotAvailable(newSlotIdx) then
                     -- Now check the corresponding slot on the adjacent card
                     if adjProps then
                         if adjCard.type == Card.Type.REACTOR then
-                            -- Reactor Case: Check if the corresponding slot on the reactor is OPEN (acts as universal Output)
-                            if adjCard:isSlotOpen(adjSlotIdx) then
+                            -- Reactor Case: Check if the corresponding slot on the reactor is AVAILABLE (acts as universal Output)
+                            if adjCard:isSlotAvailable(adjSlotIdx) then
                                 print(string.format("  Connection found via Reactor: New Input Slot %d -> Reactor Output Slot %d", newSlotIdx, adjSlotIdx))
                                 connectionRequirementMet = true
                                 goto found_connection -- Use goto to break out of nested loops
                             end
                         else
-                            -- Normal Node Case: Check if the adjacent slot is an OPEN OUTPUT of the SAME TYPE
-                            if adjProps.is_output and adjCard:isSlotOpen(adjSlotIdx) and newProps.type == adjProps.type then
+                            -- Normal Node Case: Check if the adjacent slot is an AVAILABLE OUTPUT of the SAME TYPE
+                            if adjProps.is_output and adjCard:isSlotAvailable(adjSlotIdx) and newProps.type == adjProps.type then
                                 print(string.format("  Connection found via Node: New Input Slot %d (%s) -> Adj Output Slot %d (%s)", newSlotIdx, newProps.type, adjSlotIdx, adjProps.type))
                                 connectionRequirementMet = true
                                 goto found_connection -- Use goto to break out of nested loops
@@ -272,10 +311,10 @@ function Network:findPathToReactor(targetCard)
                         local currentProps = currentCard:getSlotProperties(currentSlotIdx)
                         local neighborProps = neighborCard:getSlotProperties(neighborSlotIdx)
 
-                        -- Is current slot an OPEN OUTPUT?
-                        if currentProps and currentProps.is_output and currentCard:isSlotOpen(currentSlotIdx) then
-                            -- Is neighbor slot an OPEN INPUT of the same TYPE?
-                            if neighborProps and not neighborProps.is_output and neighborCard:isSlotOpen(neighborSlotIdx) and currentProps.type == neighborProps.type then
+                        -- Is current slot an AVAILABLE OUTPUT?
+                        if currentProps and currentProps.is_output and currentCard:isSlotAvailable(currentSlotIdx) then
+                            -- Is neighbor slot an AVAILABLE INPUT of the same TYPE?
+                            if neighborProps and not neighborProps.is_output and neighborCard:isSlotAvailable(neighborSlotIdx) and currentProps.type == neighborProps.type then
                                 -- Valid Output -> Input link found!
                                 -- print(string.format("    Found valid link: Current Output Slot %d (%s) -> Neighbor Input Slot %d (%s) [%s]", currentSlotIdx, currentProps.type, neighborSlotIdx, neighborProps.type, neighborCard.title))
 
@@ -328,6 +367,15 @@ end
 function Network:isEmpty()
     -- Use next() to check if the cards table has any entries
     return next(self.cards) == nil
+end
+
+-- Get the total number of cards in the network
+function Network:getSize()
+    local count = 0
+    for _ in pairs(self.cards) do
+        count = count + 1
+    end
+    return count
 end
 
 -- TODO: Implement network iteration/visualization helpers

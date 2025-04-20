@@ -32,8 +32,8 @@ describe("Card Module", function()
             assert.are.equal(testCardData.type, card.type)
             assert.are.equal(testCardData.buildCost.material, card.buildCost.material)
             assert.are.equal(0, card.buildCost.data) -- Check default
-            assert.is_true(card.openSlots[Card.Slots.TOP_LEFT])
-            assert.is_falsy(card.openSlots[Card.Slots.TOP_RIGHT]) -- Check default
+            assert.is_true(card.definedOpenSlots[Card.Slots.TOP_LEFT]) -- Check renamed field
+            assert.is_falsy(card.definedOpenSlots[Card.Slots.TOP_RIGHT]) -- Check default on renamed field
         end)
 
         it("should use default values when optional data is omitted", function()
@@ -43,8 +43,9 @@ describe("Card Module", function()
             assert.are.equal(0, card.buildCost.material)
             assert.are.equal(0, card.buildCost.data)
             assert.are.equal(0, card.vpValue)
-            assert.is_nil(next(card.openSlots))
-            assert.is_falsy(card.art)
+            assert.is_nil(next(card.definedOpenSlots)) -- Check renamed field
+            assert.is_falsy(card.art) -- Should be imagePath now, and nil/default
+            assert.are.equal("assets/images/placeholder.png", card.imagePath) -- Check default imagePath
             assert.are.equal("", card.flavorText)
             assert.is_table(card.activationEffect)
             assert.is_function(card.activationEffect.activate)
@@ -63,25 +64,79 @@ describe("Card Module", function()
         end)
     end)
 
-    describe("Card:isSlotOpen()", function()
+    describe("Card Slot Availability", function() -- Renamed block
         local card
         before_each(function()
             card = Card:new(testCardData)
         end)
 
-        it("should return true for an explicitly open slot", function()
-            assert.is_true(card:isSlotOpen(Card.Slots.TOP_LEFT))
-            assert.is_true(card:isSlotOpen(Card.Slots.RIGHT_BOTTOM))
+        -- Test the renamed function for defined slots
+        describe("isSlotDefinedOpen()", function()
+            it("should return true for an explicitly defined open slot", function()
+                assert.is_true(card:isSlotDefinedOpen(Card.Slots.TOP_LEFT))
+                assert.is_true(card:isSlotDefinedOpen(Card.Slots.RIGHT_BOTTOM))
+            end)
+
+            it("should return false for a slot not explicitly defined as open", function()
+                assert.is_false(card:isSlotDefinedOpen(Card.Slots.TOP_RIGHT))
+                assert.is_false(card:isSlotDefinedOpen(Card.Slots.LEFT_TOP))
+            end)
+
+            it("should return false for an invalid/non-existent slot index", function()
+                assert.is_false(card:isSlotDefinedOpen(99))
+                assert.is_false(card:isSlotDefinedOpen("invalid"))
+            end)
         end)
 
-        it("should return false for a slot not explicitly opened", function()
-            assert.is_false(card:isSlotOpen(Card.Slots.TOP_RIGHT))
-            assert.is_false(card:isSlotOpen(Card.Slots.LEFT_TOP))
-        end)
+        -- Test the new function checking availability (defined open AND not occupied)
+        describe("isSlotAvailable()", function()
+             it("should return true for a defined open slot that is not occupied", function()
+                assert.is_true(card:isSlotAvailable(Card.Slots.TOP_LEFT))
+                assert.is_true(card:isSlotAvailable(Card.Slots.RIGHT_BOTTOM))
+            end)
 
-        it("should return false for an invalid/non-existent slot index", function()
-            assert.is_false(card:isSlotOpen(99))
-            assert.is_false(card:isSlotOpen("invalid"))
+            it("should return false for a slot not defined as open", function()
+                assert.is_false(card:isSlotAvailable(Card.Slots.TOP_RIGHT))
+            end)
+            
+            it("should return false for a defined open slot that IS occupied", function()
+                card:markSlotOccupied(Card.Slots.TOP_LEFT, "test_link_3")
+                assert.is_false(card:isSlotAvailable(Card.Slots.TOP_LEFT))
+                -- Ensure other open slot is still available
+                assert.is_true(card:isSlotAvailable(Card.Slots.RIGHT_BOTTOM))
+            end)
+
+            it("should return false for an invalid/non-existent slot index", function()
+                 assert.is_false(card:isSlotAvailable(99))
+            end)
+        end)
+        
+        -- Test occupation marking
+        describe("Slot Occupation", function()
+            it("should initialize slots as unoccupied", function()
+                 assert.is_false(card:isSlotOccupied(Card.Slots.TOP_LEFT))
+                 assert.is_false(card:isSlotOccupied(Card.Slots.TOP_RIGHT)) -- Check a closed slot too
+                 assert.is_false(card:isSlotOccupied(99))
+            end)
+            
+            it("markSlotOccupied should mark a slot as occupied", function()
+                 card:markSlotOccupied(Card.Slots.RIGHT_BOTTOM, "test_link_1")
+                 assert.is_true(card:isSlotOccupied(Card.Slots.RIGHT_BOTTOM))
+                 assert.is_false(card:isSlotOccupied(Card.Slots.TOP_LEFT))
+            end)
+            
+            it("markSlotUnoccupied should mark an occupied slot as unoccupied", function()
+                 card:markSlotOccupied(Card.Slots.TOP_LEFT, "test_link_2")
+                 assert.is_true(card:isSlotOccupied(Card.Slots.TOP_LEFT))
+                 card:markSlotUnoccupied(Card.Slots.TOP_LEFT)
+                 assert.is_false(card:isSlotOccupied(Card.Slots.TOP_LEFT))
+            end)
+            
+            it("markSlotUnoccupied should do nothing to an already unoccupied slot", function()
+                 assert.is_false(card:isSlotOccupied(Card.Slots.TOP_LEFT))
+                 card:markSlotUnoccupied(Card.Slots.TOP_LEFT)
+                 assert.is_false(card:isSlotOccupied(Card.Slots.TOP_LEFT))
+            end)
         end)
     end)
 
@@ -177,20 +232,24 @@ describe("Card Module", function()
             -- tech_output_card is ABOVE tech_input_card
             local canConnect, reason = tech_output_card:canConnectTo(tech_input_card, "down")
             assert.is_true(canConnect, reason)
-            assert.matches("Slot 4.+Out.+Slot 2.+In", reason)
+            -- Reason is no longer returned on success
+            -- assert.matches("Slot 4.+Out.+Slot 2.+In", reason)
         end)
 
         it("should return true for valid connection (Cult Out -> Cult In, Right)", function()
              -- cult_output_card is LEFT of cult_input_card
              -- Need to open appropriate slots for this direction
-             cult_output_card.openSlots = { [Card.Slots.RIGHT_BOTTOM] = true } -- Resource Out (Doesn't matter, just need a right slot open)
+             cult_output_card.definedOpenSlots = { [Card.Slots.RIGHT_BOTTOM] = true } -- Corrected field name
              cult_output_card.type = Card.Type.RESOURCE -- Make types match
-             cult_input_card.openSlots = { [Card.Slots.LEFT_BOTTOM] = true } -- Resource In
+             cult_input_card.definedOpenSlots = { [Card.Slots.LEFT_BOTTOM] = true } -- Corrected field name
              cult_input_card.type = Card.Type.RESOURCE
              
              local canConnect, reason = cult_output_card:canConnectTo(cult_input_card, "right")
-             assert.is_true(canConnect, reason)
-             assert.matches("Slot 8.+Out.+Slot 6.+In", reason)
+             -- This test setup seems flawed based on GDD rule (RHS bottom is Output, LHS bottom is Input)
+             -- Expected: Slot 8 (Res Out) -> Slot 6 (Res In)
+             assert.is_true(canConnect, reason) -- Should be true if setup is correct
+             -- Reason is no longer returned on success
+             -- assert.matches("Slot 8.+Out.+Slot 6.+In", reason)
         end)
 
         it("should return false if target card is invalid", function()
@@ -209,53 +268,54 @@ describe("Card Module", function()
             -- tech_output_card (Bottom Right open) vs closed_slot_card (Top slots closed)
             local canConnect, reason = tech_output_card:canConnectTo(closed_slot_card, "down")
             assert.is_false(canConnect)
-            assert.matches("No matching open slots", reason)
+            assert.matches("No matching open Input%-?>Output slots", reason) -- Update expected reason
 
             -- Swap: closed_slot_card (Bottom slots closed) vs tech_input_card (Top Right open)
             local canConnect2, reason2 = closed_slot_card:canConnectTo(tech_input_card, "down")
             assert.is_false(canConnect2)
-            assert.matches("No matching open slots", reason2)
+            assert.matches("No matching open Input%-?>Output slots", reason2) -- Update expected reason
         end)
 
         it("should return false if slot types do not match", function()
             -- Test Tech card with Tech Output (4) facing another Tech card with Cult Input (3)
+            -- This test might be invalid now as type matching isn't required by simplified GDD rule
+            -- Let's ensure it fails for the correct reason (no Input->Output link)
             local tech_out_card_local = Card:new({ id = "TO_L", type = Card.Type.TECHNOLOGY, openSlots = { [Card.Slots.BOTTOM_RIGHT] = true } }) -- Tech Out (4)
             local tech_in_cult_slot = Card:new({ id = "TIC_L", type = Card.Type.TECHNOLOGY, openSlots = { [Card.Slots.TOP_LEFT] = true } }) -- Cult Out (1)
             
             -- tech_out_card_local is ABOVE tech_in_cult_slot. 
-            -- Facing slots: TO_L Bottom-Right (4, Tech Out) vs TIC_L Top-Left (1, Cult Out)
-            -- Types mismatch (Tech vs Cult)
+            -- Facing slots: TO_L Bottom-Right (4, Tech Out) vs TIC_L Top-Left (1, Cult Out - NOT an input)
             local canConnect, reason = tech_out_card_local:canConnectTo(tech_in_cult_slot, "down")
             assert.is_false(canConnect)
-            assert.matches("No matching open slots", reason)
+            assert.matches("No matching open Input%-?>Output slots", reason) -- Update expected reason
         end)
 
         it("should return false if both slots are inputs or both are outputs", function()
             -- Tech Input vs Tech Input
-            local tech_input_card_2 = Card:new({ id = "TECH_IN2", type = Card.Type.TECHNOLOGY, openSlots = { [Card.Slots.BOTTOM_LEFT] = true } }) -- Tech Input (3)
-            tech_input_card.openSlots = { [Card.Slots.TOP_RIGHT] = true } -- Tech Input (2)
+            local tech_input_card_2 = Card:new({ id = "TECH_IN2", type = Card.Type.TECHNOLOGY, openSlots = { [Card.Slots.BOTTOM_LEFT] = true } }) -- Cult Input (3)
+            tech_input_card.definedOpenSlots = { [Card.Slots.TOP_RIGHT] = true } -- Tech Input (2) - Corrected field name
 
             local canConnect, reason = tech_input_card:canConnectTo(tech_input_card_2, "down")
             assert.is_false(canConnect, "Input->Input should fail")
-            assert.matches("No matching open slots", reason)
+            assert.matches("No matching open Input%-?>Output slots", reason) -- Update expected reason
 
             -- Tech Output vs Tech Output
-            local tech_output_card_2 = Card:new({ id = "TECH_OUT2", type = Card.Type.TECHNOLOGY, openSlots = { [Card.Slots.TOP_LEFT] = true } }) -- Cult Output (1)
-            tech_output_card.openSlots = { [Card.Slots.BOTTOM_RIGHT] = true } -- Tech Output (4)
-            tech_output_card_2.type = Card.Type.TECHNOLOGY -- Make type match Tech Out
-            tech_output_card_2.openSlots = { [Card.Slots.TOP_RIGHT] = true } -- Open Tech In (2) - Need an open slot on the facing edge
-            -- This setup is a bit contrived, but we need a Tech card with a TOP slot open
-            -- Let's fake the slot properties temporarily for the output card
-            local originalGetSlotProps = tech_output_card_2.getSlotProperties
-            tech_output_card_2.getSlotProperties = function(self_arg, slotIdx) 
-                if slotIdx == Card.Slots.TOP_RIGHT then return { type=Card.Type.TECHNOLOGY, is_output=true } end 
-                return originalGetSlotProps(self_arg, slotIdx)
-            end
+            -- Setup needs card A (bottom slot = output), card B (top slot = output)
+            local tech_output_top = Card:new({ id = "TECH_OUT_TOP", type = Card.Type.TECHNOLOGY, openSlots = { [Card.Slots.BOTTOM_RIGHT] = true } }) -- Tech Output (4)
+            local tech_output_bottom = Card:new({ id = "TECH_OUT_BOT", type = Card.Type.TECHNOLOGY, openSlots = { [Card.Slots.TOP_LEFT] = true } }) -- Cult Output (1)
+            tech_output_bottom.type = Card.Type.TECHNOLOGY -- Match type
+            tech_output_bottom.definedOpenSlots = { [Card.Slots.TOP_RIGHT] = true } -- Open Tech Input (2) - NO, need Top-Left or Top-Right open as OUTPUT
+            tech_output_bottom.definedOpenSlots[Card.Slots.TOP_LEFT] = true -- Open Cult Output (1)
             
-            local canConnect2, reason2 = tech_output_card:canConnectTo(tech_output_card_2, "down")
-            tech_output_card_2.getSlotProperties = originalGetSlotProps -- Restore mock
-            assert.is_false(canConnect2, "Output->Output should fail")
-            assert.matches("No matching open slots", reason2)
+            -- This case seems hard to test cleanly with the simplified rule, as any valid Input->Output link makes it true.
+            -- Let's just ensure it fails if ONLY Output->Output is possible.
+            tech_output_top.definedOpenSlots = { [Card.Slots.BOTTOM_RIGHT] = true } -- Tech Output (4)
+            tech_output_bottom.definedOpenSlots = {} -- Close all slots on bottom card
+            tech_output_bottom.definedOpenSlots[Card.Slots.TOP_LEFT] = true -- Cult Output (1)
+            
+            local canConnect2, reason2 = tech_output_top:canConnectTo(tech_output_bottom, "down")
+            assert.is_false(canConnect2, "Output->Output only should fail")
+            assert.matches("No matching open Input%-?>Output slots", reason2) -- Update expected reason
         end)
     end)
 

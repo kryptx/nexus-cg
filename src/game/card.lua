@@ -17,12 +17,12 @@ Card.Type = {
 -- Top: 1 (Cult Out), 2 (Tech In)
 -- Bot: 3 (Cult In),  4 (Tech Out)
 -- Lft: 5 (Know Out), 6 (Res In)
--- Rgt: 7 (Res Out),  8 (Know In)
+-- Rgt: 7 (Know In),  8 (Res Out) -- CORRECTED: Swapped Res Out / Know In based on GDD 4.3
 Card.Slots = {
     TOP_LEFT    = 1, TOP_RIGHT   = 2,
     BOTTOM_LEFT = 3, BOTTOM_RIGHT= 4,
     LEFT_TOP    = 5, LEFT_BOTTOM = 6,
-    RIGHT_TOP   = 7, RIGHT_BOTTOM= 8,
+    RIGHT_TOP   = 7, RIGHT_BOTTOM= 8, -- CORRECTED: Swapped indices 7 and 8 based on GDD 4.3
 }
 
 -- Static helper function to get slot properties based on index
@@ -36,8 +36,8 @@ do -- Precompute slot properties
         if slotIndex == Card.Slots.BOTTOM_RIGHT then return { type = Card.Type.TECHNOLOGY, is_output = true } end
         if slotIndex == Card.Slots.LEFT_TOP     then return { type = Card.Type.KNOWLEDGE, is_output = true } end
         if slotIndex == Card.Slots.LEFT_BOTTOM  then return { type = Card.Type.RESOURCE,  is_output = false } end
-        if slotIndex == Card.Slots.RIGHT_TOP    then return { type = Card.Type.KNOWLEDGE, is_output = false } end
-        if slotIndex == Card.Slots.RIGHT_BOTTOM then return { type = Card.Type.RESOURCE,  is_output = true } end
+        if slotIndex == Card.Slots.RIGHT_TOP    then return { type = Card.Type.KNOWLEDGE, is_output = false } end -- CORRECTED based on GDD 4.3
+        if slotIndex == Card.Slots.RIGHT_BOTTOM then return { type = Card.Type.RESOURCE,  is_output = true } end  -- CORRECTED based on GDD 4.3
         return nil
     end
     for i=1, 8 do slotPropertiesCache[i] = computeSlotProperties(i) end
@@ -100,10 +100,10 @@ function Card:new(data)
     
     instance.vpValue = data.vpValue or 0 -- End-game VP value
 
-    -- Connection Slots (which of the 8 are open)
-    -- Represented as a table mapping slot index (Card.Slots) to true if open
-    -- Example: { [Card.Slots.TOP_LEFT] = true, [Card.Slots.RIGHT_BOTTOM] = true }
-    instance.openSlots = data.openSlots or {}
+    -- Connection Slots (which of the 8 are defined as potentially open by the card definition)
+    instance.definedOpenSlots = data.openSlots or {}
+    -- Runtime state tracking which slots are currently occupied by which link ID
+    instance.occupiedSlots = {} -- Stores { [slotIndex] = linkId, ... }
 
     -- Visual/Flavor
     instance.imagePath = data.imagePath or "assets/images/placeholder.png"
@@ -137,22 +137,79 @@ function Card:getConvergenceDescription()
 end
 
 -- Execute the activation effect
-function Card:activateEffect(player, network)
+function Card:activateEffect(gameService, activatingPlayer, targetNetworkOwnerOrNetwork)
+    print(string.format("  [CARD DEBUG] >>> Entering Card:activateEffect for %s (ID: %s)", self.title, self.id))
     if self.activationEffect and self.activationEffect.activate then
-        return self.activationEffect.activate(player, network)
+        local result = self.activationEffect.activate(gameService, activatingPlayer, targetNetworkOwnerOrNetwork)
+        print(string.format("  [CARD DEBUG] <<< Exiting Card:activateEffect for %s (ID: %s)", self.title, self.id))
+        return result
     end
+    print(string.format("  [CARD DEBUG] !!! Activation effect activate function not found for %s (ID: %s)", self.title, self.id))
 end
 
 -- Execute the convergence effect
-function Card:activateConvergence(player, network)
+function Card:activateConvergence(gameService, activatingPlayer, targetNetworkOwner)
+    print(string.format("  [CARD DEBUG] >>> Entering Card:activateConvergence for %s (ID: %s)", self.title, self.id))
     if self.convergenceEffect and self.convergenceEffect.activate then
-        return self.convergenceEffect.activate(player, network)
+        -- Note: Convergence effects use the same activate function currently
+        -- The distinction of who the owner/activator is happens inside the effect based on arguments
+        local result = self.convergenceEffect.activate(gameService, activatingPlayer, targetNetworkOwner)
+        print(string.format("  [CARD DEBUG] <<< Exiting Card:activateConvergence for %s (ID: %s)", self.title, self.id))
+        return result
+    end
+    print(string.format("  [CARD DEBUG] !!! Convergence effect activate function not found for %s (ID: %s)", self.title, self.id))
+end
+
+-- Marks a specific slot as occupied (e.g., by a convergence link)
+function Card:markSlotOccupied(slotIndex, linkId)
+    if not linkId then
+        print(string.format("Warning: Attempted to mark slot %s occupied without a linkId on card %s.", tostring(slotIndex), self.id or '?'))
+        return
+    end
+    if slotIndex and slotIndex >= 1 and slotIndex <= 8 then
+        if self.occupiedSlots[slotIndex] then
+             print(string.format("Warning: Slot %d on card %s is already occupied by link %s. Overwriting with %s.", slotIndex, self.id or '?', self.occupiedSlots[slotIndex], linkId))
+        end
+        self.occupiedSlots[slotIndex] = linkId
+        print(string.format("Card %s: Slot %d marked as occupied by link %s.", self.id or '?', slotIndex, linkId))
+    else
+        print(string.format("Warning: Attempted to mark invalid slot index %s as occupied on card %s.", tostring(slotIndex), self.id or '?'))
     end
 end
 
--- Helper function to check if a specific slot is open
-function Card:isSlotOpen(slotIndex)
-    return self.openSlots[slotIndex] == true
+-- Marks a specific slot as unoccupied
+function Card:markSlotUnoccupied(slotIndex)
+    if slotIndex and slotIndex >= 1 and slotIndex <= 8 then
+        if self.occupiedSlots[slotIndex] then
+            print(string.format("Card %s: Slot %d (occupied by %s) marked as unoccupied.", self.id or '?', slotIndex, self.occupiedSlots[slotIndex]))
+            self.occupiedSlots[slotIndex] = nil -- Use nil to mark as unoccupied
+        end
+    else
+        print(string.format("Warning: Attempted to mark invalid slot index %s as unoccupied on card %s.", tostring(slotIndex), self.id or '?'))
+    end
+end
+
+-- Checks if a specific slot is currently marked as occupied by any link
+function Card:isSlotOccupied(slotIndex)
+    return self.occupiedSlots[slotIndex] ~= nil
+end
+
+-- Gets the ID of the link occupying the slot, or nil if unoccupied
+function Card:getOccupyingLinkId(slotIndex)
+    return self.occupiedSlots[slotIndex]
+end
+
+-- Helper function to check if a specific slot is available for connection
+-- A slot is available if it's defined as open by the card type AND not currently occupied.
+function Card:isSlotAvailable(slotIndex)
+    local isDefinedOpen = self.definedOpenSlots[slotIndex] == true
+    local isOccupied = self:isSlotOccupied(slotIndex)
+    return isDefinedOpen and not isOccupied
+end
+
+-- Renamed original function for clarity
+function Card:isSlotDefinedOpen(slotIndex)
+    return self.definedOpenSlots[slotIndex] == true
 end
 
 -- === Connection Management Methods (Moved from Reactor) ===
@@ -214,57 +271,78 @@ function Card:getConnectionDetails(targetCard)
 end
 
 -- Check if this card can connect to a target card in a specific direction
--- target: The Card instance to check connection against
--- direction: The relative direction from self to target ("up", "down", "left", "right")
+-- This needs to be updated to use the new `isSlotAvailable` check.
 function Card:canConnectTo(target, direction)
-    if not target or not target.isSlotOpen or not target.getSlotProperties then
+    if not target or not target.isSlotAvailable or not target.getSlotProperties then -- Updated check
         -- print("Warning: Invalid target provided to canConnectTo")
         return false, "Invalid target card"
     end
 
     -- Determine facing slots based on direction (from self's perspective)
-    local selfSlots, targetSlots
+    local selfSlotsIndices, targetSlotsIndices
     if direction == "down" then -- self is ABOVE target
-        selfSlots = {Card.Slots.BOTTOM_LEFT, Card.Slots.BOTTOM_RIGHT}
-        targetSlots = {Card.Slots.TOP_LEFT, Card.Slots.TOP_RIGHT}
+        selfSlotsIndices = {Card.Slots.BOTTOM_LEFT, Card.Slots.BOTTOM_RIGHT}
+        targetSlotsIndices = {Card.Slots.TOP_LEFT, Card.Slots.TOP_RIGHT}
     elseif direction == "up" then -- self is BELOW target
-        selfSlots = {Card.Slots.TOP_LEFT, Card.Slots.TOP_RIGHT}
-        targetSlots = {Card.Slots.BOTTOM_LEFT, Card.Slots.BOTTOM_RIGHT}
+        selfSlotsIndices = {Card.Slots.TOP_LEFT, Card.Slots.TOP_RIGHT}
+        targetSlotsIndices = {Card.Slots.BOTTOM_LEFT, Card.Slots.BOTTOM_RIGHT}
     elseif direction == "right" then -- self is LEFT of target
-        selfSlots = {Card.Slots.RIGHT_TOP, Card.Slots.RIGHT_BOTTOM}
-        targetSlots = {Card.Slots.LEFT_TOP, Card.Slots.LEFT_BOTTOM}
+        selfSlotsIndices = {Card.Slots.RIGHT_TOP, Card.Slots.RIGHT_BOTTOM}
+        targetSlotsIndices = {Card.Slots.LEFT_TOP, Card.Slots.LEFT_BOTTOM}
     elseif direction == "left" then -- self is RIGHT of target
-        selfSlots = {Card.Slots.LEFT_TOP, Card.Slots.LEFT_BOTTOM}
-        targetSlots = {Card.Slots.RIGHT_TOP, Card.Slots.RIGHT_BOTTOM}
+        selfSlotsIndices = {Card.Slots.LEFT_TOP, Card.Slots.LEFT_BOTTOM}
+        targetSlotsIndices = {Card.Slots.RIGHT_TOP, Card.Slots.RIGHT_BOTTOM}
     else
         -- print("Warning: Invalid direction provided to canConnectTo:", direction)
         return false, "Invalid direction"
     end
 
-    -- Check all pairs of facing slots for a valid connection
-    for _, selfSlotIndex in ipairs(selfSlots) do
-        if self:isSlotOpen(selfSlotIndex) then
-            local selfProps = self:getSlotProperties(selfSlotIndex)
-            if selfProps then
-                for _, targetSlotIndex in ipairs(targetSlots) do
-                    if target:isSlotOpen(targetSlotIndex) then
-                        local targetProps = target:getSlotProperties(targetSlotIndex)
-                        if targetProps then
-                            -- Check GDD Rules: Matching Type AND Input/Output Mismatch
-                            if selfProps.type == targetProps.type and selfProps.is_output ~= targetProps.is_output then
-                                return true, string.format("Valid connection: Slot %d (%s %s) -> Slot %d (%s %s)",
-                                    selfSlotIndex, selfProps.type, selfProps.is_output and "Out" or "In",
-                                    targetSlotIndex, targetProps.type, targetProps.is_output and "Out" or "In")
-                            end
-                        end
+    -- Check all pairs of facing slots for a valid connection (GDD 4.3 Simplified Rule)
+    -- "The placement is valid if at least one of these open Input slots [on Card B]
+    -- aligns with a corresponding open Output slot on Card A's adjacent edge."
+    -- Here, 'self' is Card A, 'target' is Card B.
+
+    local foundValidLink = false
+    for _, targetSlotIndex in ipairs(targetSlotsIndices) do
+        if target:isSlotAvailable(targetSlotIndex) then -- Use the new check
+            local targetProps = target:getSlotProperties(targetSlotIndex)
+            if targetProps and not targetProps.is_output then -- Check if it's an INPUT slot on the target (Card B)
+                -- Now find the corresponding slot on self (Card A)
+                local correspondingSelfSlotIndex
+                if targetSlotIndex == Card.Slots.TOP_LEFT then correspondingSelfSlotIndex = Card.Slots.BOTTOM_LEFT
+                elseif targetSlotIndex == Card.Slots.TOP_RIGHT then correspondingSelfSlotIndex = Card.Slots.BOTTOM_RIGHT
+                elseif targetSlotIndex == Card.Slots.BOTTOM_LEFT then correspondingSelfSlotIndex = Card.Slots.TOP_LEFT
+                elseif targetSlotIndex == Card.Slots.BOTTOM_RIGHT then correspondingSelfSlotIndex = Card.Slots.TOP_RIGHT
+                elseif targetSlotIndex == Card.Slots.LEFT_TOP then correspondingSelfSlotIndex = Card.Slots.RIGHT_TOP
+                elseif targetSlotIndex == Card.Slots.LEFT_BOTTOM then correspondingSelfSlotIndex = Card.Slots.RIGHT_BOTTOM
+                elseif targetSlotIndex == Card.Slots.RIGHT_TOP then correspondingSelfSlotIndex = Card.Slots.LEFT_TOP
+                elseif targetSlotIndex == Card.Slots.RIGHT_BOTTOM then correspondingSelfSlotIndex = Card.Slots.LEFT_BOTTOM
+                end
+                
+                -- Check if the corresponding slot on 'self' exists in the facing slots list
+                local isFacing = false
+                for _, sIdx in ipairs(selfSlotsIndices) do 
+                    if sIdx == correspondingSelfSlotIndex then isFacing = true; break; end
+                end
+                
+                if isFacing and self:isSlotAvailable(correspondingSelfSlotIndex) then -- Use new check
+                    local selfProps = self:getSlotProperties(correspondingSelfSlotIndex)
+                    if selfProps and selfProps.is_output then -- Check if it's an OUTPUT slot on self (Card A)
+                        -- Check if types match (implicitly handled by GDD rule? No, GDD rule only requires *one* match)
+                        -- The simplified rule doesn't require type matching for placement, only Input -> Output.
+                        foundValidLink = true
+                        break -- Found at least one valid Input->Output link, placement is valid
                     end
                 end
             end
         end
     end
 
-    -- No valid connection found among facing slots
-    return false, "No matching open slots (Type & In/Out)"
+    if foundValidLink then
+        return true
+    else
+        return false, "No matching open Input->Output slots found on adjacent edges"
+    end
 end
 
 -- TODO: Add functions related to activation, linking, etc.

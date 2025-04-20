@@ -1,6 +1,9 @@
 -- tests/game/states/play_state_spec.lua
 -- Unit tests for the PlayState module
 
+local spy = require 'luassert.spy' -- Add require for spy
+local serpent = require 'serpent' -- Add require for serpent
+
 -- Mock love functions/modules used by PlayState
 -- This is crucial as we can't run actual Love2D environment
 _G.love = {
@@ -62,6 +65,12 @@ local mockGameService = { -- Base methods for the mock
     discardCard = function() return true, "Mock Card Discarded" end,
     attemptPlacement = function() return false, "Mock Placement Failed" end,
     attemptActivation = function() return false, "Mock Activation Failed" end,
+    attemptActivationGlobal = function() return false, "Mock Global Activation Failed" end,
+    -- Add new methods required by PlayState
+    getCurrentParadigm = function() return nil end, -- Return nil for now
+    getCurrentPhase = function() return "Build" end, -- Return default phase
+    advancePhase = function() return true, "Activate" end, -- Mock phase advance
+    attemptConvergence = function() return false, "Mock Convergence Failed" end,
     initializeGame = function(self, playerCount)
         -- Store the player count
         self.playerCount = playerCount
@@ -77,8 +86,16 @@ local mockGameService = { -- Base methods for the mock
         for i = 1, count do
             local player = package.loaded['src.game.player'].new(i, "Player " .. i)
             table.insert(players, player)
-            -- Create network for player
-            player.network = mockNetwork.new(player)
+            -- Assign the network created by the mock Player.new
+            -- We assume mock Player.new already created p.network
+            -- If mockNetwork.new were needed, we would call it here:
+            -- player.network = mockNetwork.new(player)
+            -- Ensure the player object actually has a network
+            if not player.network then
+                print("WARNING: Mock player created without network in mock GameService:getPlayers!")
+                -- Assign a basic one just in case
+                player.network = { getCardAt = function() return nil end, owner = player }
+            end
         end
         self.players = players -- Store for future reference
         return players
@@ -99,6 +116,7 @@ end
 local created_players_capture = {} -- Use this to capture created players if needed outside state
 package.loaded['src.game.player'] = {
     new = function(id_num, name)
+        -- print(string.format("[Mock Player.new] Creating player %s (ID: %d)", name, id_num))
         -- Create reactor card first
         local reactorCard = package.loaded['src.game.card'].new({ id = "REACTOR_" .. id_num, title = "Reactor " .. id_num, type = "Reactor" })
         
@@ -107,7 +125,12 @@ package.loaded['src.game.player'] = {
             name = name,
             resources = {},
             hand = {},  -- Start with empty hand
-            network = nil,
+            deck = {},
+            discard = {},
+            energy = 0,
+            maxEnergy = 10,
+            material = 0,
+            data = 0,
             reactorCard = reactorCard,
             addResource_calls = {}, 
             addCardToHand_calls = {}
@@ -222,7 +245,7 @@ describe("PlayState Module", function()
             assert.is_string(state.statusMessage)
             assert.is_not_nil(state.gameService)
             assert.is_table(state.uiElements)
-            assert.are.equal(2, #state.uiElements) -- End Turn, Discard
+            assert.are.equal(3, #state.uiElements) -- End Turn, Advance Phase, Discard
             assert.truthy(state.cameraX)
             assert.truthy(state.cameraZoom)
         end)
@@ -257,20 +280,12 @@ describe("PlayState Module", function()
              assert.are.same(player2, card_p2_h1.owner, "Player 2 should own its first hand card")
              assert.are.same(player2, card_p2_h2.owner, "Player 2 should own its second hand card")
 
-             -- Original loop for other checks (can be removed if redundant)
-             --[[ for i, player in ipairs(state.players) do 
-                 assert.is_not_nil(player.resources.energy) 
-                 assert.is_not_nil(player.resources.data)
-                 assert.is_not_nil(player.resources.material)
-                 assert.is_not_nil(player.reactorCard)
-                 assert.is_not_nil(player.network)
-                 assert.are.same(player, player.network.owner)
-                 assert.are.equal(2, #player.hand) 
-                 -- assert.are.same(player, player.hand[1].owner) -- The failing assertion
-                 -- assert.are.same(player, player.hand[2].owner)
-             end ]]--
+             -- Check that players have networks assigned
+             for i, player in ipairs(created_players_capture) do
+                 assert.is_table(player.network, "Player " .. i .. " should have a network table")
+                 assert.are.same(player, player.network.owner, "Player " .. i .. " network owner should be self")
+             end
 
-             assert.are.equal(2, #created_networks) -- Check count of mocks created
              assert.are.equal(6, #created_cards_capture) -- Check count of mocks created
         end)
 
@@ -279,55 +294,51 @@ describe("PlayState Module", function()
     describe(":endTurn()", function()
         it("should call gameService:endTurn and reset selection on success", function()
             -- Arrange
-            state:enter() -- Ensure state is initialized
-            state.selectedHandIndex = 1 -- Simulate a selected card
-            state.buttonDiscard:setEnabled(true) -- Simulate discard enabled
-            state.statusMessage = "Something selected"
-            -- Spy on gameService.endTurn
-            local gs_endTurn_calls = 0
-            local original_gs_endTurn = mockGameService.endTurn
-            mockGameService.endTurn = function(gs_self, state_arg)
-                gs_endTurn_calls = gs_endTurn_calls + 1
-                assert.are.same(state, state_arg) -- Check correct state is passed
-                return true, "Test Turn Ended Msg"
+            local original_endTurn = state.gameService.endTurn -- Store original
+            local gs_endTurn_called = false
+            state.gameService.endTurn = function(self, state_arg) -- Replace method
+                gs_endTurn_called = true
+                assert.are.same(state, state_arg) -- Check arg
+                return true, "Player 1's turn. (Build Phase)" -- Mock success return
             end
-            -- Spy on button setEnabled
-            local discard_setEnabled_calls = {}
-            state.buttonDiscard.setEnabled = function(btn_self, enabled)
-                 table.insert(discard_setEnabled_calls, enabled)
-                 btn_self.enabled = enabled -- Keep original behavior
-            end
+            
+            state.selectedHandIndex = 1 
+            state.currentPhase = "Build"
 
             -- Act
             state:endTurn()
 
             -- Assert
-            assert.are.equal(1, gs_endTurn_calls, "gameService:endTurn should be called once")
-            assert.is_nil(state.selectedHandIndex, "selectedHandIndex should be reset")
-            assert.are.equal("Test Turn Ended Msg", state.statusMessage, "statusMessage should be updated")
-            assert.are.equal(1, #discard_setEnabled_calls, "Discard button setEnabled should be called")
-            assert.is_false(discard_setEnabled_calls[1], "Discard button should be disabled")
-
-            -- Restore original mock behavior
-            mockGameService.endTurn = original_gs_endTurn
+            assert.is_true(gs_endTurn_called, "gameService:endTurn should have been called")
+            assert.is_nil(state.selectedHandIndex)
+            assert.is_false(state.buttonDiscard.enabled)
+            assert.are.equal("Player 1's turn. (Build Phase)", state.statusMessage, "statusMessage should be updated to default for new turn")
+            
+            state.gameService.endTurn = original_endTurn -- Restore original
         end)
 
         it("should update status message if gameService:endTurn fails", function()
             -- Arrange
-            state:enter()
-            local original_gs_endTurn = mockGameService.endTurn
-            mockGameService.endTurn = function(gs_self, state_arg)
-                return false, "Test End Turn Fail Msg"
+            local original_endTurn = state.gameService.endTurn -- Store original
+            local gs_endTurn_called = false
+            state.gameService.endTurn = function(self, state_arg) -- Replace method
+                 gs_endTurn_called = true
+                 assert.are.same(state, state_arg)
+                 return false, "Test End Turn Fail Msg" -- Mock failure return
             end
+            
+            state.selectedHandIndex = 1
+            state.currentPhase = "Converge"
 
             -- Act
             state:endTurn()
 
             -- Assert
-            assert.are.equal("Test End Turn Fail Msg", state.statusMessage)
-
-            -- Restore
-            mockGameService.endTurn = original_gs_endTurn
+            assert.is_true(gs_endTurn_called, "gameService:endTurn should have been called")
+            assert.are.equal(1, state.selectedHandIndex) -- Selection should NOT be reset on failure
+            assert.are.equal("Test End Turn Fail Msg (Converge Phase)", state.statusMessage)
+            
+            state.gameService.endTurn = original_endTurn -- Restore original
         end)
     end)
 
@@ -336,10 +347,9 @@ describe("PlayState Module", function()
              -- Arrange
             state:enter()
             state.selectedHandIndex = nil
-            -- Spy on gameService.discardCard
+            local original_discardCard = state.gameService.discardCard -- Store original
             local gs_discard_calls = 0
-            local original_gs_discard = mockGameService.discardCard
-            mockGameService.discardCard = function(...) gs_discard_calls = gs_discard_calls + 1; return true, "" end
+            state.gameService.discardCard = function(...) gs_discard_calls = gs_discard_calls + 1; return true, "" end
 
             -- Act
             state:discardSelected()
@@ -348,102 +358,100 @@ describe("PlayState Module", function()
             assert.are.equal(0, gs_discard_calls, "gameService:discardCard should not be called")
 
             -- Restore
-            mockGameService.discardCard = original_gs_discard
+            state.gameService.discardCard = original_discardCard
         end)
 
         it("should call gameService:discardCard and reset selection on success", function()
-             -- Arrange
-            state:enter()
-            state.selectedHandIndex = 2 -- Select second card
-            state.statusMessage = "Card 2 selected"
-            -- Spy on gameService.discardCard
-            local gs_discard_calls = 0
-            local gs_discard_args = {}
-            local original_gs_discard = mockGameService.discardCard
-            mockGameService.discardCard = function(gs_self, state_arg, index_arg)
-                gs_discard_calls = gs_discard_calls + 1
-                gs_discard_args = { state = state_arg, index = index_arg }
-                return true, "Test Discard Success Msg"
+            -- Arrange
+            local original_discardCard = state.gameService.discardCard -- Store original
+            local gs_discard_called_with = nil
+            state.gameService.discardCard = function(self, state_arg, index_arg) -- Replace method
+                gs_discard_called_with = { self_arg = self, state_arg = state_arg, index_arg = index_arg }
+                return true, "Test Discard Success Msg" -- Mock success return
             end
-            -- Spy on button setEnabled
-            local discard_setEnabled_calls = {}
-            state.buttonDiscard.setEnabled = function(btn_self, enabled)
-                 table.insert(discard_setEnabled_calls, enabled)
-                 btn_self.enabled = enabled
-            end
+            
+            state.selectedHandIndex = 1
+            state.buttonDiscard.enabled = true
+            state.currentPhase = "Build"
 
             -- Act
             state:discardSelected()
 
             -- Assert
-            assert.are.equal(1, gs_discard_calls, "gameService:discardCard should be called once")
-            assert.are.same(state, gs_discard_args.state, "Correct state should be passed to discardCard")
-            assert.are.equal(2, gs_discard_args.index, "Correct index should be passed to discardCard")
-            assert.is_nil(state.selectedHandIndex, "selectedHandIndex should be reset")
-            assert.are.equal("Test Discard Success Msg", state.statusMessage, "statusMessage should be updated")
-            assert.are.equal(1, #discard_setEnabled_calls, "Discard button setEnabled should be called")
-            assert.is_false(discard_setEnabled_calls[1], "Discard button should be disabled")
-
-            -- Restore
-            mockGameService.discardCard = original_gs_discard
+            assert.is_not_nil(gs_discard_called_with, "gameService.discardCard should have been called")
+            assert.are.same(state.gameService, gs_discard_called_with.self_arg)
+            assert.are.same(state, gs_discard_called_with.state_arg)
+            assert.are.equal(1, gs_discard_called_with.index_arg)
+            assert.is_nil(state.selectedHandIndex)
+            assert.is_false(state.buttonDiscard.enabled)
+            assert.are.equal("Test Discard Success Msg (Build Phase)", state.statusMessage, "statusMessage should be updated")
+            
+            state.gameService.discardCard = original_discardCard -- Restore original
         end)
 
         it("should update status message if gameService:discardCard fails", function()
             -- Arrange
-            state:enter()
+            local original_discardCard = state.gameService.discardCard -- Store original
+            local gs_discard_called_with = nil
+            state.gameService.discardCard = function(self, state_arg, index_arg) -- Replace method
+                gs_discard_called_with = { self_arg = self, state_arg = state_arg, index_arg = index_arg }
+                return false, "Test Discard Fail Msg" -- Mock failure return
+            end
+
             state.selectedHandIndex = 1
-            local original_gs_discard = mockGameService.discardCard
-            mockGameService.discardCard = function(...) return false, "Test Discard Fail Msg" end
+            state.buttonDiscard.enabled = true
+            state.currentPhase = "Build"
 
             -- Act
             state:discardSelected()
 
             -- Assert
-            assert.are.equal("Test Discard Fail Msg", state.statusMessage)
-            assert.are.equal(1, state.selectedHandIndex, "selectedHandIndex should not be reset on failure")
-
-             -- Restore
-            mockGameService.discardCard = original_gs_discard
+            assert.is_not_nil(gs_discard_called_with, "gameService.discardCard should have been called")
+            assert.are.equal(1, state.selectedHandIndex) -- Selection not reset on fail
+            assert.is_true(state.buttonDiscard.enabled) -- Button still enabled
+            assert.are.equal("Test Discard Fail Msg (Build Phase)", state.statusMessage)
+            
+            state.gameService.discardCard = original_discardCard -- Restore original
         end)
     end)
 
     describe(":resetSelectionAndStatus()", function()
         it("should reset selection state and disable discard button", function()
             -- Arrange
-            state:enter()
-            state.selectedHandIndex = 1
-            state.buttonDiscard:setEnabled(true)
-            state.statusMessage = "Old status"
-            state.handCardBounds = { { x=0, y=0, w=10, h=10 } } -- Give it some bounds
-            -- Spy on button setEnabled
-            local discard_setEnabled_calls = {}
-            state.buttonDiscard.setEnabled = function(btn_self, enabled)
-                 table.insert(discard_setEnabled_calls, enabled)
-                 btn_self.enabled = enabled
-            end
+            state.selectedHandIndex = 2
+            state.hoveredHandIndex = 1
+            state.handCardBounds = { { index=1 } } -- Dummy bounds
+            state.buttonDiscard.enabled = true
+            -- state.statusMessage = "Old status" -- No longer takes status message
 
             -- Act
-            state:resetSelectionAndStatus("New status")
+            state:resetSelectionAndStatus() -- No argument now
 
             -- Assert
             assert.is_nil(state.selectedHandIndex)
-            assert.are.equal("New status", state.statusMessage)
-            assert.are.equal(0, #state.handCardBounds, "Hand card bounds should be cleared")
-            assert.are.equal(1, #discard_setEnabled_calls)
-            assert.is_false(discard_setEnabled_calls[1])
+            assert.is_nil(state.hoveredHandIndex)
+            assert.are.equal(0, #state.handCardBounds)
+            assert.is_false(state.buttonDiscard.enabled)
+            -- Status message is NOT set by this function anymore
+            -- assert.are.equal("New status", state.statusMessage)
         end)
 
-        it("should use empty string if no new status provided", function()
-             -- Arrange
-            state:enter()
+        -- This test is now redundant as the function doesn't handle status
+        --[[ it("should use empty string if no new status provided", function()
+            -- Arrange
+            state.selectedHandIndex = 1
+            state.buttonDiscard.enabled = true
             state.statusMessage = "Old status"
 
             -- Act
             state:resetSelectionAndStatus()
 
-             -- Assert
-            assert.are.equal("", state.statusMessage)
-        end)
+            -- Assert
+            assert.is_nil(state.selectedHandIndex)
+            assert.is_false(state.buttonDiscard.enabled)
+            -- Status message is NOT set by this function anymore
+            -- assert.are.equal("", state.statusMessage)
+        end) --]]
     end)
 
     describe(":keypressed()", function()
@@ -488,22 +496,44 @@ describe("PlayState Module", function()
     describe(":mousepressed()", function()
         local mockX, mockY, mockButton = 10, 10, 1 -- Mock click coordinates & button
         local mockManager = {} -- Simple mock manager table
+        -- No spies needed here as we manually replace methods
+        local original_attemptPlacement
+        local original_attemptActivationGlobal
 
         before_each(function()
-            -- Enter state to initialize players, UI elements etc.
             state:enter()
-            -- Reset selected index before each mouse test
             state.selectedHandIndex = nil
             state.buttonDiscard:setEnabled(false)
-            -- Mock hand card bounds for selection tests
             state.handCardBounds = {
                 { index = 1, x = 100, y = 500, w = 50, h = 80 },
                 { index = 2, x = 160, y = 500, w = 50, h = 80 },
             }
-            -- Ensure game service mocks don't interfere unless intended
-            mockGameService.attemptPlacement = function() return false, "Mock Placement" end
-            mockGameService.attemptActivation = function() return false, "Mock Activation" end
+            -- Store originals before potential replacement in tests
+            original_attemptPlacement = state.gameService.attemptPlacement
+            original_attemptActivationGlobal = state.gameService.attemptActivationGlobal
         end)
+        
+        after_each(function()
+             -- Restore original methods if they were replaced
+             state.gameService.attemptPlacement = original_attemptPlacement
+             state.gameService.attemptActivationGlobal = original_attemptActivationGlobal
+        end)
+
+        -- Helper function to patch player 1's network for activation tests
+        local function patchPlayer1NetworkForActivation()
+            local player1 = state.players[1]
+            if player1 and player1.network then
+                player1.network.getCardAt = function(self_net, x, y)
+                    if x == 0 and y == 0 then
+                        return { id="MOCK_TARGET", title="Mock Target Card", type="Technology" } -- Mock card at 0,0
+                    else
+                        return nil -- Original mock behaviour for other coords
+                    end
+                end
+            else
+                error("Test setup error: Player 1 or network not found for mock patching in test")
+            end
+        end
 
         it("should prioritize UI elements and do nothing else if UI handles click", function()
             -- Arrange
@@ -608,85 +638,55 @@ describe("PlayState Module", function()
         end)
 
         it("should call attemptPlacement if clicking outside hand/UI with card selected", function()
-             -- Arrange
-            local clickX, clickY = 300, 300 -- Assume coordinates outside hand/UI
-            state.selectedHandIndex = 1
-            local original_handleMousePress = state.buttonEndTurn.handleMousePress
-            state.buttonEndTurn.handleMousePress = function() return false end
-            local original_discard_handleMousePress = state.buttonDiscard.handleMousePress
-            state.buttonDiscard.handleMousePress = function() return false end
-            -- Spy on gameService.attemptPlacement
-            local gs_placement_calls = 0
-            local gs_placement_args = {}
-            local original_gs_placement = mockGameService.attemptPlacement
-            mockGameService.attemptPlacement = function(gs_self, state_arg, index_arg, gx_arg, gy_arg)
-                gs_placement_calls = gs_placement_calls + 1
-                gs_placement_args = { state=state_arg, index=index_arg, gx=gx_arg, gy=gy_arg }
-                return false, "Mock Placement Called" -- Simulate failure to prevent resetSelection call
+            -- Arrange
+            local placement_called_with = nil
+            state.gameService.attemptPlacement = function(self, state_arg, index_arg, gx_arg, gy_arg) -- Replace
+                placement_called_with = { self, state_arg, index_arg, gx_arg, gy_arg }
+                return true, "Mock Placement Called" -- Mock success
             end
-            -- Mock renderer coord conversion
-            local original_s2w = mockRenderer.screenToWorldCoords
-            mockRenderer.screenToWorldCoords = function() return 300, 300 end
-            local original_w2g = mockRenderer.worldToGridCoords
-            mockRenderer.worldToGridCoords = function() return 3, 3 end
+            
+            state.selectedHandIndex = 1
+            state.currentPhase = "Build"
 
-             -- Act
-            state:mousepressed(mockManager, clickX, clickY, 1) -- Pass mock manager, Left click
+            -- Act
+            state:mousepressed(nil, 400, 300, 1) -- Left click in center
 
-             -- Assert
-            assert.are.equal(1, gs_placement_calls, "gameService:attemptPlacement should be called")
-            assert.are.same(state, gs_placement_args.state)
-            assert.are.equal(1, gs_placement_args.index)
-            assert.are.equal(3, gs_placement_args.gx)
-            assert.are.equal(3, gs_placement_args.gy)
-            assert.are.equal("Mock Placement Called", state.statusMessage)
-
-             -- Restore
-            state.buttonEndTurn.handleMousePress = original_handleMousePress
-            state.buttonDiscard.handleMousePress = original_discard_handleMousePress
-            mockGameService.attemptPlacement = original_gs_placement
-            mockRenderer.screenToWorldCoords = original_s2w
-            mockRenderer.worldToGridCoords = original_w2g
+            -- Assert
+            assert.is_not_nil(placement_called_with, "attemptPlacement should be called")
+            assert.are.same(state, placement_called_with[2])
+            assert.are.equal(1, placement_called_with[3])
+            -- Assuming grid coords 0,0 - check if necessary
+            assert.are.equal(0, placement_called_with[4]) 
+            assert.are.equal(0, placement_called_with[5])
+            assert.are.equal("Mock Placement Called (Build Phase)", state.statusMessage)
+            -- Restore handled by after_each
         end)
 
-        it("should call attemptActivation with right mouse button", function()
-             -- Arrange
-            local clickX, clickY = 300, 300
-            local original_handleMousePress = state.buttonEndTurn.handleMousePress
-            state.buttonEndTurn.handleMousePress = function() return false end
-            local original_discard_handleMousePress = state.buttonDiscard.handleMousePress
-            state.buttonDiscard.handleMousePress = function() return false end
-            -- Spy on gameService.attemptActivation
-            local gs_activation_calls = 0
-            local gs_activation_args = {}
-            local original_gs_activation = mockGameService.attemptActivation
-            mockGameService.attemptActivation = function(gs_self, state_arg, gx_arg, gy_arg)
-                gs_activation_calls = gs_activation_calls + 1
-                gs_activation_args = { state=state_arg, gx=gx_arg, gy=gy_arg }
-                return false, "Mock Activation Called"
+        it("should call attemptActivationGlobal with right mouse button", function()
+            -- Arrange
+            patchPlayer1NetworkForActivation() -- << Patch network specifically for this test
+
+            local activation_called_with = nil
+            state.gameService.attemptActivationGlobal = function(self, act_idx, target_idx, gx_arg, gy_arg) -- Replace with new mock signature
+                activation_called_with = { self, act_idx, target_idx, gx_arg, gy_arg }
+                return true, "Mock Activation Called" -- Mock success
             end
-            -- Mock renderer coord conversion
-            local original_s2w = mockRenderer.screenToWorldCoords
-            mockRenderer.screenToWorldCoords = function() return 300, 300 end
-            local original_w2g = mockRenderer.worldToGridCoords
-            mockRenderer.worldToGridCoords = function() return 3, 3 end
+            
+            state.selectedHandIndex = nil
+            state.currentPhase = "Activate"
 
-             -- Act
-            state:mousepressed(mockManager, clickX, clickY, 2) -- Pass mock manager, Right click
+            -- Act
+            state:mousepressed(nil, 400, 300, 2) -- Right click
 
-             -- Assert
-            assert.are.equal(1, gs_activation_calls, "gameService:attemptActivation should be called")
-            assert.are.same(state, gs_activation_args.state)
-            assert.are.equal(3, gs_activation_args.gx)
-            assert.are.equal(3, gs_activation_args.gy)
-            assert.are.equal("Mock Activation Called", state.statusMessage)
-
-             -- Restore
-            state.buttonEndTurn.handleMousePress = original_handleMousePress
-            state.buttonDiscard.handleMousePress = original_discard_handleMousePress
-            mockGameService.attemptActivation = original_gs_activation
-            mockRenderer.screenToWorldCoords = original_s2w
-            mockRenderer.worldToGridCoords = original_w2g
+            -- Assert
+            assert.is_not_nil(activation_called_with, "attemptActivationGlobal should be called")
+            assert.are.same(state.gameService, activation_called_with[1])
+            assert.are.equal(1, activation_called_with[2]) -- Check activator index (should be 1)
+            assert.are.equal(1, activation_called_with[3]) -- Check target index (should be 1 since only P1 exists in mock)
+            assert.are.equal(0, activation_called_with[4])
+            assert.are.equal(0, activation_called_with[5])
+            assert.are.equal("Mock Activation Called (Activate Phase)", state.statusMessage)
+            -- Restore handled by after_each
         end)
 
         -- TODO: Test middle mouse button panning state toggle

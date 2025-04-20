@@ -11,7 +11,7 @@ describe("Player Module", function()
 
     before_each(function()
         -- Create a fresh player instance for each test
-        player = Player:new(player_id, player_name)
+        player = Player:new({ id = player_id, name = player_name })
     end)
 
     describe("Player:new()", function()
@@ -22,7 +22,7 @@ describe("Player Module", function()
         end)
 
         it("should default name if not provided", function()
-            local player_no_name = Player:new(99)
+            local player_no_name = Player:new({ id = 99 })
             assert.are.equal("Player 99", player_no_name.name)
         end)
 
@@ -46,20 +46,16 @@ describe("Player Module", function()
         end)
 
         it("should initialize available convergence links", function()
-            assert.is_table(player.availableConvergenceLinks)
-            assert.are.equal(4, player.availableConvergenceLinks[Card.Type.TECHNOLOGY])
-            assert.are.equal(4, player.availableConvergenceLinks[Card.Type.CULTURE])
-            assert.are.equal(4, player.availableConvergenceLinks[Card.Type.RESOURCE])
-            assert.are.equal(4, player.availableConvergenceLinks[Card.Type.KNOWLEDGE])
-        end)
-
-        it("should initialize an empty active convergence links table", function()
-            assert.is_table(player.activeConvergenceLinks)
-            assert.is_nil(next(player.activeConvergenceLinks))
+            assert.is_table(player.usedConvergenceLinkSets)
+            assert.are.equal(false, player.usedConvergenceLinkSets[Card.Type.TECHNOLOGY])
+            assert.are.equal(false, player.usedConvergenceLinkSets[Card.Type.CULTURE])
+            assert.are.equal(false, player.usedConvergenceLinkSets[Card.Type.RESOURCE])
+            assert.are.equal(false, player.usedConvergenceLinkSets[Card.Type.KNOWLEDGE])
+            assert.are.equal(0, player.initiatedLinksCount)
         end)
 
         it("should error if ID is missing", function()
-            assert.error(function() Player:new(nil, "No ID") end)
+            assert.error(function() Player:new({ name = "No ID" }) end)
         end)
     end)
 

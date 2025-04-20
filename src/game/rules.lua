@@ -84,12 +84,12 @@ function Rules:hasValidConnection(newCard, existingCard, dx, dy)
     
     -- Check for at least one valid Output -> Input connection
     for _, newSlotIndex in ipairs(newCardFacingSlots) do
-        if newCard:isSlotOpen(newSlotIndex) then
+        if newCard:isSlotAvailable(newSlotIndex) then 
             local newSlotProps = Card:getSlotProperties(newSlotIndex)
             
             -- For each potential slot on the existing card that faces the new card
             for _, existingSlotIndex in ipairs(existingCardFacingSlots) do
-                if existingCard:isSlotOpen(existingSlotIndex) then
+                if existingCard:isSlotAvailable(existingSlotIndex) then 
                     local existingSlotProps = Card:getSlotProperties(existingSlotIndex)
                     
                     -- Check if we have an Output -> Input connection with matching type
@@ -211,7 +211,7 @@ function Rules:calculateFinalScores(gameService)
         local score = player:getVictoryPoints()
         
         -- Add 1 VP for each card in network (excluding Reactor)
-        local networkSize = player:getNetwork():getSize() - 1 -- -1 for Reactor
+        local networkSize = player.network:getSize() - 1 -- -1 for Reactor
         score = score + networkSize
         
         -- TODO: Add paradigm-specific scoring

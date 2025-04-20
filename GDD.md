@@ -125,8 +125,11 @@ A player's turn consists of the following phases, performed in order:
 
 *   **Concept:** Global rule modifications that periodically change throughout the game, forcing players to adapt their strategies.
 *   **Starting Paradigm:** The game begins with one randomly drawn "Genesis Paradigm" card revealed during setup, establishing an initial global rule variant.
-*   **Paradigm Deck:** A separate deck of Paradigm Shift cards exists.
-*   **Triggering Shifts:** Paradigm Shifts are triggered when specific conditions are met. Proposal: Shuffle a predetermined number of Paradigm Shift cards into the lower portion (e.g., bottom third) of the main draw deck. When a Paradigm Shift card is drawn, it immediately replaces the currently active Paradigm.
+*   **Paradigm Deck:** A separate deck of Standard Paradigm Shift cards exists, shuffled at the start of the game.
+*   **Triggering Shifts:** Paradigm Shifts are triggered immediately when specific game milestones related to Convergence Links are reached. Each trigger condition occurs only once per game. When triggered, the next card is drawn from the shuffled Standard Paradigm deck and replaces the currently active Paradigm.
+    1.  **First Convergence:** Triggered when the *first* Convergence Link is successfully established between *any* two players.
+    2.  **Universal Convergence:** Triggered when *every* player in the game has established *at least one* Convergence Link. (Note: This trigger may never occur if one or more players fail to establish any links).
+    3.  **Individual Completion:** Triggered the *first* time *any* player successfully establishes their final (e.g., 4th) Convergence Link. (Note: This trigger may never occur if no player uses all their links).
 *   **Scope of Effects:** The revealed Paradigm Shift card dictates new global rules primarily focused on:
     *   Costs (e.g., Energy for activation, Material for building specific types).
     *   Resource generation or conversion rates.

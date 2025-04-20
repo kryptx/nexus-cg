@@ -42,6 +42,16 @@ function Renderer:new()
     instance.images = {} -- Table to cache loaded image objects
     instance.icons = {} -- Table to cache loaded icon image objects
 
+    -- Store rendering constants on the instance
+    instance.CARD_WIDTH = CARD_WIDTH
+    instance.CARD_HEIGHT = CARD_HEIGHT
+    instance.GRID_SPACING = GRID_SPACING
+    instance.SLOT_RADIUS = SLOT_RADIUS
+    instance.HAND_CARD_WIDTH = HAND_CARD_WIDTH
+    instance.HAND_CARD_HEIGHT = HAND_CARD_HEIGHT
+    instance.UI_ICON_SIZE = UI_ICON_SIZE
+    -- ... potentially add others if needed ...
+
     -- Store default offsets
     instance.defaultOffsetX = NETWORK_OFFSET_X
     instance.defaultOffsetY = NETWORK_OFFSET_Y
@@ -216,10 +226,12 @@ end
 
 -- Convert network grid coordinates (x, y) to WORLD coordinates (wx, wy)
 -- Note: World coordinates are independent of camera zoom/pan
-function Renderer:gridToWorldCoords(gridX, gridY)
-    -- Place grid (0,0) at world origin for simplicity with camera
-    local wx = gridX * (CARD_WIDTH + GRID_SPACING)
-    local wy = gridY * (CARD_HEIGHT + GRID_SPACING)
+function Renderer:gridToWorldCoords(gridX, gridY, originX, originY)
+    originX = originX or 0 -- Default to 0 if not provided
+    originY = originY or 0
+    -- Place grid (0,0) relative to the player's origin
+    local wx = originX + gridX * (CARD_WIDTH + GRID_SPACING)
+    local wy = originY + gridY * (CARD_HEIGHT + GRID_SPACING)
     return wx, wy
 end
 
@@ -231,12 +243,16 @@ function Renderer:screenToWorldCoords(sx, sy, cameraX, cameraY, cameraZoom)
 end
 
 -- Convert WORLD coordinates (wx, wy) to network grid coordinates (gridX, gridY)
-function Renderer:worldToGridCoords(wx, wy)
-    -- Corrected calculation
+function Renderer:worldToGridCoords(wx, wy, originX, originY)
+    originX = originX or 0 -- Default to 0 if not provided
+    originY = originY or 0
+    -- Corrected calculation relative to origin
     local cellWidth = CARD_WIDTH + GRID_SPACING
     local cellHeight = CARD_HEIGHT + GRID_SPACING
-    local gridX = math.floor(wx / cellWidth)
-    local gridY = math.floor(wy / cellHeight)
+    -- Check for division by zero, although unlikely with positive cell dimensions
+    if cellWidth == 0 or cellHeight == 0 then return 0, 0 end
+    local gridX = math.floor((wx - originX) / cellWidth)
+    local gridY = math.floor((wy - originY) / cellHeight)
     return gridX, gridY
 end
 
@@ -259,94 +275,263 @@ local function getSlotInfo(slotIndex)
     return nil
 end
 
+-- Helper function to find the specific card slot index closest to world coordinates
+-- Returns: gridX, gridY, card, slotIndex OR nil, nil, nil, nil
+function Renderer:getSlotAtWorldPos(network, wx, wy, originX, originY)
+    originX = originX or 0
+    originY = originY or 0
+    local tolerance = self.SLOT_RADIUS * 3.5
+    local toleranceSq = tolerance * tolerance -- Use squared distance
+
+    -- Find the primary grid cell under the click
+    local clickGridX, clickGridY = self:worldToGridCoords(wx, wy, originX, originY)
+
+    -- Define candidate grid cells to check (primary + orthogonal neighbors)
+    local candidateCells = {
+        {clickGridX, clickGridY},
+        {clickGridX + 1, clickGridY},
+        {clickGridX - 1, clickGridY},
+        {clickGridX, clickGridY + 1},
+        {clickGridX, clickGridY - 1}
+    }
+
+    local closestMatch = {
+        distanceSq = toleranceSq,
+        card = nil,
+        gridX = nil,
+        gridY = nil,
+        slotIndex = nil
+    }
+
+    -- Check slots on cards in candidate cells
+    for _, cellCoords in ipairs(candidateCells) do
+        local gridX, gridY = cellCoords[1], cellCoords[2]
+        local card = network:getCardAt(gridX, gridY)
+
+        if card then
+            local cardWX, cardWY = self:gridToWorldCoords(gridX, gridY, originX, originY)
+
+            for slotIndex = 1, 8 do
+                local slotInfo = getSlotInfo(slotIndex)
+                if slotInfo then
+                    local slotType = slotInfo[3]
+                    local isOutput = slotInfo[4]
+                    local r = self.SLOT_RADIUS
+
+                    -- Calculate the anchor point on the card edge
+                    local anchorWX = cardWX + slotInfo[1]
+                    local anchorWY = cardWY + slotInfo[2]
+
+                    -- Calculate the visual center of the slot graphic
+                    local centerWX, centerWY = anchorWX, anchorWY
+                    if isOutput then
+                        if slotIndex == Card.Slots.TOP_LEFT or slotIndex == Card.Slots.TOP_RIGHT then centerWY = anchorWY - r / 2
+                        elseif slotIndex == Card.Slots.BOTTOM_LEFT or slotIndex == Card.Slots.BOTTOM_RIGHT then centerWY = anchorWY + r / 2
+                        elseif slotIndex == Card.Slots.LEFT_TOP or slotIndex == Card.Slots.LEFT_BOTTOM then centerWX = anchorWX - r / 2
+                        elseif slotIndex == Card.Slots.RIGHT_TOP or slotIndex == Card.Slots.RIGHT_BOTTOM then centerWX = anchorWX + r / 2
+                        end
+                    end
+
+                    -- Check distance from click to the calculated center
+                    local distSq = (wx - centerWX)^2 + (wy - centerWY)^2
+
+                    if distSq < closestMatch.distanceSq then
+                        -- Update closest match found so far
+                        closestMatch.distanceSq = distSq
+                        closestMatch.card = card
+                        closestMatch.gridX = gridX
+                        closestMatch.gridY = gridY
+                        closestMatch.slotIndex = slotIndex
+                    end
+                end
+            end
+        end
+    end
+
+    -- Return the details of the closest match if one was found within tolerance
+    if closestMatch.card then
+        return closestMatch.gridX, closestMatch.gridY, closestMatch.card, closestMatch.slotIndex
+    else
+        return nil, nil, nil, nil -- No slot found close enough in any candidate cell
+    end
+end
+
 -- Helper function to draw the 8 connection slots for a card
-function Renderer:drawCardSlots(card, sx, sy, alphaOverride)
+function Renderer:drawCardSlots(card, sx, sy, alphaOverride, activeLinks)
     alphaOverride = alphaOverride or 1.0 -- Default to opaque
+    activeLinks = activeLinks or {} -- Ensure it's a table
     if not card then return end
+
+    -- Create a lookup map for faster link detail retrieval
+    local linkMap = {}
+    for _, link in ipairs(activeLinks) do
+        linkMap[link.linkId] = link
+    end
 
     local originalFont = love.graphics.getFont()
     local originalColor = {love.graphics.getColor()}
-    local r = SLOT_RADIUS -- Use radius for sizing
+    local r = self.SLOT_RADIUS -- Use instance variable
 
     for slotIndex = 1, 8 do
         local info = getSlotInfo(slotIndex)
         if info then
             local slotX = sx + info[1]
             local slotY = sy + info[2]
-            local slotType = info[3]
             local isOutput = info[4]
-            local isOpen = card:isSlotOpen(slotIndex)
+            local isDefinedOpen = card:isSlotDefinedOpen(slotIndex)
+            local occupyingLinkId = card:getOccupyingLinkId(slotIndex)
+            local isOccupied = occupyingLinkId ~= nil
 
-            -- Determine orientation based on slot index
+            -- Calculate the visual center needed for positioning the tab
+            local centerWX, centerWY = slotX, slotY
             local orientation
-            if slotIndex == Card.Slots.TOP_LEFT or slotIndex == Card.Slots.TOP_RIGHT then
-                orientation = "top"
-            elseif slotIndex == Card.Slots.BOTTOM_LEFT or slotIndex == Card.Slots.BOTTOM_RIGHT then
-                orientation = "bottom"
-            elseif slotIndex == Card.Slots.LEFT_TOP or slotIndex == Card.Slots.LEFT_BOTTOM then
-                orientation = "left"
-            elseif slotIndex == Card.Slots.RIGHT_TOP or slotIndex == Card.Slots.RIGHT_BOTTOM then
-                orientation = "right"
+            if slotIndex == Card.Slots.TOP_LEFT or slotIndex == Card.Slots.TOP_RIGHT then orientation = "top"
+            elseif slotIndex == Card.Slots.BOTTOM_LEFT or slotIndex == Card.Slots.BOTTOM_RIGHT then orientation = "bottom"
+            elseif slotIndex == Card.Slots.LEFT_TOP or slotIndex == Card.Slots.LEFT_BOTTOM then orientation = "left"
+            elseif slotIndex == Card.Slots.RIGHT_TOP or slotIndex == Card.Slots.RIGHT_BOTTOM then orientation = "right"
             end
 
-            if isOpen then
-                 -- Apply alpha override to slot color
-                local baseColor = SLOT_COLORS[slotType] or {1,1,1,1}
-                love.graphics.setColor(baseColor[1], baseColor[2], baseColor[3], (baseColor[4] or 1) * alphaOverride)
+            -- Draw original slot shape underneath first (slightly dimmed/transparent)
+            self:_drawSingleSlotShape(slotIndex, slotX, slotY, r, alphaOverride * 0.4)
 
-                local vertices
-                if isOutput then -- Draw rectangle
-                    if orientation == "top" then
-                        vertices = { slotX-r, slotY-r, slotX+r, slotY-r, slotX+r, slotY, slotX-r, slotY }
-                    elseif orientation == "bottom" then
-                        vertices = { slotX-r, slotY, slotX+r, slotY, slotX+r, slotY+r, slotX-r, slotY+r }
-                    elseif orientation == "left" then
-                        vertices = { slotX-r, slotY-r, slotX, slotY-r, slotX, slotY+r, slotX-r, slotY+r }
-                    elseif orientation == "right" then
-                        vertices = { slotX, slotY-r, slotX+r, slotY-r, slotX+r, slotY+r, slotX, slotY+r }
+            if isOccupied then
+                -- 1. Draw original shape underneath (dimmed)
+                self:_drawSingleSlotShape(slotIndex, slotX, slotY, r, alphaOverride * 0.4)
+
+                -- 2. Draw the larger tab centered on the visual center
+                local linkDetails = linkMap[occupyingLinkId]
+                local playerNumber = linkDetails and linkDetails.initiatingPlayerIndex or "?"
+
+                -- Draw a square tab positioned next to the slot center
+                local tabSize = r * 3.5 -- Size of the square tab
+                local tabX, tabY
+                local fixedOffset = r * 1.0 -- Moderate offset outwards
+
+                -- Position tab based on slot ANCHOR (slotX, slotY) and orientation
+                if orientation == "top" then
+                    tabX = slotX - tabSize / 2
+                    tabY = slotY - fixedOffset - tabSize
+                elseif orientation == "bottom" then
+                    tabX = slotX - tabSize / 2
+                    tabY = slotY + fixedOffset
+                elseif orientation == "left" then
+                    tabX = slotX - fixedOffset - tabSize
+                    tabY = slotY - tabSize / 2
+                elseif orientation == "right" then
+                    tabX = slotX + fixedOffset
+                    tabY = slotY - tabSize / 2
+                else -- Fallback
+                    local centerWX, centerWY = slotX, slotY
+                    if isOutput then
+                       if slotIndex == Card.Slots.TOP_LEFT or slotIndex == Card.Slots.TOP_RIGHT then centerWY = slotY - r / 2
+                       elseif slotIndex == Card.Slots.BOTTOM_LEFT or slotIndex == Card.Slots.BOTTOM_RIGHT then centerWY = slotY + r / 2
+                       elseif slotIndex == Card.Slots.LEFT_TOP or slotIndex == Card.Slots.LEFT_BOTTOM then centerWX = slotX - r / 2
+                       elseif slotIndex == Card.Slots.RIGHT_TOP or slotIndex == Card.Slots.RIGHT_BOTTOM then centerWX = slotX + r / 2
+                       end
                     end
-                else -- Draw triangle (input)
-                    if orientation == "top" then -- Points down
-                        vertices = { slotX-r, slotY-r, slotX+r, slotY-r, slotX, slotY+r }
-                    elseif orientation == "bottom" then -- Points up
-                        vertices = { slotX-r, slotY+r, slotX+r, slotY+r, slotX, slotY-r }
-                    elseif orientation == "left" then -- Points right
-                        vertices = { slotX-r, slotY-r, slotX-r, slotY+r, slotX+r, slotY }
-                    elseif orientation == "right" then -- Points left
-                        vertices = { slotX+r, slotY-r, slotX+r, slotY+r, slotX-r, slotY }
-                    end
+                    tabX = centerWX - tabSize / 2
+                    tabY = centerWY - tabSize / 2
                 end
 
-                if vertices then
-                    love.graphics.polygon("fill", vertices)
-                    -- Apply alpha override to border color
-                    local borderColor = SLOT_BORDER_COLOR
-                    love.graphics.setColor(borderColor[1], borderColor[2], borderColor[3], (borderColor[4] or 1) * alphaOverride)
-                    love.graphics.polygon("line", vertices)
-                else
-                    -- Fallback or error handling if orientation/type is unexpected
-                    love.graphics.circle("fill", slotX, slotY, r)
-                     -- Apply alpha override to border color
-                    local borderColor = SLOT_BORDER_COLOR
-                    love.graphics.setColor(borderColor[1], borderColor[2], borderColor[3], (borderColor[4] or 1) * alphaOverride)
-                    love.graphics.circle("line", slotX, slotY, r)
-                end
+                -- Draw tab square (Restore appearance)
+                love.graphics.setColor(0.9, 0.9, 0.9, alphaOverride * 0.7) -- Light gray, transparent
+                love.graphics.rectangle("fill", tabX, tabY, tabSize, tabSize)
+                love.graphics.setColor(0, 0, 0, alphaOverride) -- Black border
+                love.graphics.rectangle("line", tabX, tabY, tabSize, tabSize)
+
+                -- Draw player number on tab (Use manually scaled print)
+                local tabFont = self.fonts.worldSmall or originalFont
+                love.graphics.setFont(tabFont)
+                love.graphics.setColor(0, 0, 0, alphaOverride)
+                local text = tostring(playerNumber)
+                local textScale = 0.45 / self.worldFontMultiplier -- Use worldSmall multiplier
+
+                -- Calculate text dimensions at font's native size
+                local nativeTextW = tabFont:getWidth(text)
+                local nativeTextH = tabFont:getHeight()
+
+                -- Calculate position to center the text *after* scaling
+                local scaledTextW = nativeTextW * textScale
+                local scaledTextH = nativeTextH * textScale
+                local textDrawX = tabX + (tabSize - scaledTextW) / 2
+                local textDrawY = tabY + (tabSize - scaledTextH) / 2
+
+                -- Apply scaling and print
+                love.graphics.push()
+                love.graphics.translate(textDrawX, textDrawY)
+                love.graphics.scale(textScale, textScale)
+                love.graphics.print(text, 0, 0)
+                love.graphics.pop()
+
+            elseif isDefinedOpen then
+                -- Draw normal open slot using the helper
+                 self:_drawSingleSlotShape(slotIndex, slotX, slotY, r, alphaOverride)
 
             else -- Closed slot
-                 -- Apply alpha override to closed slot color
+                -- Draw closed slot indicator (small gray circle)
                 local closedColor = CLOSED_SLOT_COLOR
                 love.graphics.setColor(closedColor[1], closedColor[2], closedColor[3], (closedColor[4] or 1) * alphaOverride)
-                love.graphics.circle("fill", slotX, slotY, r * 0.8) -- Slightly smaller
-                -- Apply alpha override to border color
+                love.graphics.circle("fill", slotX, slotY, r * 0.8)
                 local borderColor = SLOT_BORDER_COLOR
                 love.graphics.setColor(borderColor[1], borderColor[2], borderColor[3], (borderColor[4] or 1) * alphaOverride)
                 love.graphics.circle("line", slotX, slotY, r * 0.8)
             end
         end
     end
-    -- Restore font/color just in case slot drawing changes them
+    -- Restore font/color
     love.graphics.setFont(originalFont)
     love.graphics.setColor(originalColor)
+end
+
+-- Internal helper to draw the shape for a single slot
+function Renderer:_drawSingleSlotShape(slotIndex, slotX, slotY, radius, alpha)
+    local info = getSlotInfo(slotIndex)
+    if not info then return end
+
+    local slotType = info[3]
+    local isOutput = info[4]
+    local r = radius -- Use passed radius
+
+    -- Determine orientation
+    local orientation
+    if slotIndex == Card.Slots.TOP_LEFT or slotIndex == Card.Slots.TOP_RIGHT then orientation = "top"
+    elseif slotIndex == Card.Slots.BOTTOM_LEFT or slotIndex == Card.Slots.BOTTOM_RIGHT then orientation = "bottom"
+    elseif slotIndex == Card.Slots.LEFT_TOP or slotIndex == Card.Slots.LEFT_BOTTOM then orientation = "left"
+    elseif slotIndex == Card.Slots.RIGHT_TOP or slotIndex == Card.Slots.RIGHT_BOTTOM then orientation = "right"
+    end
+
+    -- Apply alpha override to slot color
+    local baseColor = SLOT_COLORS[slotType] or {1,1,1,1}
+    love.graphics.setColor(baseColor[1], baseColor[2], baseColor[3], (baseColor[4] or 1) * alpha)
+
+    local vertices
+    if isOutput then -- Draw rectangle
+        if orientation == "top" then vertices = { slotX-r, slotY-r, slotX+r, slotY-r, slotX+r, slotY, slotX-r, slotY }
+        elseif orientation == "bottom" then vertices = { slotX-r, slotY, slotX+r, slotY, slotX+r, slotY+r, slotX-r, slotY+r }
+        elseif orientation == "left" then vertices = { slotX-r, slotY-r, slotX, slotY-r, slotX, slotY+r, slotX-r, slotY+r }
+        elseif orientation == "right" then vertices = { slotX, slotY-r, slotX+r, slotY-r, slotX+r, slotY+r, slotX, slotY+r }
+        end
+    else -- Draw triangle (input)
+        if orientation == "top" then vertices = { slotX-r, slotY-r, slotX+r, slotY-r, slotX, slotY+r } -- Points down
+        elseif orientation == "bottom" then vertices = { slotX-r, slotY+r, slotX+r, slotY+r, slotX, slotY-r } -- Points up
+        elseif orientation == "left" then vertices = { slotX-r, slotY-r, slotX-r, slotY+r, slotX+r, slotY } -- Points right
+        elseif orientation == "right" then vertices = { slotX+r, slotY-r, slotX+r, slotY+r, slotX-r, slotY } -- Points left
+        end
+    end
+
+    if vertices then
+        love.graphics.polygon("fill", vertices)
+        -- Apply alpha override to border color
+        local borderColor = SLOT_BORDER_COLOR
+        love.graphics.setColor(borderColor[1], borderColor[2], borderColor[3], (borderColor[4] or 1) * alpha)
+        love.graphics.polygon("line", vertices)
+    else
+        -- Fallback or error handling
+        love.graphics.circle("fill", slotX, slotY, r)
+        local borderColor = SLOT_BORDER_COLOR
+        love.graphics.setColor(borderColor[1], borderColor[2], borderColor[3], (borderColor[4] or 1) * alpha)
+        love.graphics.circle("line", slotX, slotY, r)
+    end
 end
 
 -- Internal core function to draw a card's elements based on context
@@ -543,12 +728,12 @@ function Renderer:_drawCardInternal(card, x, y, context)
 
     -- Restore color before drawing slots (they handle alpha internally)
     love.graphics.setColor(originalColor)
-    -- Draw Connection Slots (call as method on renderer, passing coordinates and alpha)
-    self:drawCardSlots(card, x, y, alphaOverride)
+    -- Draw Connection Slots (call as method on renderer, passing coordinates, alpha, and activeLinks)
+    self:drawCardSlots(card, x, y, alphaOverride, context.activeLinks)
 end
 
 -- Internal utility function to draw a single card in the world
-function Renderer:_drawSingleCardInWorld(card, wx, wy, alphaOverride, useInvalidBorder)
+function Renderer:_drawSingleCardInWorld(card, wx, wy, activeLinks, alphaOverride, useInvalidBorder)
     -- Default alpha and border type
     alphaOverride = alphaOverride or 1.0
     useInvalidBorder = useInvalidBorder or false
@@ -569,7 +754,8 @@ function Renderer:_drawSingleCardInWorld(card, wx, wy, alphaOverride, useInvalid
             artLabel = 0.416666667 -- 10pt effective size
         },
         alpha = alphaOverride,
-        borderType = useInvalidBorder and "invalid" or "normal"
+        borderType = useInvalidBorder and "invalid" or "normal",
+        activeLinks = activeLinks -- Pass links through
     }
 
     -- Call the core drawing function
@@ -577,8 +763,10 @@ function Renderer:_drawSingleCardInWorld(card, wx, wy, alphaOverride, useInvalid
 end
 
 -- Draw a player's network grid, applying camera transform
-function Renderer:drawNetwork(network, cameraX, cameraY, cameraZoom)
+function Renderer:drawNetwork(network, cameraX, cameraY, cameraZoom, originX, originY, activeLinks)
     if not network then return end
+    originX = originX or 0 -- Default origin if not provided
+    originY = originY or 0
 
     love.graphics.push() -- Save current transform state
     love.graphics.translate(-cameraX * cameraZoom, -cameraY * cameraZoom)
@@ -594,7 +782,7 @@ function Renderer:drawNetwork(network, cameraX, cameraY, cameraZoom)
     for cardId, card in pairs(network.cards) do
         -- Process only if card is a valid table with a position
         if type(card) == "table" and card.position then
-            local wx, wy = self:gridToWorldCoords(card.position.x, card.position.y)
+            local wx, wy = self:gridToWorldCoords(card.position.x, card.position.y, originX, originY) -- Pass origin
             -- Add to queue instead of drawing immediately
             table.insert(drawQueue, { card = card, wx = wx, wy = wy })
         else
@@ -610,8 +798,8 @@ function Renderer:drawNetwork(network, cameraX, cameraY, cameraZoom)
     for _, item in ipairs(drawQueue) do
         -- Call as utility function, passing self
         -- _drawSingleCardInWorld(self, item.card, item.wx, item.wy)
-        -- Call as method
-        self:_drawSingleCardInWorld(item.card, item.wx, item.wy)
+        -- Call as method, passing activeLinks
+        self:_drawSingleCardInWorld(item.card, item.wx, item.wy, activeLinks)
     end
 
     -- Restore original font/color after drawing all cards
@@ -622,15 +810,17 @@ function Renderer:drawNetwork(network, cameraX, cameraY, cameraZoom)
 end
 
 -- Draw highlight / card preview over the hovered grid cell, or red outline if invalid
-function Renderer:drawHoverHighlight(gridX, gridY, cameraX, cameraY, cameraZoom, selectedCard, isPlacementValid)
+function Renderer:drawHoverHighlight(gridX, gridY, cameraX, cameraY, cameraZoom, selectedCard, isPlacementValid, originX, originY)
     -- Default to valid if not provided
     isPlacementValid = isPlacementValid == nil or isPlacementValid == true
+    originX = originX or 0 -- Default origin
+    originY = originY or 0
 
     if gridX == nil or gridY == nil then return end
 
     -- If a card is selected, draw highlight or preview
     if selectedCard then
-        local wx, wy = self:gridToWorldCoords(gridX, gridY)
+        local wx, wy = self:gridToWorldCoords(gridX, gridY, originX, originY) -- Use origin
         love.graphics.push()
         love.graphics.translate(-cameraX * cameraZoom, -cameraY * cameraZoom)
         love.graphics.scale(cameraZoom, cameraZoom)
@@ -638,7 +828,8 @@ function Renderer:drawHoverHighlight(gridX, gridY, cameraX, cameraY, cameraZoom,
 
         -- Use _drawSingleCardInWorld, passing alpha and validity flag
         local useInvalidBorder = not isPlacementValid
-        self:_drawSingleCardInWorld(selectedCard, wx, wy, 0.5, useInvalidBorder)
+        -- Corrected arguments: Pass nil for activeLinks, then alpha, then border flag
+        self:_drawSingleCardInWorld(selectedCard, wx, wy, nil, 0.5, useInvalidBorder)
 
         -- Restore state (pop restores color, font, line width, transforms)
         love.graphics.pop()
@@ -772,11 +963,12 @@ function Renderer:drawHand(player, selectedIndex)
 end
 
 -- Drawing UI elements (resources, VP, turn info)
-function Renderer:drawUI(player)
+function Renderer:drawUI(player, hoveredLinkType, currentPhase, convergenceSelectionState)
     if not player then return end
 
     local originalFont = love.graphics.getFont()
     local originalColor = {love.graphics.getColor()}
+    local originalLineWidth = love.graphics.getLineWidth() -- Store original line width
 
     -- Use UI Label Style
     local style = self.styleGuide.UI_LABEL
@@ -797,7 +989,7 @@ function Renderer:drawUI(player)
     -- Print UI text
     local uiX = 10
     local uiY_start = 30
-    local lineSpacing = 20
+    local lineSpacing = 21
     love.graphics.print(string.format("--- %s UI ---", player.name), uiX, uiY_start)
     love.graphics.print(string.format("VP: %d", player.vp), uiX, uiY_start + lineSpacing)
 
@@ -850,15 +1042,96 @@ function Renderer:drawUI(player)
         love.graphics.setColor(r, g, b, a) -- Restore text color
         local materialText = tostring(player.resources.material)
         love.graphics.print(materialText, currentX + iconSize + iconSpacing, resY)
-        -- No need to update currentX after the last one
+        currentX = currentX + font:getWidth(materialText) + resGroupSpacing
     else -- Fallback
         local materialText = string.format("M:%d", player.resources.material)
         love.graphics.print(materialText, currentX, resY)
+        currentX = currentX + font:getWidth(materialText) + resGroupSpacing
+    end
+
+    -- Draw Available Convergence Link Sets
+    local linkY = resY + lineSpacing -- Draw below resources
+    local linkStartX = uiX
+    local linkIconSize = UI_ICON_SIZE * 0.8 -- Slightly smaller than resource icons
+    local linkIconSpacing = 3
+    local linkGroupSpacing = 5
+    local linkTextStyle = self.styleGuide.UI_LABEL -- Use standard UI label style
+    local linkFont = self.fonts[linkTextStyle.fontName] or font -- Fallback to standard UI font
+    love.graphics.setFont(linkFont)
+    love.graphics.setColor(linkTextStyle.color)
+    love.graphics.print("Links:", linkStartX, linkY)
+    currentX = linkStartX + linkFont:getWidth("Links:") + linkGroupSpacing
+
+    local linkTypes = { Card.Type.TECHNOLOGY, Card.Type.CULTURE, Card.Type.RESOURCE, Card.Type.KNOWLEDGE }
+    for _, linkType in ipairs(linkTypes) do
+        local isAvailable = player:hasLinkSetAvailable(linkType)
+        local isHovered = (hoveredLinkType == linkType)
+        local icon = self.icons[linkType] -- Get the icon for the link type
+        local bgColor = SLOT_COLORS[linkType] or {0.5, 0.5, 0.5, 1} -- Fallback gray
+        local boxSize = linkIconSize + 4 -- Background box slightly larger than icon
+        local boxX = currentX
+        local boxY = linkY - 2 -- Adjust vertical position slightly for centering
+
+        -- Draw background square, dimmed if not available
+        if isAvailable then
+            love.graphics.setColor(bgColor[1], bgColor[2], bgColor[3], bgColor[4] or 1)
+        else
+            love.graphics.setColor(bgColor[1] * 0.5, bgColor[2] * 0.5, bgColor[3] * 0.5, (bgColor[4] or 1) * 0.7)
+        end
+        love.graphics.rectangle("fill", boxX, boxY, boxSize, boxSize)
+
+        -- Draw white border if hovered, available, and in Converge phase and not already selecting
+        if isHovered and isAvailable and currentPhase == "Converge" and convergenceSelectionState == nil then
+            local currentLineWidth = love.graphics.getLineWidth()
+            love.graphics.setLineWidth(2) -- Make border noticeable
+            love.graphics.setColor(1, 1, 1, 1) -- White
+            love.graphics.rectangle("line", boxX, boxY, boxSize, boxSize)
+            love.graphics.setLineWidth(currentLineWidth) -- Reset line width
+        end
+
+        -- Draw icon or text on top
+        if icon then
+            local iconDrawX = boxX + (boxSize - linkIconSize) / 2 -- Center icon in box
+            local iconDrawY = boxY + (boxSize - linkIconSize) / 2
+            local scale = linkIconSize / icon:getWidth()
+            -- Set icon color (white, potentially dimmed if needed, though background dimming is primary)
+            if isAvailable then
+                love.graphics.setColor(1, 1, 1, 1) -- Full white for icon itself
+            else
+                love.graphics.setColor(0.8, 0.8, 0.8, 0.8) -- Slightly dimmed white
+            end
+            love.graphics.draw(icon, iconDrawX, iconDrawY, 0, scale, scale)
+            currentX = currentX + boxSize + linkIconSpacing -- Advance by box size + spacing
+        else
+            -- Fallback: Draw text abbreviation centered in box
+            local typeStr = "UNK"
+            if linkType == Card.Type.TECHNOLOGY then typeStr = "T" end
+            if linkType == Card.Type.CULTURE then typeStr = "C" end
+            if linkType == Card.Type.RESOURCE then typeStr = "R" end
+            if linkType == Card.Type.KNOWLEDGE then typeStr = "K" end
+            -- Set text color (using style, dimmed if needed)
+            local txtColor = linkTextStyle.color
+            if isAvailable then
+                love.graphics.setColor(txtColor[1], txtColor[2], txtColor[3], txtColor[4] or 1)
+            else
+                love.graphics.setColor(txtColor[1]*0.5, txtColor[2]*0.5, txtColor[3]*0.5, (txtColor[4] or 1)*0.7)
+            end
+            -- Calculate text position for centering
+            local textWidth = linkFont:getWidth(typeStr)
+            local textHeight = linkFont:getHeight()
+            local textDrawX = boxX + (boxSize - textWidth) / 2
+            local textDrawY = boxY + (boxSize - textHeight) / 2
+            love.graphics.print(typeStr, textDrawX, textDrawY)
+            currentX = currentX + boxSize + linkIconSpacing -- Advance by box size + spacing
+        end
+         -- Add spacing before next link type
+         currentX = currentX + linkGroupSpacing
     end
 
     -- Restore
     love.graphics.setFont(originalFont)
     love.graphics.setColor(originalColor)
+    love.graphics.setLineWidth(originalLineWidth) -- Restore original line width at the end
 end
 
 return Renderer

@@ -25,7 +25,7 @@ describe("Network Module", function()
         reactorCard = Card:new(reactorData)
 
         -- Mock Player setup
-        player = Player:new(1, "Test Player Net")
+        player = Player:new({ id = 1, name = "Test Player Net" })
         player.reactorCard = reactorCard -- Assign reactor BEFORE creating network
         reactorCard.owner = player -- Set owner here, before Network:new uses the card
 

@@ -38,13 +38,13 @@ describe("Reactor Card", function()
             local baseData = CardDefinitions["REACTOR_BASE"]
             -- Verify all slots defined in REACTOR_BASE are open
             for slotIndex, shouldBeOpen in pairs(baseData.openSlots) do
-                assert.are.equal(shouldBeOpen, reactor:isSlotOpen(slotIndex), "Slot " .. slotIndex .. " mismatch")
+                assert.are.equal(shouldBeOpen, reactor:isSlotDefinedOpen(slotIndex), "Slot " .. slotIndex .. " mismatch")
             end
             -- Verify a sample of other properties
             assert.are.equal(baseData.flavorText, reactor.flavorText)
             -- Verify a slot NOT defined in REACTOR_BASE is closed (assuming baseData is comprehensive)
             -- This assumes the definition includes all 8 slots. If not, this needs adjustment.
-            assert.is_false(reactor:isSlotOpen(99))
+            assert.is_false(reactor:isSlotDefinedOpen(99))
         end)
         
         it("should have reactor-specific properties", function()
@@ -57,6 +57,7 @@ describe("Reactor Card", function()
     describe("Reactor Effects (from CardDefinitions)", function()
         local activatingPlayer
         local network
+        local mockGameService -- Declare mock gameService
 
         before_each(function()
             -- Create mocks for effect execution
@@ -69,19 +70,27 @@ describe("Reactor Card", function()
             -- Mock the owner player as well
             mockPlayer.resources = { energy = 0 } 
             mockPlayer.addResource = function(self, type, amount) self.resources[type] = (self.resources[type] or 0) + amount end
+
+            -- Create mock game service with necessary methods for these tests (none needed for reactor resources)
+            mockGameService = {
+                -- awardVP = function(self, player, amount) player:addVP(amount) end, -- Example if needed
+                -- playerDrawCards = function(self, player, amount) print("Mock draw") end, -- Example if needed
+                -- addResourceToAllPlayers = function(self, resource, amount) print("Mock add all") end -- Example if needed
+            }
         end)
 
         it("activationEffect should grant 1 Energy to activating player", function()
             assert.is_table(reactor.activationEffect, "Reactor activationEffect should be a table")
             assert.is_function(reactor.activationEffect.activate, "Reactor activationEffect.activate should be a function")
-            reactor.activationEffect.activate(activatingPlayer, network) -- Function call syntax
-            assert.are.equal(1, activatingPlayer.resources.energy)
+            reactor.activationEffect.activate(mockGameService, activatingPlayer, network)
+            assert.are.equal(1, mockPlayer.resources.energy) -- Check OWNER's energy now
+            assert.are.equal(0, activatingPlayer.resources.energy) -- Activator should still have 0
         end)
 
         it("convergenceEffect should grant 1 Energy to owner player", function()
             assert.is_table(reactor.convergenceEffect, "Reactor convergenceEffect should be a table")
             assert.is_function(reactor.convergenceEffect.activate, "Reactor convergenceEffect.activate should be a function")
-            reactor.convergenceEffect.activate(activatingPlayer, network) -- Function call syntax
+            reactor.convergenceEffect.activate(mockGameService, activatingPlayer, network)
             assert.are.equal(1, mockPlayer.resources.energy) -- Owner gets energy
             assert.are.equal(0, activatingPlayer.resources.energy) -- Activator does not
         end)
