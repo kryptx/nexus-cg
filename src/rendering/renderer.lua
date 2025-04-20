@@ -363,8 +363,9 @@ function Renderer:_drawSingleCardInWorld(card, wx, wy)
     love.graphics.rectangle("line", wx + margin, effectsY, CARD_WIDTH - (2 * margin), effectsH)
     -- Effects Text (Use Helper - passing renderer)
     local effectBaseFontSize = self.baseSmallFontSize
-    local actionText = "Action: " .. (type(card.actionEffect) == 'function' and "[Function]" or (card.actionEffect or "..."))
-    local convergenceText = "Conv: " .. (type(card.convergenceEffect) == 'function' and "[Function]" or (card.convergenceEffect or "..."))
+    local actionText = "Action: " .. (type(card.activationEffect) == 'function' and "[Function]" or (card.activationEffect or "..."))
+    local convergenceText = "Convergence: " .. (type(card.convergenceEffect) == 'function' and "[Function]" or (card.convergenceEffect or "..."))
+    local vpText = "VP: " .. tostring(card.vpValue or 0)
     local effectsLimit = (CARD_WIDTH - (2 * margin) - 4)
     local effectsTextYBase = effectsY + 2
     local effectFont = self.fonts["worldSmall"]
@@ -564,8 +565,9 @@ function Renderer:drawHoveredHandCard(card, sx, sy, scale)
     love.graphics.rectangle("line", cardX + margin, effectsY, CARD_WIDTH - (2 * margin), effectsH)
     -- Effects Text (Use Helper)
     local effectBaseFontSize = self.uiBaseSmallSize
-    local actionText = "Action: " .. (type(card.actionEffect) == 'function' and "[Function]" or (card.actionEffect or "..."))
-    local convergenceText = "Conv: " .. (type(card.convergenceEffect) == 'function' and "[Function]" or (card.convergenceEffect or "..."))
+    local actionText = "Action: " .. (type(card.activationEffect) == 'function' and "[Function]" or (card.activationEffect or "..."))
+    local convergenceText = "Convergence: " .. (type(card.convergenceEffect) == 'function' and "[Function]" or (card.convergenceEffect or "..."))
+    local vpText = "VP: " .. tostring(card.vpValue or 0)
     local effectsLimit = CARD_WIDTH - (2 * margin) - 4
     local effectsTextYBase = effectsY + 2 -- Start 2px below top of effects box
     -- Use UI base size and PREVIEW font for line height

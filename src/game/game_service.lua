@@ -5,7 +5,7 @@ local Card = require('src.game.card') -- Needed for checking card type
 local Rules = require('src.game.rules') -- Rules system for validating game actions
 local Vector = require('src.utils.vector') -- Vector utilities for spatial operations
 local AudioManager = require('src.audio.audio_manager') -- Audio manager for sound effects
-local Reactor = require('src.game.reactor') -- Reactor card implementation
+local CardDefinitions = require('src.game.data.card_definitions') -- Card definitions
 
 local GameService = {}
 GameService.__index = GameService
@@ -41,14 +41,15 @@ function GameService:initializeGame(playerCount)
         player:addResource('data', 5)    -- Starting data
         player:addResource('material', 5) -- Starting material
         
-        -- Create reactor card first
-        local CardDefinitions = require('src.game.data.card_definitions')
+        -- Create reactor card first using Card constructor with reactor definition
         local reactorData = CardDefinitions["REACTOR_BASE"]
-        if not reactorData then
-            error("REACTOR_BASE definition not found!")
+        player.reactorCard = Card:new(reactorData)
+        if not player.reactorCard then
+            error(string.format("Failed to create reactor card for Player %d", player.id))
         end
-        player.reactorCard = require('src.game.card'):new(reactorData)
+        -- Set owner and reactor-specific properties
         player.reactorCard.owner = player
+        player.reactorCard.baseResourceProduction = false
         
         -- Create network and initialize it with the reactor
         local Network = require('src.game.network')
@@ -234,10 +235,6 @@ function GameService:attemptActivation(state, targetGridX, targetGridY)
         return false, "No card at activation target."
     end
 
-    if targetCard.type == Card.Type.REACTOR then
-        return false, "Cannot activate the Reactor directly."
-    end
-
     print(string.format("[Service] Attempting activation targeting %s (%s) at (%d,%d)", targetCard.title, targetCard.id, targetGridX, targetGridY))
 
     -- Find the reactor to trace path back from target
@@ -264,16 +261,24 @@ function GameService:attemptActivation(state, targetGridX, targetGridY)
 
              -- Execute effects BACKWARDS along path (GDD 4.5)
              local activationMessages = {}
-             table.insert(activationMessages, string.format("Activated path (Cost %d E):", energyCost))
-             for i = 1, pathLength do -- Iterate from target (index 1) back towards reactor
-                local cardId = path[i]
-                local cardToActivate = currentPlayer.network:getCardById(cardId)
-                if cardToActivate and cardToActivate.actionEffect then
-                    -- NOTE: actionEffect might return a status string in the future
-                    cardToActivate:actionEffect(currentPlayer, currentPlayer.network)
-                    table.insert(activationMessages, string.format("  - %s activated!", cardToActivate.title))
-                    print(string.format("    Effect for %s executed.", cardToActivate.title))
-                end
+              table.insert(activationMessages, string.format("Activated path (Cost %d E):", energyCost))
+
+             -- Always activate the target card itself first, even if path is empty
+             if targetCard and targetCard.activationEffect and type(targetCard.activationEffect) == 'function' then
+                 targetCard.activationEffect(currentPlayer, currentPlayer.network)
+                 table.insert(activationMessages, string.format("  - %s activated!", targetCard.title))
+                 print(string.format("    Effect for %s executed.", targetCard.title))
+             end
+             
+             -- Activate remaining cards in path (excluding target if path not empty)
+             for i = 2, pathLength do -- Start from index 2 if path exists
+                  local cardId = path[i]
+                  local cardToActivate = currentPlayer.network:getCardById(cardId)
+                  if cardToActivate and cardToActivate.activationEffect and type(cardToActivate.activationEffect) == 'function' then
+                      cardToActivate.activationEffect(currentPlayer, currentPlayer.network)
+                      table.insert(activationMessages, string.format("  - %s activated!", cardToActivate.title))
+                      print(string.format("    Effect for %s executed.", cardToActivate.title))
+                  end
              end
              return true, table.concat(activationMessages, "\n") -- Multi-line status
         else

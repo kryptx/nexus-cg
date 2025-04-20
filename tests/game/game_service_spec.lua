@@ -3,14 +3,16 @@
 
 local GameService = require 'src.game.game_service'
 local Card = require 'src.game.card' -- For card types
+local CardSlots = require('src.game.card').Slots
 
 -- Helper to create basic mock objects
-local function createMockCard(id, title, costM, costD, actionEffect)
+local function createMockCard(id, title, costM, costD, activationEffect, convergenceEffect, vpValue)
     local card = {
         id = id, title = title,
         buildCost = { material = costM or 0, data = costD or 0 },
-        actionEffect = actionEffect or function() end,
-        -- Add other fields if needed by service methods being tested
+        activationEffect = activationEffect or function() end,
+        convergenceEffect = convergenceEffect or function() end,
+        vpValue = vpValue or 0,
         type = Card.Type.TECHNOLOGY, -- Default type for simplicity
         -- For Reactor tests
         getSlotProperties = function() 
@@ -68,9 +70,15 @@ local function createMockNetwork(cards, validPlacementResult, pathResult)
     end
     
     -- Create a mock reactor for tests that need to find one
-    local mockReactor = createMockCard("REACTOR_TEST", "Test Reactor", 0, 0)
+    local mockReactor = createMockCard("REACTOR_BASE", "Reactor Core", 0, 0)
     mockReactor.type = Card.Type.REACTOR
-    cardLookup["REACTOR_TEST"] = mockReactor
+    -- Override the activation effect with the correct one for a reactor
+    mockReactor.activationEffect = function(player, network)
+        if player and player.addResource then
+            player:addResource("energy", 1)
+        end
+    end
+    cardLookup["REACTOR_BASE"] = mockReactor
     
     local network = {
         cards = cardLookup or {},
@@ -111,7 +119,7 @@ local function createMockNetwork(cards, validPlacementResult, pathResult)
             return count
         end,
         findReactor = function(self)
-            return self.cards["REACTOR_TEST"] or nil
+            return self.cards["REACTOR_BASE"] or nil
         end
     }
     return network
@@ -225,14 +233,14 @@ describe("GameService Module", function()
     describe("GameService:attemptActivation()", function()
         local targetCard
         local pathCard1, pathCard2
-        local actionEffect1_calls, actionEffect2_calls
+        local activationEffect1_calls, activationEffect2_calls
 
         before_each(function()
-            actionEffect1_calls = 0
-            actionEffect2_calls = 0
-            pathCard1 = createMockCard("P1", "Path 1", 0, 0, function() actionEffect1_calls = actionEffect1_calls + 1 end)
-            pathCard2 = createMockCard("P2", "Path 2", 0, 0, function() actionEffect2_calls = actionEffect2_calls + 1 end)
-            targetCard = pathCard1 -- Usually target is first element of path
+            activationEffect1_calls = 0
+            activationEffect2_calls = 0
+            pathCard1 = createMockCard("P1", "Path 1", 0, 0, function() activationEffect1_calls = activationEffect1_calls + 1 end)
+            pathCard2 = createMockCard("P2", "Path 2", 0, 0, function() activationEffect2_calls = activationEffect2_calls + 1 end)
+            targetCard = pathCard1
             mockNetwork1.getCardAt_result = targetCard -- Make getCardAt return the target
             mockNetwork1.cards[pathCard1.id] = pathCard1
             mockNetwork1.cards[pathCard2.id] = pathCard2
@@ -261,8 +269,8 @@ describe("GameService Module", function()
             assert.matches("Path 2 activated!", msg)
             -- Check side effects
             assert.are.equal(1, mockPlayer1.resources.energy) -- 3 - 2 = 1
-            assert.are.equal(1, actionEffect1_calls) -- Target activates first
-            assert.are.equal(1, actionEffect2_calls) -- Then previous node
+            assert.are.equal(1, activationEffect1_calls) -- Target activates first
+            assert.are.equal(1, activationEffect2_calls) -- Then previous node
         end)
 
         it("should return failure if path found but unaffordable", function()
@@ -273,28 +281,64 @@ describe("GameService Module", function()
             assert.matches("Not enough energy", msg)
             -- Check no side effects
             assert.are.equal(1, mockPlayer1.resources.energy)
-            assert.are.equal(0, actionEffect1_calls)
-            assert.are.equal(0, actionEffect2_calls)
+            assert.are.equal(0, activationEffect1_calls)
+            assert.are.equal(0, activationEffect2_calls)
         end)
 
         it("should return failure if no path found", function()
             -- Remove path cards from network to force path not found
-            mockNetwork1.cards = { ["REACTOR_TEST"] = mockNetwork1.cards["REACTOR_TEST"] }
+            mockNetwork1.cards = { ["REACTOR_BASE"] = mockNetwork1.cards["REACTOR_BASE"] }
             local success, msg = service:attemptActivation(mockState, 5, 5)
 
             assert.is_false(success)
             assert.matches("No valid activation path", msg)
             -- Check no side effects
             assert.are.equal(5, mockPlayer1.resources.energy)
-            assert.are.equal(0, actionEffect1_calls)
+            assert.are.equal(0, activationEffect1_calls)
         end)
 
-        it("should return failure if target card is Reactor", function()
-            mockNetwork1.getCardAt_result = createMockCard("REACTOR", "Reactor", 0, 0)
-            mockNetwork1.getCardAt_result.type = Card.Type.REACTOR -- Set type
-            local success, msg = service:attemptActivation(mockState, 0, 0)
-            assert.is_false(success)
-            assert.matches("Cannot activate the Reactor", msg)
+        it("should allow activating the Reactor and grant energy", function()
+            local mockReactorCard = mockNetwork1:findReactor() -- Get the reactor from the mock network
+            mockNetwork1.getCardAt_result = mockReactorCard -- Set getCardAt to return reactor
+            mockPlayer1.resources.energy = 5 -- Ensure player has energy
+            
+            -- Mock path validation to return a path of length 0 (direct connection)
+            service.rules.isActivationPathValid = function(_, network, startNodeId, targetNodeId)
+                if targetNodeId == mockReactorCard.id then
+                    return true, {}, nil -- Empty path, cost 0
+                end
+                return false, nil, "Path validation failed for test"
+            end
+
+            local playerEnergyBefore = mockPlayer1.resources.energy
+            local success, msg = service:attemptActivation(mockState, 0, 0) -- Target reactor coords
+
+            assert.is_true(success, "Reactor activation should succeed. Reason: " .. (msg or "nil"))
+            -- Check for activation message (may or may not have newline depending on path length)
+            assert.matches("Reactor Core activated!", msg)
+            assert.are.equal(playerEnergyBefore + 1, mockPlayer1.resources.energy) -- Gained 1E from effect, spent 0E cost
+        end)
+        
+        it("should activate Reactor even if path validation returns non-empty path", function()
+            local mockReactorCard = mockNetwork1:findReactor() 
+            mockNetwork1.getCardAt_result = mockReactorCard 
+            mockPlayer1.resources.energy = 5 
+            
+            -- Mock path validation to return a path of length 1 (cost 1)
+            service.rules.isActivationPathValid = function(_, network, startNodeId, targetNodeId)
+                if targetNodeId == mockReactorCard.id then
+                    return true, { mockReactorCard.id }, nil -- Path of length 1
+                end
+                return false, nil, "Path validation failed for test"
+            end
+
+            local playerEnergyBefore = mockPlayer1.resources.energy
+            local success, msg = service:attemptActivation(mockState, 0, 0) 
+
+            assert.is_true(success, "Reactor activation should succeed. Reason: " .. (msg or "nil"))
+            -- Check for activation message (should include reactor)
+            assert.matches("Reactor Core activated!", msg)
+            assert.are.equal(playerEnergyBefore - 1 + 1, mockPlayer1.resources.energy) -- Cost 1E, Gained 1E
         end)
 
         it("should return failure if no card at target location", function()
@@ -354,6 +398,48 @@ describe("GameService Module", function()
             local success, msg = service:endTurn(mockState)
             assert.is_true(success)
             assert.are.equal("GAME_OVER", msg)
+            assert.is_true(service.gameOver) -- Check game over flag
+        end)
+
+        it("should draw a card during cleanup if player hand is below minimum", function()
+            mockPlayer1.hand = {} -- Empty hand
+            service.deck = { createMockCard("D1", "Deck Card 1", 0, 0) } -- One card in deck
+            service.rules.isGameEndTriggered = function() return false end
+            -- Mock shouldDrawCard correctly accepting self (rules) and player
+            service.rules.shouldDrawCard = function(rules_self, player_arg)
+                assert(type(player_arg.getHandSize) == 'function', "Mock player missing getHandSize method in 'should draw' test")
+                return true -- Always return true for this test case
+            end
+            
+            assert.are.equal(0, #mockPlayer1.hand)
+            local success, msg = service:endTurn(mockState)
+            
+            assert.is_true(success)
+            assert.are.equal(1, #mockPlayer1.hand) -- Player drew a card
+            assert.are.equal("D1", mockPlayer1.hand[1].id)
+            assert.are.equal(0, #service.deck) -- Deck is now empty
+            assert.are.equal(2, service.currentPlayerIndex) -- Turn advanced
+        end)
+        
+        it("should NOT draw a card during cleanup if player hand is at minimum", function()
+            -- Assume MIN_HAND_SIZE is at least 2 based on previous tests
+            mockPlayer1.hand = { mockCard1, mockCard2 }
+            service.deck = { createMockCard("D1", "Deck Card 1", 0, 0) }
+            service.rules.isGameEndTriggered = function() return false end
+            service.rules.MIN_HAND_SIZE = 2 -- Set explicitly for test clarity
+            -- Mock shouldDrawCard correctly accepting self (rules) and player
+            service.rules.shouldDrawCard = function(rules_self, player_arg) 
+                assert(type(player_arg.getHandSize) == 'function', "Mock player missing getHandSize method in 'should NOT draw' test")
+                return player_arg:getHandSize() < service.rules.MIN_HAND_SIZE
+            end
+
+            assert.are.equal(2, #mockPlayer1.hand)
+            local success, msg = service:endTurn(mockState)
+            
+            assert.is_true(success)
+            assert.are.equal(2, #mockPlayer1.hand) -- Hand size unchanged
+            assert.are.equal(1, #service.deck)    -- Deck unchanged
+            assert.are.equal(2, service.currentPlayerIndex) -- Turn advanced
         end)
     end)
 

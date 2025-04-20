@@ -13,8 +13,25 @@ definitions["REACTOR_BASE"] = {
     title = "Reactor Core",
     type = CardTypes.REACTOR,
     buildCost = { material = 0, data = 0 }, -- No build cost
-    actionEffect = function() print("Reactor has no action.") end,
-    convergenceEffect = function() print("Reactor has no convergence effect.") end,
+    -- Grants 1 Energy to the activating player
+    activationEffect = function(player, network) 
+        if player and player.addResource then 
+            player:addResource("energy", 1)
+            print("Reactor Activation: +1 Energy for " .. (player.name or "player " .. player.id))
+        end
+    end,
+    -- Grants 1 Energy to the OWNER player when activated via convergence
+    convergenceEffect = function(activatingPlayer, network) 
+        -- Note: The effect gets the player *initiating* the convergence.
+        -- We need to find the *owner* of this reactor card within the network.
+        local ownerPlayer = network and network.owner
+        if ownerPlayer and ownerPlayer.addResource then
+            ownerPlayer:addResource("energy", 1)
+            print("Reactor Convergence: +1 Energy for owner " .. (ownerPlayer.name or "player " .. ownerPlayer.id))
+        else
+            print("Reactor Convergence: Could not find owner to grant energy.")
+        end
+    end,
     vpValue = 0,
     imagePath = "assets/images/reactor-core.png",
     -- GDD 4.1: Reactor has all 8 slots open initially
@@ -36,8 +53,8 @@ definitions["NODE_TECH_001"] = {
     title = "Basic Processing Unit",
     type = CardTypes.TECHNOLOGY,
     buildCost = { material = 1, data = 0 },
-    actionEffect = function(player, network) print("Basic Processing Unit: +1 Data (Action).") end, -- Placeholder logic
-    convergenceEffect = function(player, network) print("Basic Processing Unit: Opponent gets +1 Data (Convergence).") end, -- Placeholder logic
+    activationEffect = function(player, network) print("+1 Data.") end, -- Placeholder logic
+    convergenceEffect = function(player, network) print("Opponent gets +1 Data.") end, -- Placeholder logic
     vpValue = 0,
     imagePath = "assets/images/basic-processing-unit.png",
     -- Example: Tech Output (Bottom Right), Tech Input (Top Right)
@@ -55,8 +72,8 @@ definitions["NODE_CULT_001"] = {
     title = "Community Forum",
     type = CardTypes.CULTURE,
     buildCost = { material = 1, data = 0 },
-    actionEffect = function(player, network) print("Community Forum: Draw 1 card (Action).") end, -- Placeholder
-    convergenceEffect = function(player, network) print("Community Forum: Opponent draws 1 card (Convergence).") end, -- Placeholder
+    activationEffect = function(player, network) print("Draw 1 card.") end, -- Placeholder
+    convergenceEffect = function(player, network) print("Opponent draws 1 card.") end, -- Placeholder
     vpValue = 1,
     imagePath = "assets/images/community-forum.png",
     -- Example: Culture Output (Top Left), Culture Input (Bottom Left)
