@@ -95,7 +95,7 @@ function GameService:initializeGame(playerCount)
         })
         
         -- Set starting resources
-        player:addResource('energy', 1)  -- Starting energy
+        player:addResource('energy', 0)  -- Starting energy
         player:addResource('data', 1)    -- Starting data
         player:addResource('material', 3) -- Starting material
         

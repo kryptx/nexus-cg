@@ -76,6 +76,7 @@ function PlayState:init(gameService)
     self.activeParadigm = nil -- Track the currently active Paradigm Shift card object
     self.currentPhase = nil -- Track the current turn phase locally
     self.playerOrigins = {}
+    self.isPaused = false
 
     -- Camera State
     self.cameraX = -love.graphics.getWidth() / 2 -- Center initial view roughly
@@ -108,28 +109,46 @@ function PlayState:init(gameService)
     local screenW = love.graphics.getWidth()
     local screenH = love.graphics.getHeight()
     local buttonY = screenH - 50
-    local buttonWidth = 150
+    local endTurnWidth = 80 -- Width for End Turn/Next Phase
+    local discardWidth = 140 -- Increased width for discard buttons
+    local buttonHeight = 40 -- Explicit height
     local buttonGap = 10
     local uiFonts = self.renderer.fonts -- Get the fonts table
     local uiStyleGuide = self.renderer.styleGuide -- Get the style guide
 
-    local currentX = screenW - buttonWidth - buttonGap
-    self.buttonEndTurn = Button:new(currentX, buttonY, "End Turn", function() self:endTurn() end, buttonWidth, nil, uiFonts, uiStyleGuide) -- Pass fonts & styles
-    
-    currentX = currentX - buttonWidth - buttonGap
-    self.buttonAdvancePhase = Button:new(currentX, buttonY, "Next Phase", function() self:advancePhase() end, buttonWidth, nil, uiFonts, uiStyleGuide)
+    -- End Turn / Next Phase buttons
+    local currentX = screenW - endTurnWidth - buttonGap
+    self.buttonEndTurn = Button:new(currentX, buttonY, "End Turn", function() self:endTurn() end, endTurnWidth, buttonHeight, uiFonts, uiStyleGuide)
 
-    -- Create separate discard buttons
+    currentX = currentX - endTurnWidth - buttonGap
+    self.buttonAdvancePhase = Button:new(currentX, buttonY, "Next Phase", function() self:advancePhase() end, endTurnWidth, buttonHeight, uiFonts, uiStyleGuide)
+
+    -- Create discard buttons with text and inline icons
     currentX = 10
-    self.buttonDiscardMaterial = Button:new(currentX, buttonY, "Discard for 1 M", function() self:discardSelected('material') end, buttonWidth, nil, uiFonts, uiStyleGuide)
+    local discardText = "Discard for 1 "
+    -- Use nil for the 'icon' parameter (5th to last), pass icon to 'inlineIcon' (last)
+    self.buttonDiscardMaterial = Button:new(currentX, buttonY, discardText, function() self:discardSelected('material') end, discardWidth, buttonHeight, uiFonts, uiStyleGuide, nil, self.renderer.icons.material)
     self.buttonDiscardMaterial:setEnabled(false)
 
-    currentX = currentX + buttonWidth + buttonGap
-    self.buttonDiscardData = Button:new(currentX, buttonY, "Discard for 1 D", function() self:discardSelected('data') end, buttonWidth, nil, uiFonts, uiStyleGuide)
+    currentX = currentX + discardWidth + buttonGap
+    self.buttonDiscardData = Button:new(currentX, buttonY, discardText, function() self:discardSelected('data') end, discardWidth, buttonHeight, uiFonts, uiStyleGuide, nil, self.renderer.icons.data)
     self.buttonDiscardData:setEnabled(false)
 
     -- Update uiElements list
     self.uiElements = { self.buttonEndTurn, self.buttonAdvancePhase, self.buttonDiscardMaterial, self.buttonDiscardData }
+
+    local pauseButtonW = 150
+    local pauseButtonH = 40
+    local pauseButtonGap = 15
+    local pauseTotalHeight = (pauseButtonH * 3) + (pauseButtonGap * 2)
+    local pauseStartY = (screenH - pauseTotalHeight) / 2
+    local pauseButtonX = (screenW - pauseButtonW) / 2
+
+    self.pauseMenuButtons = {
+        Button:new(pauseButtonX, pauseStartY, "Resume Game", function() self.isPaused = false end, pauseButtonW, pauseButtonH, uiFonts, uiStyleGuide),
+        Button:new(pauseButtonX, pauseStartY + pauseButtonH + pauseButtonGap, "Main Menu", function() print("TODO: Transition to Main Menu state") end, pauseButtonW, pauseButtonH, uiFonts, uiStyleGuide),
+        Button:new(pauseButtonX, pauseStartY + 2 * (pauseButtonH + pauseButtonGap), "Quit Game", function() love.event.quit() end, pauseButtonW, pauseButtonH, uiFonts, uiStyleGuide)
+    }
 end
 
 function PlayState:enter()
@@ -246,16 +265,28 @@ function PlayState:resetSelectionAndStatus()
 end
 
 function PlayState:update(stateManager, dt)
-    -- Update UI elements (buttons)
     local mx, my = love.mouse.getPosition()
     local mouseDown = love.mouse.isDown(1)
+
+    if self.isPaused then
+        -- Update only pause menu buttons when paused
+        for _, button in ipairs(self.pauseMenuButtons) do
+            if button.update then
+                button:update(mx, my, mouseDown)
+            end
+        end
+        return -- Don't update game elements or handle game input when paused
+    end
+
+    -- If not paused, proceed with regular updates:
+    -- Update UI elements (buttons)
     for _, element in ipairs(self.uiElements) do
         if element.update then
             element:update(mx, my, mouseDown)
         end
     end
 
-    -- Keyboard Panning Logic
+    -- Keyboard Panning Logic (only if not paused)
     local effectivePanSpeed = KEYBOARD_PAN_SPEED / self.cameraZoom
     if love.keyboard.isDown('w') or love.keyboard.isDown('up') then
         self.cameraY = self.cameraY - effectivePanSpeed * dt
@@ -404,14 +435,40 @@ function PlayState:draw(stateManager)
     local statusY = 10 -- Position near the top
     love.graphics.print(statusText, statusX, statusY)
 
-    -- Draw turn indicator & Quit message
+    -- Draw turn indicator & Other Debug Info
     love.graphics.setColor(1,1,1,1)
     love.graphics.print(string.format("Current Turn: Player %d (%s)", self.gameService.currentPlayerIndex, currentPlayer.name), 10, 10)
     love.graphics.print("MMB Drag / WASD: Pan | Wheel: Zoom | C: Test Converge | P: Next Phase", screenW / 2 - 200, screenH - 20)
-    love.graphics.print("Press Esc to Quit", 10, screenH - 20)
 
-    -- Restore original font
+    -- Restore original font before drawing pause menu (if needed)
     love.graphics.setFont(originalFont)
+
+    -- [[[ Draw Pause Menu (if paused) ]]]
+    if self.isPaused then
+        -- Draw semi-transparent overlay
+        local originalColor = {love.graphics.getColor()}
+        love.graphics.setColor(0, 0, 0, 0.7) -- Black, 70% opacity
+        love.graphics.rectangle('fill', 0, 0, screenW, screenH)
+
+        -- Draw "Paused" title
+        love.graphics.setFont(self.renderer.fonts.uiStandard) -- Use a suitable font
+        love.graphics.setColor(1, 1, 1, 1) -- White text
+        local titleText = "Paused"
+        local titleWidth = love.graphics.getFont():getWidth(titleText)
+        local titleX = (screenW - titleWidth) / 2
+        local titleY = 50 -- Position near the top
+        love.graphics.print(titleText, titleX, titleY)
+
+        -- Draw pause menu buttons
+        for _, button in ipairs(self.pauseMenuButtons) do
+            button:draw()
+        end
+
+        -- Restore original color and font
+        love.graphics.setColor(originalColor)
+        love.graphics.setFont(originalFont)
+    end
+    -- [[[ End Draw Pause Menu ]]]
 end
 
 -- Helper function to check if point (px, py) is inside a rectangle {x, y, w, h}
@@ -420,7 +477,18 @@ local function isPointInRect(px, py, rect)
 end
 
 function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
-    -- Store last mouse position for panning
+    if self.isPaused then
+        if button == 1 then -- Only handle left clicks for buttons
+            for _, pbutton in ipairs(self.pauseMenuButtons) do
+                if pbutton.handleMousePress and pbutton:handleMousePress(x, y) then
+                    return -- Pause menu button handled the click
+                end
+            end
+        end
+        return -- Don't process game input if paused
+    end
+    
+    -- Store last mouse position for panning (only if not paused)
     self.lastMouseX = x
     self.lastMouseY = y
 
@@ -694,6 +762,16 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
 end
 
 function PlayState:mousereleased(stateManager, x, y, button, istouch)
+    if self.isPaused then
+        -- Potentially handle pause button release if needed by Button class,
+        -- but likely handled on press. Stop panning regardless.
+        if button == 3 then
+            self.isPanning = false
+            love.mouse.setRelativeMode(false)
+        end
+        return
+    end
+
     if button == 3 then -- Middle mouse button: Stop panning
         self.isPanning = false
         love.mouse.setRelativeMode(false) -- Show cursor again
@@ -701,6 +779,12 @@ function PlayState:mousereleased(stateManager, x, y, button, istouch)
 end
 
 function PlayState:mousemoved(stateManager, x, y, dx, dy, istouch)
+    if self.isPaused then
+        -- Update pause button hover state if implemented in Button class
+        -- For now, just prevent panning/game hover updates.
+        return
+    end
+
     -- Update world mouse coordinates
     local worldX, worldY = self.renderer:screenToWorldCoords(x, y, self.cameraX, self.cameraY, self.cameraZoom)
 
@@ -754,6 +838,10 @@ function PlayState:mousemoved(stateManager, x, y, dx, dy, istouch)
 end
 
 function PlayState:wheelmoved(stateManager, x, y)
+    if self.isPaused then
+        return
+    end
+
     -- Zoom in/out based on scroll direction (y > 0 is scroll up/zoom in)
     local zoomFactor = 1.1
     local oldZoom = self.cameraZoom
@@ -781,9 +869,11 @@ end
 
 function PlayState:keypressed(stateManager, key)
     if key == "escape" then
-        love.event.quit()
+        self.isPaused = not self.isPaused -- Toggle pause state
     elseif key == "p" then -- Debug: Advance Phase
-        self:advancePhase()
+        if not self.isPaused then
+            self:advancePhase()
+        end
     end
 end
 

@@ -359,7 +359,7 @@ describe("GameService Module", function()
 
     describe("GameService:discardCard()", function()
         it("should remove card, add material, and return success for valid index", function()
-            local success, msg = service:discardCard(mockState, 2) -- Discard Card 2
+            local success, msg = service:discardCard(mockState, 2, 'material') -- Discard Card 2 for material
             assert.is_true(success)
             assert.matches("Discarded 'Card 2'", msg)
             -- Check side effects
@@ -371,7 +371,7 @@ describe("GameService Module", function()
         end)
 
         it("should return failure for invalid card index", function()
-            local success, msg = service:discardCard(mockState, 99)
+            local success, msg = service:discardCard(mockState, 99, 'material') -- Add type arg
             assert.is_false(success)
             assert.matches("Invalid card index", msg)
             assert.are.equal(2, #mockPlayer1.hand) -- Hand unchanged
@@ -380,7 +380,7 @@ describe("GameService Module", function()
 
         it("should return failure if not in Build phase", function()
             service.currentPhase = TurnPhase.ACTIVATE -- Wrong phase
-            local success, msg = service:discardCard(mockState, 1)
+            local success, msg = service:discardCard(mockState, 1, 'material') -- Add type arg
             assert.is_false(success)
             assert.matches("Discarding not allowed in Activate phase", msg)
         end)
