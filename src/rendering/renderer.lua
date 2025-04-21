@@ -75,26 +75,39 @@ function Renderer:new()
         print("Loading TTF fonts...")
         -- World Fonts (3x)
         instance.fonts.worldStandard = love.graphics.newFont(fontPath, baseStandardSize * 3)
+        instance.fonts.worldStandard:setFilter('linear', 'linear') -- Add filtering
         instance.fonts.worldSmall = love.graphics.newFont(fontPath, baseSmallSize * 3)
+        instance.fonts.worldSmall:setFilter('linear', 'linear') -- Add filtering
         instance.fonts.worldTitleSemiBold = love.graphics.newFont(fontPathSemiBold, baseTitleSize * 3)
+        instance.fonts.worldTitleSemiBold:setFilter('linear', 'linear') -- Add filtering
         -- UI Fonts (Sized by uiFontMultiplier)
         instance.fonts.uiStandard = love.graphics.newFont(fontPath, uiBaseStandardSize * uiFontMultiplier)
+        instance.fonts.uiStandard:setFilter('linear', 'linear') -- Add filtering
         instance.fonts.uiSmall = love.graphics.newFont(fontPath, uiBaseSmallSize * uiFontMultiplier)
+        instance.fonts.uiSmall:setFilter('linear', 'linear') -- Add filtering
         print("  Loaded UI Fonts (Sizes: " .. uiBaseStandardSize*uiFontMultiplier .. ", " .. uiBaseSmallSize*uiFontMultiplier .. ")")
 
         -- Preview Fonts (Using world font paths but UI sizes/multiplier)
         instance.fonts.previewTitleSemiBold = love.graphics.newFont(fontPathSemiBold, uiBaseStandardSize * uiFontMultiplier) -- 10*2=20pt
+        instance.fonts.previewTitleSemiBold:setFilter('linear', 'linear') -- Add filtering
         instance.fonts.previewStandard = love.graphics.newFont(fontPath, uiBaseStandardSize * uiFontMultiplier)     -- 10*2=20pt
+        instance.fonts.previewStandard:setFilter('linear', 'linear') -- Add filtering
         instance.fonts.previewSmall = love.graphics.newFont(fontPath, uiBaseSmallSize * uiFontMultiplier)         -- 8*2=16pt
+        instance.fonts.previewSmall:setFilter('linear', 'linear') -- Add filtering
 
     else
         print("Warning: One or more TTF fonts not found... Using default-sized fonts.")
         -- Fallback
         instance.fonts.worldStandard = love.graphics.newFont(baseStandardSize * 3)
+        instance.fonts.worldStandard:setFilter('linear', 'linear') -- Add filtering
         instance.fonts.worldSmall = love.graphics.newFont(baseSmallSize * 3)
+        instance.fonts.worldSmall:setFilter('linear', 'linear') -- Add filtering
         instance.fonts.worldTitleSemiBold = instance.fonts.worldSmall
+        -- No need to filter instance.fonts.worldSmall again if it's assigned here
         instance.fonts.uiStandard = love.graphics.newFont(uiBaseStandardSize * uiFontMultiplier)
+        instance.fonts.uiStandard:setFilter('linear', 'linear') -- Add filtering
         instance.fonts.uiSmall = love.graphics.newFont(uiBaseSmallSize * uiFontMultiplier)
+        instance.fonts.uiSmall:setFilter('linear', 'linear') -- Add filtering
         -- Fallback for Preview Fonts
         instance.fonts.previewTitleSemiBold = instance.fonts.uiStandard -- Fallback to standard UI
         instance.fonts.previewStandard = instance.fonts.uiStandard
