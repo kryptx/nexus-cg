@@ -11,6 +11,7 @@ local ServiceModule = require('src.game.game_service') -- Require GameService mo
 local GameService = ServiceModule.GameService -- Extract the actual GameService table
 local TurnPhase = ServiceModule.TurnPhase -- Extract TurnPhase constants
 local StyleGuide = require('src.rendering.styles') -- Require the styles
+local Text = require('src.ui.text') -- Need Text for wrapping
 
 local PlayState = {}
 
@@ -32,9 +33,30 @@ local LINK_UI_ICON_SPACING = 3
 local LINK_UI_GROUP_SPACING = 5
 local LINK_UI_START_X = 10
 local LINK_UI_Y_OFFSET = 21 -- Relative to resource line Y
+local BUTTON_GAP = 10 -- Moved here as an UPVALUE constant
 
 -- Define Card module here for use in getSlotInfo, or require it
 local Card = require('src.game.card')
+
+-- Helper function for phase descriptions
+local function getPhaseDescription(phase)
+    if phase == TurnPhase.BUILD then
+        return [[Build Phase:
+- Place 1 Node: Click a card in hand, then click a valid grid location. Cost: Material/Data.
+- Discard 1 Card: Select a card, then click 'Discard' for 1 Material OR 1 Data.
+- Pass: Click 'Next Phase'.]]
+    elseif phase == TurnPhase.ACTIVATE then
+        return [[Activate Phase:
+- Activate Path: Right-click a Node (yours or opponent's via link) to activate the path back to your Reactor. Cost: Energy per Node in path.
+- Pass: Click 'Next Phase'.]]
+    elseif phase == TurnPhase.CONVERGE then
+        return [[Converge Phase:
+- Create Link: Click a Link icon in the Link menu, then click a valid Output slot on your network, then a valid Input slot on an opponent's network. Uses a Link Set.
+- Pass: Click 'End Turn'.]]
+    else
+        return "Unknown Phase"
+    end
+end
 
 -- Helper function to get slot position and implicit type based on GDD 4.3 (Corrected)
 -- Note: This version uses renderer instance for dimensions
@@ -77,6 +99,7 @@ function PlayState:init(gameService)
     self.currentPhase = nil -- Track the current turn phase locally
     self.playerOrigins = {}
     self.isPaused = false
+    self.showHelpBox = true -- Enable help box by default
 
     -- Camera State
     self.cameraX = -love.graphics.getWidth() / 2 -- Center initial view roughly
@@ -112,15 +135,14 @@ function PlayState:init(gameService)
     local endTurnWidth = 80 -- Width for End Turn/Next Phase
     local discardWidth = 140 -- Increased width for discard buttons
     local buttonHeight = 40 -- Explicit height
-    local buttonGap = 10
     local uiFonts = self.renderer.fonts -- Get the fonts table
     local uiStyleGuide = self.renderer.styleGuide -- Get the style guide
 
     -- End Turn / Next Phase buttons
-    local currentX = screenW - endTurnWidth - buttonGap
+    local currentX = screenW - endTurnWidth - BUTTON_GAP
     self.buttonEndTurn = Button:new(currentX, buttonY, "End Turn", function() self:endTurn() end, endTurnWidth, buttonHeight, uiFonts, uiStyleGuide)
 
-    currentX = currentX - endTurnWidth - buttonGap
+    currentX = currentX - endTurnWidth - BUTTON_GAP
     self.buttonAdvancePhase = Button:new(currentX, buttonY, "Next Phase", function() self:advancePhase() end, endTurnWidth, buttonHeight, uiFonts, uiStyleGuide)
 
     -- Create discard buttons with text and inline icons
@@ -130,12 +152,23 @@ function PlayState:init(gameService)
     self.buttonDiscardMaterial = Button:new(currentX, buttonY, discardText, function() self:discardSelected('material') end, discardWidth, buttonHeight, uiFonts, uiStyleGuide, nil, self.renderer.icons.material)
     self.buttonDiscardMaterial:setEnabled(false)
 
-    currentX = currentX + discardWidth + buttonGap
+    currentX = currentX + discardWidth + BUTTON_GAP
     self.buttonDiscardData = Button:new(currentX, buttonY, discardText, function() self:discardSelected('data') end, discardWidth, buttonHeight, uiFonts, uiStyleGuide, nil, self.renderer.icons.data)
     self.buttonDiscardData:setEnabled(false)
 
+    -- Calculate position for Help Toggle button (e.g., near top right)
+    local toggleHelpWidth = 100
+    local toggleHelpHeight = 30
+    local toggleHelpX = screenW - toggleHelpWidth - BUTTON_GAP
+    local toggleHelpY = 10 -- Place it near the top status message
+
+    self.buttonToggleHelp = Button:new(toggleHelpX, toggleHelpY, "Toggle Help", function()
+        self.showHelpBox = not self.showHelpBox
+        print("Help Box Toggled: ", self.showHelpBox)
+    end, toggleHelpWidth, toggleHelpHeight, uiFonts, uiStyleGuide)
+
     -- Update uiElements list
-    self.uiElements = { self.buttonEndTurn, self.buttonAdvancePhase, self.buttonDiscardMaterial, self.buttonDiscardData }
+    self.uiElements = { self.buttonEndTurn, self.buttonAdvancePhase, self.buttonDiscardMaterial, self.buttonDiscardData, self.buttonToggleHelp }
 
     local pauseButtonW = 150
     local pauseButtonH = 40
@@ -439,6 +472,42 @@ function PlayState:draw(stateManager)
     love.graphics.setColor(1,1,1,1)
     love.graphics.print(string.format("Current Turn: Player %d (%s)", self.gameService.currentPlayerIndex, currentPlayer.name), 10, 10)
     love.graphics.print("MMB Drag / WASD: Pan | Wheel: Zoom | C: Test Converge | P: Next Phase", screenW / 2 - 200, screenH - 20)
+
+    -- [[[ Draw Help Box (if enabled) ]]]
+    if self.showHelpBox and self.currentPhase then
+        local helpText = getPhaseDescription(self.currentPhase)
+        local helpPadding = 10
+        local helpBoxMaxWidth = 250 -- Max width before text wraps
+        local helpFont = self.renderer.fonts.uiSmall or self.renderer.fonts.uiStandard -- Use smaller font if available
+
+        love.graphics.setFont(helpFont) -- Set font for width/height calculation
+
+        -- Use the Text utility to wrap and calculate height
+        local wrappedHelpText, helpLines = Text.wrapText(helpFont, helpText, helpBoxMaxWidth)
+        local helpBoxHeight = helpLines * helpFont:getHeight() + (2 * helpPadding)
+        local helpBoxWidth = helpBoxMaxWidth + (2 * helpPadding) -- Use max width for box size
+
+        -- Position the box (e.g., below the help toggle button)
+        local helpBoxX = screenW - helpBoxWidth - BUTTON_GAP
+        local helpBoxY = self.buttonToggleHelp.y + self.buttonToggleHelp.height + BUTTON_GAP
+
+        -- Draw background
+        local originalColor = {love.graphics.getColor()}
+        love.graphics.setColor(StyleGuide.HELP_BOX_BACKGROUND_COLOR) -- Use StyleGuide color
+        love.graphics.rectangle('fill', helpBoxX, helpBoxY, helpBoxWidth, helpBoxHeight)
+
+        -- Draw border
+        love.graphics.setLineWidth(1)
+        love.graphics.setColor(StyleGuide.HELP_BOX_BORDER_COLOR) -- Use StyleGuide color
+        love.graphics.rectangle('line', helpBoxX, helpBoxY, helpBoxWidth, helpBoxHeight)
+
+        -- Draw wrapped text
+        love.graphics.setColor(StyleGuide.HELP_BOX_TEXT_COLOR) -- Use StyleGuide color
+        love.graphics.printf(wrappedHelpText, helpBoxX + helpPadding, helpBoxY + helpPadding, helpBoxMaxWidth, 'left')
+
+        love.graphics.setColor(originalColor) -- Restore original color
+    end
+    -- [[[ End Draw Help Box ]]]
 
     -- Restore original font before drawing pause menu (if needed)
     love.graphics.setFont(originalFont)

@@ -22,6 +22,9 @@ local StyleGuide = {
     PREVIEW_COST =     { fontName = 'previewSmall',         color = {0.2, 0.2, 0.2, 1} }, -- Dark Gray
     PREVIEW_EFFECT =   { fontName = 'previewSmall',         color = {0.1, 0.1, 0.1, 1} }, -- Dark Gray
     PREVIEW_ART_LABEL ={ fontName = 'previewStandard',      color = {0, 0, 0, 1} },       -- Black
+    HELP_BOX_BACKGROUND_COLOR = {0.1, 0.1, 0.15, 0.85}, -- Gray with 50% opacity
+    HELP_BOX_BORDER_COLOR = {0.8, 0.8, 0.8, 0.9},
+    HELP_BOX_TEXT_COLOR = {1, 1, 1, 1}, -- White
 }
 
 -- You could add baseSize here too if needed for complex calculations,

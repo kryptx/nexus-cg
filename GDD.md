@@ -35,8 +35,8 @@ The core theme revolves around shaping an evolving ecosystem where individual pl
     *   A player board (Functionality TBD: resource tracking, VP tracking, etc.).
     *   One "Reactor" card placed in their starting play area. This serves as the **base**. The Reactor has **all 8 connection slots 'open'** according to the standard convention (See 4.3) and allows adjacent placement without requiring an initial Output->Input link.
     *   **One Genesis Card:** Create a separate pool of "Genesis Cards" (See 5.1.A). Each player draws one Genesis Card at random from this pool and adds it to their hand. Shuffle any remaining Genesis Cards into the main Node deck before proceeding.
-    *   A starting hand of **X** defined "Seed Cards". Exact composition and quantity **X** TBD (deal these *after* the Genesis Card).
-    *   Initial resources: **Y** Energy, **Z** Data, **W** Material. Quantities TBD.
+    *   A starting hand of **2** additional cards dealt from the node deck. This forms a starting hand of **3** cards. (deal these *after* the Genesis Card).
+    *   Initial resources: **0** Energy, **1** Data, **2** Material. Quantities currently under play test.
     *   Four Convergence Link sets (each with 2 markers) - see 4.6.
 *   **Central Setup:**
     *   The main deck (Node cards) is shuffled and placed centrally.

@@ -97,7 +97,7 @@ function GameService:initializeGame(playerCount)
         -- Set starting resources
         player:addResource('energy', 0)  -- Starting energy
         player:addResource('data', 1)    -- Starting data
-        player:addResource('material', 3) -- Starting material
+        player:addResource('material', 2) -- Starting material
         
         -- Create reactor card first using Card constructor with reactor definition
         local reactorData = CardDefinitions["REACTOR_BASE"]
@@ -202,7 +202,7 @@ end
 
 -- Deal initial hands to all players
 function GameService:dealInitialHands()
-    local NUM_STARTING_CARDS = 3 -- Number of *Seed* cards to draw after Genesis card
+    local NUM_STARTING_CARDS = 2 -- Number of *Seed* cards to draw after Genesis card
     
     print("Shuffling Genesis card pool...")
     shuffle(self.genesisCardsPool)
@@ -1229,43 +1229,44 @@ function GameService:performEnergyGain(player)
 
     print(string.format("[Energy Gain] Calculating for Player %d (%s). Base gain: %d", player.id, player.name, energyGain))
 
-    -- Calculate bonus based on convergence links
-    local linkedOpponentIndices = {}
-    local numLinksFromOpponents = 0
-    local numUniqueOpponentsLinked = 0
+    -- Calculate bonus based on convergence links initiated BY this player
+    local linkedOpponentIndices = {} -- Tracks unique opponent IDs targeted by this player
+    local numLinksToOpponents = 0   -- Total links initiated by this player TO any opponent
+    local numUniqueOpponentsLinked = 0 -- Count of unique opponents targeted
 
     -- Iterate through all active links
     for _, link in ipairs(self.activeConvergenceLinks) do
-        -- Check if the link TARGETS the current player (link.targetPlayerIndex == player.id)
-        -- AND originates from an OPPONENT (link.initiatingPlayerIndex ~= player.id)
-        if link.targetPlayerIndex == player.id and link.initiatingPlayerIndex ~= player.id then
-            numLinksFromOpponents = numLinksFromOpponents + 1
-            local opponentId = link.initiatingPlayerIndex
+        -- Check if the link was INITIATED by the current player (link.initiatingPlayerIndex == player.id)
+        -- AND targets an OPPONENT (link.targetPlayerIndex ~= player.id)
+        if link.initiatingPlayerIndex == player.id and link.targetPlayerIndex ~= player.id then
+            numLinksToOpponents = numLinksToOpponents + 1
+            local opponentId = link.targetPlayerIndex
             if not linkedOpponentIndices[opponentId] then
                 linkedOpponentIndices[opponentId] = true
                 numUniqueOpponentsLinked = numUniqueOpponentsLinked + 1
-                print(string.format("  - Found link FROM opponent P%d (Link ID: %s). New unique opponent.", opponentId, link.linkId))
+                print(string.format("  - Found link TO opponent P%d (Link ID: %s). New unique opponent.", opponentId, link.linkId))
             else
-                print(string.format("  - Found link FROM opponent P%d (Link ID: %s). Already counted.", opponentId, link.linkId))
+                print(string.format("  - Found link TO opponent P%d (Link ID: %s). Already counted.", opponentId, link.linkId))
             end
         end
     end
 
     local bonusEnergy = 0
-    local linkedFromAllOpponents = (numUniqueOpponentsLinked >= numOpponents)
+    -- Prevent division by zero if there are no opponents (e.g., 1-player game)
+    local linkedToAllOpponents = numOpponents > 0 and (numUniqueOpponentsLinked >= numOpponents)
 
-    if numLinksFromOpponents > 0 then
-        if linkedFromAllOpponents then
-            -- Full Link Bonus: +1 Energy per link
-            bonusEnergy = numLinksFromOpponents
-            print(string.format("  - Linked from ALL %d opponents. Bonus: +%d E (1 per link)", numOpponents, bonusEnergy))
+    if numLinksToOpponents > 0 then
+        if linkedToAllOpponents then
+            -- Full Link Bonus: +1 Energy per link initiated TO any opponent
+            bonusEnergy = numLinksToOpponents
+            print(string.format("  - Linked TO ALL %d opponents. Bonus: +%d E (1 per link)", numOpponents, bonusEnergy))
         else
-            -- Initial Link Limitation: +1 Energy per unique opponent
+            -- Initial Link Limitation: +1 Energy per unique opponent linked TO
             bonusEnergy = numUniqueOpponentsLinked
-            print(string.format("  - Linked from %d/%d opponents. Bonus: +%d E (1 per unique opponent)", numUniqueOpponentsLinked, numOpponents, bonusEnergy))
+            print(string.format("  - Linked TO %d/%d opponents. Bonus: +%d E (1 per unique opponent)", numUniqueOpponentsLinked, numOpponents, bonusEnergy))
         end
     else
-         print("  - No convergence links found from opponents.")
+         print("  - No convergence links found TO opponents.")
     end
 
     energyGain = energyGain + bonusEnergy
