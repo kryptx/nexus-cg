@@ -292,7 +292,7 @@ describe("PlayState Module", function()
             assert.is_string(state.statusMessage)
             assert.is_not_nil(state.gameService)
             assert.is_table(state.uiElements)
-            assert.are.equal(4, #state.uiElements) -- CORRECTED: End Turn, Advance Phase, Discard M, Discard D
+            assert.are.equal(5, #state.uiElements)
             assert.truthy(state.cameraX)
             assert.truthy(state.cameraZoom)
             assert.is_false(state.isPaused) -- Check pause default
