@@ -34,7 +34,8 @@ The core theme revolves around shaping an evolving ecosystem where individual pl
 *   **Player Setup:** Each player receives:
     *   A player board (Functionality TBD: resource tracking, VP tracking, etc.).
     *   One "Reactor" card placed in their starting play area. This serves as the **base**. The Reactor has **all 8 connection slots 'open'** according to the standard convention (See 4.3) and allows adjacent placement without requiring an initial Output->Input link.
-    *   A starting hand of **X** defined "Seed Cards". Exact composition and quantity **X** TBD.
+    *   **One Genesis Card:** Create a separate pool of "Genesis Cards" (See 5.1.A). Each player draws one Genesis Card at random from this pool and adds it to their hand. Shuffle any remaining Genesis Cards into the main Node deck before proceeding.
+    *   A starting hand of **X** defined "Seed Cards". Exact composition and quantity **X** TBD (deal these *after* the Genesis Card).
     *   Initial resources: **Y** Energy, **Z** Data, **W** Material. Quantities TBD.
     *   Four Convergence Link sets (each with 2 markers) - see 4.6.
 *   **Central Setup:**
@@ -47,12 +48,13 @@ The core theme revolves around shaping an evolving ecosystem where individual pl
 
 A player's turn consists of the following phases, performed in order:
 
-1.  **Build Phase:** Player may perform one or both of the following actions, in any order:
+1.  **Energy Gain Phase (Start of Turn):** Gain Energy based on your Reactor and established Convergence Links (See 4.4 Resource Management).
+2.  **Build Phase:** Player may perform one or both of the following actions, in any order:
     *   Add one or more cards from their hand to their network, paying associated costs (e.g., Material) and following placement rules (See 4.3 Network Building), including the Uniqueness Rule.
-    *   Discard one card from their hand to gain 1 Material resource. (This provides an outlet for duplicate cards).
-2.  **Activate Phase:** Player may spend Energy to activate a path of connected nodes (See 4.5 Card Actions & Activation).
-3.  **Converge Phase:** Player may initiate new connections to opponent networks using Convergence Link sets (See 4.6 Convergence Mechanic).
-4.  **Cleanup Phase (End of Turn):**
+    *   Discard one card from their hand to gain 1 Material or Data resource. (This provides an outlet for duplicate cards).
+3.  **Activate Phase:** Player may spend Energy to activate a path of connected nodes (See 4.5 Card Actions & Activation).
+4.  **Converge Phase:** Player may initiate new connections to opponent networks using Convergence Link sets (See 4.6 Convergence Mechanic).
+5.  **Cleanup Phase (End of Turn):**
     *   Check hand size. If the player has fewer than 3 cards in hand, they draw 1 card from the main deck.
     *   Pass the turn to the next player.
 
@@ -77,7 +79,15 @@ A player's turn consists of the following phases, performed in order:
 ### 4.4 Resource Management
 
 *   **Types:** Energy (E), Data (D), Material (M).
-*   **Acquisition:** Gained primarily through Node Action/Convergence effects, potential Reactor base income, discarding cards (Material).
+*   **Acquisition:**
+    *   **Beginning-of-Turn Energy:** At the start of each turn (Energy Gain Phase), players gain Energy based on their network connections:
+        *   Gain a base of **1 Energy** for their own Reactor.
+        *   Gain additional Energy based on Convergence Links they have initiated from opponent networks into their own network.
+        *   **Initial Link Limitation:** *Until* the player has established at least one Convergence Link originating from *each* opponent's network, they gain only **+1 Energy per opponent** they are linked from (regardless of the number of links from that specific opponent).
+        *   **Full Link Bonus:** *Once* the player has established at least one Convergence Link originating from *every* other player's network, they gain **+1 Energy for *each*** such Convergence Link they have initiated.
+        *   **Maximum Gain:** The total Energy gained during the Energy Gain Phase (base + bonus) cannot exceed **4 Energy**.
+    *   **Card Effects:** Data, Material, and *rarely* Energy are also gained through Node Action/Convergence effects resolved during the Activate Phase.
+    *   **Discarding:** Discarding a card from hand during the Build Phase yields 1 Material.
 *   **Spending:**
     *   Energy: Used for path activation (cost = path length). Potentially other card effects.
     *   Data: Used primarily for card effects that involve drawing or manipulating cards.
@@ -185,7 +195,13 @@ These form the main draw deck and are the building blocks of player networks.
     *   **(Optional) VP Value:** Some cards might grant VP at game end (indicated by a VP icon/number).
     *   **(Optional) Flavor Text:** Thematic text.
 
-*   **Seed Cards:** A specific subset of Node Cards used for the starting player hands. Functionally identical layout, likely with simpler/fewer open slots.
+*   **Seed Cards:** A specific subset of Node Cards used for the starting player hands. Functionally identical layout, likely with simpler/fewer open slots. *Note: Seed Cards are dealt after Genesis Cards.*
+*   **Genesis Cards:** A designated subset of Node Cards specifically designed to facilitate early game activation paths.
+    *   **Purpose:** Ensure each player starts with at least one card capable of being placed adjacent to the Reactor, immediately forming a valid activation path back to it, and offering a basic resource upon activation.
+    *   **Criteria:** Genesis Cards must meet two key criteria:
+        1.  **Low Build Cost:** The Material/Data cost must be low enough that the card can potentially be played on the first turn using starting resources. (Exact costs TBD).
+        2.  **Paired Input/Output:** Must possess at least one pair of 'open' Input and 'open' Output slots *on the same edge* according to the 8-slot convention (4.3). This guarantees it can both connect *to* the Reactor (Output->Input) and provide a connection point *from* the Reactor (for activation paths starting at the Genesis Card, Output->Input).
+    *   **Setup:** A separate pool of Genesis Cards is created. One is dealt to each player at the start, and the rest are shuffled into the main Node deck (See 4.1).
 
 **B. Reactor Card**
 
@@ -197,8 +213,7 @@ Each player starts with one unique Reactor card.
     *   **Connection Slots:** All 8 potential slots are **'open'** according to the convention in 4.3. Allows adjacent placement without requiring link formation.
     *   **Art:** Unique art representing the player's core base.
     *   **No Build Cost.**
-    *   **No Action/Convergence Effect:** Serves only as the destination for activation path traces.
-    *   **(Potential) Base Income:** May generate a small amount of a resource (e.g., 1 Energy) automatically each turn (TBD).
+    *   **No Action/Convergence Effect:** Serves only as the destination for activation path traces and contributes 1 base Energy during the Energy Gain Phase (See 4.4).
 
 **C. Paradigm Shift Cards**
 

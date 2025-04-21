@@ -21,6 +21,7 @@ end
 
 -- Define Turn Phases
 local TurnPhase = {
+    ENERGY_GAIN = "Energy Gain", -- Phase for start-of-turn energy gain
     BUILD = "Build",
     ACTIVATE = "Activate",
     CONVERGE = "Converge",
@@ -94,9 +95,9 @@ function GameService:initializeGame(playerCount)
         })
         
         -- Set starting resources
-        player:addResource('energy', 5)  -- Starting energy
-        player:addResource('data', 5)    -- Starting data
-        player:addResource('material', 5) -- Starting material
+        player:addResource('energy', 1)  -- Starting energy
+        player:addResource('data', 1)    -- Starting data
+        player:addResource('material', 3) -- Starting material
         
         -- Create reactor card first using Card constructor with reactor definition
         local reactorData = CardDefinitions["REACTOR_BASE"]
@@ -128,18 +129,27 @@ function GameService:initializeGame(playerCount)
     -- Deal initial hands to players
     self:dealInitialHands()
     
-    -- Set the first player and phase
+    -- Set the first player
     self.currentPlayerIndex = 1
-    self.currentPhase = TurnPhase.BUILD
     
     -- Draw initial paradigm
     self:drawInitialParadigm()
-    
+
+    -- Initial Energy Gain for Player 1
+    print("[Service] Performing initial energy gain for Player 1...")
+    self.currentPhase = TurnPhase.ENERGY_GAIN -- Set phase temporarily
+    local advanced, message = self:advancePhase() -- Perform gain and advance to BUILD
+    if not advanced then
+         print("Error during initial energy gain phase advance: " .. (message or "Unknown error"))
+         -- Handle potential error, maybe default phase to BUILD anyway?
+         self.currentPhase = TurnPhase.BUILD 
+    end
+
     print(string.format("Game initialized with %d players. Player 1 starts in %s phase.", playerCount, self.currentPhase))
-    
+
     -- Play menu music (consider moving this to PlayState:enter)
     self.audioManager:playMusic("menu")
-    
+
     return true
 end
 
@@ -147,23 +157,35 @@ end
 function GameService:initializeMainDeck()
     print("Initializing main deck...")
     self.deck = {}
+    local genesisCardsPool = {} -- Temporary pool for Genesis cards
     
-    -- Get the card definitions
     local cardDefinitions = require('src.game.data.card_definitions')
     
-    -- Add all non-reactor cards from definitions to the deck
+    -- Separate Genesis cards and add regular cards to the deck
     for cardId, cardData in pairs(cardDefinitions) do
         if cardData.type ~= Card.Type.REACTOR then  -- Skip reactor cards
-            for i = 1, 3 do -- Add multiple copies
+            if cardData.isGenesis then
+                -- Create and add to Genesis pool (assume 1 copy per definition)
                 local card = Card:new(cardData)
-                table.insert(self.deck, card)
+                table.insert(genesisCardsPool, card)
+                print(string.format("  Added Genesis card %s to pool.", card.id))
+            else
+                -- Add multiple copies of regular cards to the main deck
+                for i = 1, 3 do 
+                    local card = Card:new(cardData)
+                    table.insert(self.deck, card)
+                end
             end
         end
     end
     
-    -- Shuffle the main deck
+    -- Store the Genesis pool for dealing
+    self.genesisCardsPool = genesisCardsPool 
+    print(string.format("Separated %d Genesis cards.", #self.genesisCardsPool))
+    
+    -- Shuffle the main deck (excluding Genesis cards for now)
     shuffle(self.deck)
-    print(string.format("Main deck initialized and shuffled with %d cards", #self.deck))
+    print(string.format("Main deck initialized with %d regular cards (before adding remaining Genesis).", #self.deck))
 end
 
 -- Initialize paradigm decks
@@ -180,16 +202,39 @@ end
 
 -- Deal initial hands to all players
 function GameService:dealInitialHands()
-    local NUM_STARTING_CARDS = 3
-    print(string.format("Dealing %d starting cards to each player...", NUM_STARTING_CARDS))
+    local NUM_STARTING_CARDS = 3 -- Number of *Seed* cards to draw after Genesis card
+    
+    print("Shuffling Genesis card pool...")
+    shuffle(self.genesisCardsPool)
+    
+    print("Dealing 1 Genesis card to each player...")
     for _, player in ipairs(self.players) do
-        print(string.format("  Dealing to %s...", player.name))
+        if #self.genesisCardsPool > 0 then
+            local genesisCard = table.remove(self.genesisCardsPool, 1) -- Take from top
+            player:addCardToHand(genesisCard)
+            print(string.format("  Dealt Genesis card '%s' to %s.", genesisCard.title, player.name))
+        else
+            print(string.format("    Warning: Not enough Genesis cards to deal to %s!", player.name))
+        end
+    end
+    
+    print(string.format("Shuffling %d remaining Genesis card(s) into main deck...", #self.genesisCardsPool))
+    for _, remainingGenesisCard in ipairs(self.genesisCardsPool) do
+        table.insert(self.deck, remainingGenesisCard)
+    end
+    shuffle(self.deck) -- Shuffle again after adding remaining Genesis cards
+    self.genesisCardsPool = nil -- Clear the temporary pool
+    print(string.format("Main deck now contains %d cards (including remaining Genesis).", #self.deck))
+    
+    print(string.format("Dealing %d starting Seed cards to each player...", NUM_STARTING_CARDS))
+    for _, player in ipairs(self.players) do
+        print(string.format("  Dealing Seed cards to %s...", player.name))
         for i = 1, NUM_STARTING_CARDS do
             local card = self:drawCard()
             if card then
                 player:addCardToHand(card)
             else
-                print(string.format("    Warning: Deck empty while dealing initial hand to %s (drew %d cards).", player.name, i-1))
+                print(string.format("    Warning: Deck empty while dealing Seed cards to %s (drew %d).", player.name, i-1))
                 break -- No more cards
             end
         end
@@ -382,8 +427,8 @@ function GameService:attemptActivation(state, targetGridX, targetGridY)
         
     if isValid and path then
         local pathLength = #path
-        local energyCost = pathLength
-        print(string.format("  Path found! Length: %d, Cost: %d Energy.", pathLength, energyCost))
+        local energyCost = pathLength -- Assume Rules:isActivationPathValid returns path excluding reactor
+        print(string.format("  Activation path found! Length (Nodes): %d, Cost: %d Energy.", pathLength, energyCost))
 
         if currentPlayer.resources.energy >= energyCost then
              print("  Activation affordable.")
@@ -425,25 +470,30 @@ function GameService:attemptActivation(state, targetGridX, targetGridY)
 end
 
 -- Discard Card
-function GameService:discardCard(state, cardIndex)
+function GameService:discardCard(state, cardIndex, resourceType)
     -- Phase check (GDD 4.2: Discard is part of Build Phase action)
     if self.currentPhase ~= TurnPhase.BUILD then
         return false, "Discarding not allowed in " .. self.currentPhase .. " phase."
+    end
+
+    -- Validate resource type
+    if resourceType ~= 'material' and resourceType ~= 'data' then
+        return false, "Invalid resource type for discard. Must be 'material' or 'data'."
     end
 
     local currentPlayer = self.players[self.currentPlayerIndex]
     local cardToRemove = currentPlayer.hand[cardIndex]
 
     if cardToRemove then
-        print(string.format("[Service] Discarding '%s' for 1 Material.", cardToRemove.title))
-        currentPlayer:addResource('material', 1)
+        print(string.format("[Service] Discarding '%s' for 1 %s.", cardToRemove.title, resourceType))
+        currentPlayer:addResource(resourceType, 1)
         table.remove(currentPlayer.hand, cardIndex)
-        
+
         -- Play discard sound
         self.audioManager:playSound("card_draw") -- Reuse the draw sound for now
-        
+
         -- Success! PlayState handles resetting selection.
-        return true, string.format("Discarded '%s' for 1 Material.", cardToRemove.title)
+        return true, string.format("Discarded '%s' for 1 %s.", cardToRemove.title, resourceType)
     else
         return false, "Cannot discard: Invalid card index."
     end
@@ -680,29 +730,33 @@ end
 -- Advance to the next logical phase in the turn
 function GameService:advancePhase()
     local currentP = self.currentPhase
-    
+
     -- If already in Cleanup, cannot advance further
     if currentP == TurnPhase.CLEANUP then
         print("[Service] Cannot advance phase: Already in Cleanup.")
         return false, "Already in final phase"
     end
-    
+
     local nextP = currentP
-    if currentP == TurnPhase.BUILD then
+    if currentP == TurnPhase.ENERGY_GAIN then
+        -- Calculate and award energy before moving to Build
+        self:performEnergyGain(self:getCurrentPlayer())
+        nextP = TurnPhase.BUILD
+    elseif currentP == TurnPhase.BUILD then
         nextP = TurnPhase.ACTIVATE
     elseif currentP == TurnPhase.ACTIVATE then
         nextP = TurnPhase.CONVERGE
     elseif currentP == TurnPhase.CONVERGE then
         nextP = TurnPhase.CLEANUP -- Ready to end turn
     end
-    
+
     -- If the phase changed, update and return true
     if nextP ~= currentP then
         self.currentPhase = nextP
         print(string.format("[Service] Player %d advanced to %s phase.", self.currentPlayerIndex, self.currentPhase))
         return true, self.currentPhase
     end
-    
+
     -- Should not be reachable if logic above is correct, but acts as a safeguard
     print("Warning: advancePhase reached unexpected state.")
     return false, "Invalid state or phase"
@@ -772,18 +826,33 @@ function GameService:endTurn(state)
     
     -- Advance to next player (using modulo to wrap around)
     self.currentPlayerIndex = (oldIndex % #self.players) + 1
-    -- Reset phase for the new player
-    self.currentPhase = TurnPhase.BUILD
-    
+    -- Set phase for the new player to ENERGY_GAIN
+    self.currentPhase = TurnPhase.ENERGY_GAIN
+
     -- Keep state in sync for backward compatibility
     if state then
         state.currentPlayerIndex = self.currentPlayerIndex
-        state.currentPhase = self.currentPhase -- Make sure PlayState knows the phase
+        state.currentPhase = self.currentPhase -- Sync PlayState to ENERGY_GAIN initially
     end
-    
-    print(string.format("[Service] Turn ended for Player %d. Starting turn for Player %d in %s phase.", 
+
+    -- Immediately advance from ENERGY_GAIN to BUILD, performing energy gain
+    local advanced, message = self:advancePhase() -- This calculates energy and sets phase to BUILD
+    if not advanced then
+        -- Handle potential error during automatic advance
+        print("Error automatically advancing phase after energy gain: " .. (message or "Unknown error"))
+        -- Might need more robust error handling depending on potential failure cases
+        return false, "Error during automatic phase transition."
+    end
+
+    -- Update PlayState's phase again after the automatic advance
+    if state then
+        state.currentPhase = self.currentPhase -- Sync PlayState to BUILD
+    end
+
+    -- Update log message to reflect the phase the player actually starts in
+    print(string.format("[Service] Turn ended for Player %d. Starting turn for Player %d in %s phase.",
         oldIndex, self.currentPlayerIndex, self.currentPhase))
-    
+
     return true, string.format("Player %d's turn (%s Phase).", self.currentPlayerIndex, self.currentPhase)
 end
 
@@ -861,17 +930,12 @@ function GameService:triggerGameEndCheck()
     -- Note: The GDD says "depleted for the first time". We might need a flag if drawCard sets one.
     -- For now, just checking if empty. The Rules:isGameEndTriggered already handles this check.
     -- We rely on the endTurn logic to call calculateFinalScores if gameOver is set.
-    if not endReason and self:isDeckEmpty() then
-        -- Check if anyone *would* draw on cleanup (GDD 4.8 says end is triggered at end of turn)
-        -- Simpler: just check if empty. The real trigger happens in endTurn's rule check.
-        -- Let's stick to the VP check here for simplicity, endTurn handles the deck check via rules.
-        -- GDD 4.8: "The game end is triggered when either [...] occurs at the end of any player's turn:"
-        -- So, we just set the flag here based on VP. The endTurn check handles the final trigger.
-        -- Removing the deck check from here simplifies things.
-        -- if self:isDeckEmpty() then
-        --     endReason = "Main deck depleted!"
-        -- end
-    end
+    -- GDD 4.8: "The game end is triggered when either [...] occurs at the end of any player's turn:"
+    -- So, we just set the flag here based on VP. The endTurn check handles the final trigger.
+    -- Removing the deck check from here simplifies things.
+    -- if self:isDeckEmpty() then
+    --     endReason = "Main deck depleted!"
+    -- end
 
     if endReason then
         print(string.format("[Game End Check] Condition met: %s. Setting gameOver = true.", endReason))
@@ -895,7 +959,6 @@ end
 -- ==============================
 
 -- Attempt Activation targeting any node in any player's network
--- WIP: Requires implementation of findGlobalActivationPath
 function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayerIndex, targetGridX, targetGridY)
     -- Phase check
     if self.currentPhase ~= TurnPhase.ACTIVATE then
@@ -929,18 +992,17 @@ function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayer
         return false, "Error: Activating player's reactor not found."
     end
 
-    -- TODO: Implement and call the new global pathfinding function
     local isValid, pathData, reason = self:findGlobalActivationPath(targetCard, activatorReactor, activatingPlayer)
 
     if isValid and pathData then
         -- pathData should ideally contain: 
         -- { path = { {card=Card, owner=Player}, ... }, cost = number, isConvergenceStart = boolean }
         local path = pathData.path
-        local energyCost = pathData.cost
+        local energyCost = pathData.cost - 1-- GDD 4.5: Cost is path length EXCLUDING reactor
         local isConvergenceStart = pathData.isConvergenceStart
-        local pathLength = #path
+        local pathLength = #path -- Full path length including reactor
 
-        print(string.format("  Global path found! Length: %d, Cost: %d Energy. Convergence Start: %s", 
+        print(string.format("  Global path found! Length (incl. reactor): %d, Nodes in Path (Cost): %d Energy. Convergence Start: %s", 
             pathLength, energyCost, tostring(isConvergenceStart)))
 
         if activatingPlayer.resources.energy >= energyCost then
@@ -987,7 +1049,7 @@ function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayer
             
             return true, table.concat(activationMessages, "\n")
         else
-             print("  Activation failed: Cannot afford energy cost.")
+            print("  Activation failed: Cannot afford energy cost.")
             return false, string.format("Not enough energy. Cost: %d E (Have: %d E)", energyCost, activatingPlayer.resources.energy)
         end
     else
@@ -1040,9 +1102,16 @@ function GameService:findGlobalActivationPath(targetCard, activatorReactor, acti
                 -- Check if the owner of the first node (target) is different from the second node
                 isConvergenceStart = currentPath[1].owner ~= currentPath[2].owner
             end
+
+            -- Correct Path: Exclude the reactor itself as per GDD 4.5 definition
+            local activationPath = {}
+            for i = 1, #currentPath do -- Copy all elements including the last one (the reactor)
+                activationPath[i] = currentPath[i]
+            end
+
             local pathData = {
-                path = currentPath,
-                cost = #currentPath, -- GDD 4.5: cost = path length (number of nodes)
+                path = activationPath, -- Path including reactor
+                cost = #activationPath, -- Cost IS the length of the path including the reactor
                 isConvergenceStart = isConvergenceStart
             }
             return true, pathData, nil
@@ -1148,6 +1217,72 @@ function GameService:findGlobalActivationPath(targetCard, activatorReactor, acti
 
     -- If queue is empty and reactor not found
     return false, nil, "No valid activation path exists to the activator's reactor."
+end
+
+-- Calculate and add start-of-turn energy gain based on GDD 4.8
+function GameService:performEnergyGain(player)
+    if not player then return end
+
+    local energyGain = 1 -- Base gain for Reactor
+    local numOpponents = #self.players - 1
+    local MAX_ENERGY_GAIN = 4 -- GDD 4.8 cap
+
+    print(string.format("[Energy Gain] Calculating for Player %d (%s). Base gain: %d", player.id, player.name, energyGain))
+
+    -- Calculate bonus based on convergence links
+    local linkedOpponentIndices = {}
+    local numLinksFromOpponents = 0
+    local numUniqueOpponentsLinked = 0
+
+    -- Iterate through all active links
+    for _, link in ipairs(self.activeConvergenceLinks) do
+        -- Check if the link TARGETS the current player (link.targetPlayerIndex == player.id)
+        -- AND originates from an OPPONENT (link.initiatingPlayerIndex ~= player.id)
+        if link.targetPlayerIndex == player.id and link.initiatingPlayerIndex ~= player.id then
+            numLinksFromOpponents = numLinksFromOpponents + 1
+            local opponentId = link.initiatingPlayerIndex
+            if not linkedOpponentIndices[opponentId] then
+                linkedOpponentIndices[opponentId] = true
+                numUniqueOpponentsLinked = numUniqueOpponentsLinked + 1
+                print(string.format("  - Found link FROM opponent P%d (Link ID: %s). New unique opponent.", opponentId, link.linkId))
+            else
+                print(string.format("  - Found link FROM opponent P%d (Link ID: %s). Already counted.", opponentId, link.linkId))
+            end
+        end
+    end
+
+    local bonusEnergy = 0
+    local linkedFromAllOpponents = (numUniqueOpponentsLinked >= numOpponents)
+
+    if numLinksFromOpponents > 0 then
+        if linkedFromAllOpponents then
+            -- Full Link Bonus: +1 Energy per link
+            bonusEnergy = numLinksFromOpponents
+            print(string.format("  - Linked from ALL %d opponents. Bonus: +%d E (1 per link)", numOpponents, bonusEnergy))
+        else
+            -- Initial Link Limitation: +1 Energy per unique opponent
+            bonusEnergy = numUniqueOpponentsLinked
+            print(string.format("  - Linked from %d/%d opponents. Bonus: +%d E (1 per unique opponent)", numUniqueOpponentsLinked, numOpponents, bonusEnergy))
+        end
+    else
+         print("  - No convergence links found from opponents.")
+    end
+
+    energyGain = energyGain + bonusEnergy
+
+    -- Apply cap
+    if energyGain > MAX_ENERGY_GAIN then
+        print(string.format("  - Calculated gain (%d) exceeds cap (%d). Capping to %d.", energyGain, MAX_ENERGY_GAIN, MAX_ENERGY_GAIN))
+        energyGain = MAX_ENERGY_GAIN
+    end
+
+    -- Add the resource
+    if energyGain > 0 then
+        player:addResource('energy', energyGain)
+        print(string.format("  Added %d Energy to Player %d. New total: %d", energyGain, player.id, player.resources.energy))
+    else
+         print("  No energy gained this turn.")
+    end
 end
 
 -- Return both GameService and TurnPhase

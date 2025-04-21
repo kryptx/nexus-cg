@@ -119,10 +119,17 @@ function PlayState:init(gameService)
     currentX = currentX - buttonWidth - buttonGap
     self.buttonAdvancePhase = Button:new(currentX, buttonY, "Next Phase", function() self:advancePhase() end, buttonWidth, nil, uiFonts, uiStyleGuide)
 
+    -- Create separate discard buttons
     currentX = 10
-    self.buttonDiscard = Button:new(currentX, buttonY, "Discard Selected", function() self:discardSelected() end, buttonWidth, nil, uiFonts, uiStyleGuide) -- Pass fonts & styles
-    self.buttonDiscard:setEnabled(false)
-    self.uiElements = { self.buttonEndTurn, self.buttonAdvancePhase, self.buttonDiscard }
+    self.buttonDiscardMaterial = Button:new(currentX, buttonY, "Discard for 1 M", function() self:discardSelected('material') end, buttonWidth, nil, uiFonts, uiStyleGuide)
+    self.buttonDiscardMaterial:setEnabled(false)
+
+    currentX = currentX + buttonWidth + buttonGap
+    self.buttonDiscardData = Button:new(currentX, buttonY, "Discard for 1 D", function() self:discardSelected('data') end, buttonWidth, nil, uiFonts, uiStyleGuide)
+    self.buttonDiscardData:setEnabled(false)
+
+    -- Update uiElements list
+    self.uiElements = { self.buttonEndTurn, self.buttonAdvancePhase, self.buttonDiscardMaterial, self.buttonDiscardData }
 end
 
 function PlayState:enter()
@@ -214,9 +221,10 @@ function PlayState:advancePhase()
 end
 
 -- Action: Discard the selected card (Delegates to service)
-function PlayState:discardSelected()
+function PlayState:discardSelected(resourceType)
     if self.selectedHandIndex then
-        local success, message = self.gameService:discardCard(self, self.selectedHandIndex)
+        -- Pass the resourceType to the game service
+        local success, message = self.gameService:discardCard(self, self.selectedHandIndex, resourceType)
         if success then
             self:resetSelectionAndStatus()
              self:updateStatusMessage(message) -- Show discard success message
@@ -226,12 +234,14 @@ function PlayState:discardSelected()
     end
 end
 
--- Helper to reset selection state 
+-- Helper to reset selection state
 function PlayState:resetSelectionAndStatus()
     self.selectedHandIndex = nil
-    self.hoveredHandIndex = nil 
-    self.handCardBounds = {} 
-    self.buttonDiscard:setEnabled(false) 
+    self.hoveredHandIndex = nil
+    self.handCardBounds = {}
+    -- Ensure both discard buttons are disabled
+    self.buttonDiscardMaterial:setEnabled(false)
+    self.buttonDiscardData:setEnabled(false)
     -- self.statusMessage = newStatus or "" -- Status is now handled by updateStatusMessage
 end
 
@@ -453,11 +463,14 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
         if handClickedIndex then
             -- Handle selection locally in PlayState
             if self.selectedHandIndex == handClickedIndex then
-                self:resetSelectionAndStatus()
+                self:resetSelectionAndStatus() -- This now disables both discard buttons
                 self:updateStatusMessage("Card deselected.")
             else
                 self.selectedHandIndex = handClickedIndex
-                self.buttonDiscard:setEnabled(currentPhase == TurnPhase.BUILD) -- Only enable discard in Build phase
+                -- Enable both discard buttons if in Build phase
+                local enableDiscard = (currentPhase == TurnPhase.BUILD)
+                self.buttonDiscardMaterial:setEnabled(enableDiscard)
+                self.buttonDiscardData:setEnabled(enableDiscard)
                 local card = currentPlayer.hand[self.selectedHandIndex]
                 self:updateStatusMessage(string.format("Selected card: %s (%s)", card.title, card.id))
             end

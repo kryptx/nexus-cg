@@ -280,7 +280,8 @@ describe("Rules Module", function()
             local player1 = {
                 id = "p1",
                 getVictoryPoints = function() return 5 end,
-                getNetwork = function() return network1 end
+                getNetwork = function() return network1 end,
+                network = network1 -- Add the network field directly
             }
             network1.getSize = function() return 3 end
             
@@ -289,7 +290,8 @@ describe("Rules Module", function()
             local player2 = {
                 id = "p2", 
                 getVictoryPoints = function() return 8 end,
-                getNetwork = function() return network2 end
+                getNetwork = function() return network2 end,
+                network = network2 -- Add the network field directly
             }
             network2.getSize = function() return 5 end
             

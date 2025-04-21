@@ -99,7 +99,14 @@ local mockGameService = { -- Base methods for the mock
         end
         self.players = players -- Store for future reference
         return players
-    end
+    end,
+    -- Add the required TurnPhase constants to the mock service module
+    TurnPhase = {
+        BUILD = "Build",
+        ACTIVATE = "Activate",
+        CONVERGE = "Converge",
+        CLEANUP = "Cleanup"
+    }
 }
 mockGameService.new = function() -- Constructor returns a new instance based on the base
     local instance = {

@@ -78,22 +78,6 @@ describe("Reactor Card", function()
                 -- addResourceToAllPlayers = function(self, resource, amount) print("Mock add all") end -- Example if needed
             }
         end)
-
-        it("activationEffect should grant 1 Energy to activating player", function()
-            assert.is_table(reactor.activationEffect, "Reactor activationEffect should be a table")
-            assert.is_function(reactor.activationEffect.activate, "Reactor activationEffect.activate should be a function")
-            reactor.activationEffect.activate(mockGameService, activatingPlayer, network)
-            assert.are.equal(1, mockPlayer.resources.energy) -- Check OWNER's energy now
-            assert.are.equal(0, activatingPlayer.resources.energy) -- Activator should still have 0
-        end)
-
-        it("convergenceEffect should grant 1 Energy to owner player", function()
-            assert.is_table(reactor.convergenceEffect, "Reactor convergenceEffect should be a table")
-            assert.is_function(reactor.convergenceEffect.activate, "Reactor convergenceEffect.activate should be a function")
-            reactor.convergenceEffect.activate(mockGameService, activatingPlayer, network)
-            assert.are.equal(1, mockPlayer.resources.energy) -- Owner gets energy
-            assert.are.equal(0, activatingPlayer.resources.energy) -- Activator does not
-        end)
     end)
     
 end) 
