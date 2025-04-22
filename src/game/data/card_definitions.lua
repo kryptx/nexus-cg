@@ -3,7 +3,7 @@
 -- This data can be used by a CardFactory or similar system to create Card instances.
 
 local CardTypes = require('src.game.card').Type
-local CardSlots = require('src.game.card').Slots
+local CardPorts = require('src.game.card').Ports -- Use new Port constants
 local CardEffects = require('src.game.card_effects')
 local ResourceType = CardEffects.ResourceType
 
@@ -18,12 +18,12 @@ definitions["REACTOR_BASE"] = {
     
     vpValue = 0,
     imagePath = "assets/images/reactor-core.png",
-    -- GDD 4.1: Reactor has all 8 slots open initially
-    openSlots = {
-        [CardSlots.TOP_LEFT] = true, [CardSlots.TOP_RIGHT] = true,
-        [CardSlots.BOTTOM_LEFT] = true, [CardSlots.BOTTOM_RIGHT] = true,
-        [CardSlots.LEFT_TOP] = true, [CardSlots.LEFT_BOTTOM] = true,
-        [CardSlots.RIGHT_TOP] = true, [CardSlots.RIGHT_BOTTOM] = true,
+    -- GDD 4.1: Reactor has all 8 ports present initially
+    definedPorts = {
+        [CardPorts.TOP_LEFT] = true, [CardPorts.TOP_RIGHT] = true,
+        [CardPorts.BOTTOM_LEFT] = true, [CardPorts.BOTTOM_RIGHT] = true,
+        [CardPorts.LEFT_TOP] = true, [CardPorts.LEFT_BOTTOM] = true,
+        [CardPorts.RIGHT_TOP] = true, [CardPorts.RIGHT_BOTTOM] = true,
     },
     art = nil, -- Placeholder
     flavorText = "The heart of the network.",
@@ -46,19 +46,16 @@ definitions["GENESIS_TECH_001"] = {
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } } }
-        -- Description: "Grants 1 Data to the activator." (Changed from Owner)
+        -- Description: "Grants 1 Data to the activator."
     }),
     vpValue = 0,
     imagePath = "assets/images/genesis-initial-circuit.png", -- Placeholder path
-    openSlots = {
-        [CardSlots.BOTTOM_LEFT] = true,   -- 3: Culture Input (Reactor Edge)
-        [CardSlots.BOTTOM_RIGHT] = true,  -- 4: Technology Output (Reactor Edge)
-        [CardSlots.TOP_LEFT] = true,      -- 1: Culture Output (Top Edge)
-        [CardSlots.LEFT_TOP] = true,      -- 5: Knowledge Output (Left Edge)
-        [CardSlots.RIGHT_BOTTOM] = true,  -- 8: Resource Output (Right Edge)
-        [CardSlots.TOP_RIGHT] = false,    -- 2
-        [CardSlots.LEFT_BOTTOM] = false,  -- 6
-        [CardSlots.RIGHT_TOP] = false,    -- 7
+    definedPorts = {
+        [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input (Reactor Edge)
+        [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output (Reactor Edge)
+        [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output (Top Edge)
+        [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output (Left Edge)
+        [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output (Right Edge)
     },
     art = nil,
     flavorText = "The first connection flickers to life.",
@@ -76,19 +73,16 @@ definitions["GENESIS_RES_001"] = {
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 1 } } }
-        -- Description: "Grants 1 Material to the activator." (Unchanged)
+        -- Description: "Grants 1 Material to the activator."
     }),
     vpValue = 0,
     imagePath = "assets/images/genesis-first-spark.png", -- Placeholder path
-    openSlots = {
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input (Reactor Edge)
-        [CardSlots.RIGHT_BOTTOM] = true,  -- 8: Resource Output (Reactor Edge)
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input (Top Edge)
-        [CardSlots.BOTTOM_RIGHT] = true,  -- 4: Technology Output (Bottom Edge)
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input (Left Edge)
-        [CardSlots.TOP_LEFT] = false,     -- 1
-        [CardSlots.BOTTOM_LEFT] = false,  -- 3
-        [CardSlots.LEFT_TOP] = false,     -- 5
+    definedPorts = {
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input (Reactor Edge)
+        [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output (Reactor Edge)
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input (Top Edge)
+        [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output (Bottom Edge)
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input (Left Edge)
     },
     art = nil,
     flavorText = "A trickle becomes a potential flow.",
@@ -106,19 +100,16 @@ definitions["GENESIS_KNOW_001"] = {
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } } }
-        -- Description: "Grants 1 Data to the activator." (Unchanged)
+        -- Description: "Grants 1 Data to the activator."
     }),
     vpValue = 0,
     imagePath = "assets/images/genesis-seed-thought.png", -- Placeholder path
-    openSlots = {
-        [CardSlots.LEFT_TOP] = true,      -- 5: Knowledge Output (Reactor Edge)
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input (Reactor Edge)
-        [CardSlots.TOP_LEFT] = true,      -- 1: Culture Output (Top Edge)
-        [CardSlots.BOTTOM_LEFT] = true,   -- 3: Culture Input (Bottom Edge)
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input (Right Edge)
-        [CardSlots.TOP_RIGHT] = false,    -- 2
-        [CardSlots.BOTTOM_RIGHT] = false, -- 4
-        [CardSlots.RIGHT_BOTTOM] = false, -- 8
+    definedPorts = {
+        [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output (Reactor Edge)
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input (Reactor Edge)
+        [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output (Top Edge)
+        [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input (Bottom Edge)
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input (Right Edge)
     },
     art = nil,
     flavorText = "The first question asked.",
@@ -135,21 +126,17 @@ definitions["GENESIS_CULT_001"] = {
         -- Description: "Grants 1 Data to the owner."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
-        -- actions = { { effect = "gainVPForActivator", options = { amount = 1 } } } -- Removed VP gain
         actions = { { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } } } 
-        -- Description: "Grants 1 Data to the activator." (Changed from VP gain, now consistent with other Genesis)
+        -- Description: "Grants 1 Data to the activator."
     }),
     vpValue = 0,
     imagePath = "assets/images/genesis-nascent-meme.png", -- Placeholder path
-    openSlots = {
-        [CardSlots.TOP_LEFT] = true,      -- 1: Culture Output (Reactor Edge)
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input (Reactor Edge)
-        [CardSlots.BOTTOM_LEFT] = true,   -- 3: Culture Input (Bottom Edge)
-        [CardSlots.LEFT_TOP] = true,      -- 5: Knowledge Output (Left Edge)
-        [CardSlots.RIGHT_BOTTOM] = true,  -- 8: Resource Output (Right Edge)
-        [CardSlots.BOTTOM_RIGHT] = false, -- 4
-        [CardSlots.LEFT_BOTTOM] = false,  -- 6
-        [CardSlots.RIGHT_TOP] = false,    -- 7
+    definedPorts = {
+        [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output (Reactor Edge)
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input (Reactor Edge)
+        [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input (Bottom Edge)
+        [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output (Left Edge)
+        [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output (Right Edge)
     },
     art = nil,
     flavorText = "An idea begins to spread.",
@@ -164,18 +151,18 @@ definitions["NODE_TECH_001"] = {
     buildCost = { material = 1, data = 0 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } }
-        -- Description: "Grants 1 Data to the owner." (Unchanged)
+        -- Description: "Grants 1 Data to the owner."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } } }
-        -- Description: "Grants 1 Data to the activator." (Changed from Owner)
+        -- Description: "Grants 1 Data to the activator."
     }),
     vpValue = 0,
     imagePath = "assets/images/basic-processing-unit.png",
-    openSlots = {
-        [CardSlots.BOTTOM_RIGHT] = true, -- Tech Output
-        [CardSlots.TOP_RIGHT] = true,    -- Tech Input
-        [CardSlots.LEFT_BOTTOM] = true,  -- Resource Input (Added)
+    definedPorts = {
+        [CardPorts.BOTTOM_RIGHT] = true, -- Tech Output
+        [CardPorts.TOP_RIGHT] = true,    -- Tech Input
+        [CardPorts.LEFT_BOTTOM] = true,  -- Resource Input
     },
     art = nil,
     flavorText = "Standard computational core.",
@@ -185,21 +172,21 @@ definitions["NODE_CULT_001"] = {
     id = "NODE_CULT_001",
     title = "Community Forum",
     type = CardTypes.CULTURE,
-    buildCost = { material = 1, data = 1 }, -- Increased Data cost by 1
+    buildCost = { material = 1, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "drawCardsForOwner", options = { amount = 1 } } }
-        -- Description: "Owner draws 1 card." (Unchanged)
+        -- Description: "Owner draws 1 card."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { { effect = "drawCardsForActivator", options = { amount = 1 } } }
-        -- Description: "Activator draws 1 card." (Unchanged)
+        -- Description: "Activator draws 1 card."
     }),
-    vpValue = 0, -- Reduced VP from 1 to 0 due to low cost
+    vpValue = 0,
     imagePath = "assets/images/community-forum.png",
-    openSlots = {
-        [CardSlots.TOP_LEFT] = true,    -- Culture Output
-        [CardSlots.BOTTOM_LEFT] = true, -- Culture Input
-        [CardSlots.RIGHT_TOP] = true,   -- Knowledge Input (Added)
+    definedPorts = {
+        [CardPorts.TOP_LEFT] = true,    -- Culture Output
+        [CardPorts.BOTTOM_LEFT] = true, -- Culture Input
+        [CardPorts.RIGHT_TOP] = true,   -- Knowledge Input
     },
     art = nil,
     flavorText = "Where ideas are shared, connections are forged.",
@@ -212,18 +199,18 @@ definitions["NODE_TECH_002"] = {
     buildCost = { material = 3, data = 1 }, 
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } } }
-        -- Description: "Grants 2 Data to the owner." (Unchanged)
+        -- Description: "Grants 2 Data to the owner."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { { effect = "addResourceToBoth", options = { resource = ResourceType.DATA, amount = 1 } } }
-        -- Description: "Grants 1 Data to both the owner and activator." (Unchanged)
+        -- Description: "Grants 1 Data to both the owner and activator."
     }),
-    vpValue = 1, -- Reduced VP from 2 to 1
+    vpValue = 1,
     imagePath = "assets/images/advanced-processing-unit.png",
-    openSlots = {
-        [CardSlots.BOTTOM_RIGHT] = true, -- Tech Output
-        [CardSlots.TOP_RIGHT] = true,    -- Tech Input
-        [CardSlots.LEFT_TOP] = true,     -- Knowledge Output (Added)
+    definedPorts = {
+        [CardPorts.BOTTOM_RIGHT] = true, -- Tech Output
+        [CardPorts.TOP_RIGHT] = true,    -- Tech Input
+        [CardPorts.LEFT_TOP] = true,     -- Knowledge Output
     },
     art = nil,
     flavorText = "Twice the processing power, half the size.",
@@ -236,21 +223,20 @@ definitions["NODE_CULT_002"] = {
     buildCost = { material = 2, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
-            -- { effect = "addResourceToAllPlayers", options = { resource = ResourceType.DATA, amount = 1 } } -- Removed global effect
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
         }
-        -- Description: "Grants 1 Data to the owner." (Changed from addResourceToAllPlayers)
+        -- Description: "Grants 1 Data to the owner."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 2 } } }
-        -- Description: "Grants 2 Data to the activator." (Unchanged)
+        -- Description: "Grants 2 Data to the activator."
     }),
-    vpValue = 1, -- Reduced VP from 2 to 1
+    vpValue = 1,
     imagePath = "assets/images/cultural-exchange.png",
-    openSlots = {
-        [CardSlots.TOP_LEFT] = true,    -- Culture Output
-        [CardSlots.BOTTOM_LEFT] = true, -- Culture Input
-        [CardSlots.RIGHT_BOTTOM] = true, -- Resource Output (Added)
+    definedPorts = {
+        [CardPorts.TOP_LEFT] = true,    -- Culture Output
+        [CardPorts.BOTTOM_LEFT] = true, -- Culture Input
+        [CardPorts.RIGHT_BOTTOM] = true, -- Resource Output
     },
     art = nil,
     flavorText = "Sharing knowledge benefits many.",
@@ -263,21 +249,18 @@ definitions["NODE_KNOW_001"] = {
     buildCost = { material = 1, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } }
-        -- Description: "Grants 1 Data to the owner." (Unchanged)
+        -- Description: "Grants 1 Data to the owner."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } } }
-        -- Description: "Grants 1 Data to the activator." (Changed from owner)
+        -- Description: "Grants 1 Data to the activator."
     }),
     vpValue = 0,
     imagePath = "assets/images/data-relay.png",
-    openSlots = {
-        [CardSlots.LEFT_TOP] = true,    -- Knowledge Output
-        [CardSlots.RIGHT_TOP] = true,   -- Knowledge Input
-        [CardSlots.LEFT_BOTTOM] = true, -- Resource Input (Added) - Can be powered
-        [CardSlots.TOP_LEFT] = false, [CardSlots.TOP_RIGHT] = false,
-        [CardSlots.BOTTOM_LEFT] = false, [CardSlots.BOTTOM_RIGHT] = false,
-        [CardSlots.RIGHT_BOTTOM] = false,
+    definedPorts = {
+        [CardPorts.LEFT_TOP] = true,    -- Knowledge Output
+        [CardPorts.RIGHT_TOP] = true,   -- Knowledge Input
+        [CardPorts.LEFT_BOTTOM] = true, -- Resource Input
     },
     art = nil,
     flavorText = "Connecting streams of information.",
@@ -294,22 +277,18 @@ definitions["NODE_RES_001"] = {
             { condition = { type = "adjacency", nodeType = CardTypes.TECHNOLOGY, count = 1 },
               effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 1 } }
         }
-        -- Description: "Grants 2 Material to the owner. If adjacent to 1+ Technology node(s): Grants 1 Energy to the owner." (Added conditional Energy)
+        -- Description: "Grants 2 Material to the owner. If adjacent to 1+ Technology node(s): Grants 1 Energy to the owner."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { { effect = "addResourceToBoth", options = { resource = ResourceType.MATERIAL, amount = 1 } } }
-        -- Description: "Grants 1 Material to both the owner and activator." (Unchanged)
+        -- Description: "Grants 1 Material to both the owner and activator."
     }),
     vpValue = 0,
     imagePath = "assets/images/materials-depot.png",
-    openSlots = {
-        [CardSlots.LEFT_BOTTOM] = true,   -- Resource Input
-        [CardSlots.RIGHT_BOTTOM] = true,  -- Resource Output
-        [CardSlots.TOP_RIGHT] = true,     -- Technology Input (Added) - Synergy for Energy
-        [CardSlots.TOP_LEFT] = false, 
-        [CardSlots.BOTTOM_LEFT] = false, [CardSlots.BOTTOM_RIGHT] = false,
-        [CardSlots.LEFT_TOP] = false,
-        [CardSlots.RIGHT_TOP] = false,
+    definedPorts = {
+        [CardPorts.LEFT_BOTTOM] = true,   -- Resource Input
+        [CardPorts.RIGHT_BOTTOM] = true,  -- Resource Output
+        [CardPorts.TOP_RIGHT] = true,     -- Technology Input
     },
     art = nil,
     flavorText = "Storing the building blocks, awaiting the spark.",
@@ -326,25 +305,22 @@ definitions["NODE_CULT_004"] = {
         actions = {
             { effect = "drawCardsForOwner", options = { amount = 1 } }
         }
-        -- Description: "Owner draws 1 card." (Unchanged)
+        -- Description: "Owner draws 1 card."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 2 } },
         }
-        -- Description: "Grants 2 Data to the activator." (Unchanged)
+        -- Description: "Grants 2 Data to the activator."
     }),
-    vpValue = 1, -- Reduced VP from 2 to 1
+    vpValue = 1,
     imagePath = "assets/images/synaptic-media-hub.png",
-    openSlots = {
-        [CardSlots.TOP_LEFT] = true,      -- 1: Culture Output
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input
-        [CardSlots.BOTTOM_LEFT] = true,   -- 3: Culture Input (Added)
-        [CardSlots.BOTTOM_RIGHT] = true,  -- 4: Technology Output
-        [CardSlots.LEFT_TOP] = false,     -- 5
-        [CardSlots.LEFT_BOTTOM] = false,  -- 6
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input
-        [CardSlots.RIGHT_BOTTOM] = false, -- 8
+    definedPorts = {
+        [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
+        [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input
+        [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
     },
     art = nil,
     flavorText = "Broadcasting the pulse of the collective.",
@@ -361,26 +337,23 @@ definitions["NODE_TECH_003"] = {
             { condition = { type = "satisfiedInputs", count = 2},
             effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Owner gains 1 Material. If 2+ input slot(s) are connected: Owner gains 1 VP." (Made VP conditional)
+        -- Description: "Owner gains 1 Material. If 2+ input port(s) are connected: Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the activator. Grants 1 Material to the owner." (Unchanged)
+        -- Description: "Grants 1 Data to the activator. Grants 1 Material to the owner."
     }),
     vpValue = 1, 
     imagePath = "assets/images/applied-arts-workshop.png",
-    openSlots = {
-        [CardSlots.BOTTOM_LEFT] = true,   -- 3: Culture Input
-        [CardSlots.BOTTOM_RIGHT] = true,  -- 4: Technology Output
-        [CardSlots.LEFT_TOP] = true,      -- 5: Knowledge Output
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input
-        [CardSlots.TOP_LEFT] = true,      -- 1: Culture Output (Added)
-        [CardSlots.TOP_RIGHT] = false,    -- 2
-        [CardSlots.RIGHT_TOP] = false,    -- 7
-        [CardSlots.RIGHT_BOTTOM] = false, -- 8
+    definedPorts = {
+        [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input
+        [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
+        [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
+        [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output
     },
     art = nil,
     flavorText = "Turning inspiration into innovation.",
@@ -390,29 +363,26 @@ definitions["NODE_RES_002"] = {
     id = "NODE_RES_002",
     title = "Automated Drill Site",
     type = CardTypes.RESOURCE,
-    buildCost = { material = 4, data = 1 }, -- Reduced data cost
+    buildCost = { material = 4, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
-        actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 3 } } }
-        -- Description: "Grants 3 Material to the owner." (Unchanged)
+        actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
+                   { effect = "drawCardsForOwner", options = { amount = 1 } } }
+        -- Description: "Grants 1 Material to the owner. Owner draws 1 card."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
         }
-        -- Description: "Grants 1 Material to the activator. Grants 1 Data to the owner." (Unchanged)
+        -- Description: "Grants 1 Material to the activator. Grants 1 Data to the owner."
     }),
-    vpValue = 1, -- Reduced VP from 2 to 1
+    vpValue = 1,
     imagePath = "assets/images/automated-drill-site.png",
-    openSlots = {
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input
-        [CardSlots.RIGHT_BOTTOM] = true,  -- 8: Resource Output
-        [CardSlots.TOP_LEFT] = false,     -- 1
-        [CardSlots.BOTTOM_LEFT] = false,  -- 3
-        [CardSlots.BOTTOM_RIGHT] = false, -- 4
-        [CardSlots.LEFT_TOP] = false,     -- 5
+    definedPorts = {
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
+        [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
     },
     art = nil,
     flavorText = "Extracting value with calculated precision.",
@@ -425,30 +395,28 @@ definitions["NODE_KNOW_002"] = {
     buildCost = { material = 2, data = 3 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
-            { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }, -- Reduced data gain
+            { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
+            { condition = { type = "satisfiedInputs", count = 2 },
+              effect = "drawCardsForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the owner. Owner gains 1 VP." (Reduced Data)
+        -- Description: "Grants 1 Data to the owner. If 2+ input port(s) are connected: Owner draws 1 card."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
-             -- { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } } -- Removed owner Material gain
              { condition = { type = "adjacency", nodeType = CardTypes.RESOURCE, count = 1 },
                effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the activator. If adjacent to 1+ Resource node(s): Grants 1 Material to the owner." (Made owner Material conditional)
+        -- Description: "Grants 1 Data to the activator. If adjacent to 1+ Resource node(s): Grants 1 Material to the owner."
     }),
     vpValue = 1, 
     imagePath = "assets/images/materials-analysis-lab.png",
-    openSlots = {
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input
-        [CardSlots.LEFT_TOP] = true,      -- 5: Knowledge Output
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input
-        [CardSlots.TOP_LEFT] = false,     -- 1
-        [CardSlots.BOTTOM_LEFT] = false,  -- 3
-        [CardSlots.BOTTOM_RIGHT] = false, -- 4
-        [CardSlots.RIGHT_BOTTOM] = true,  -- 8: Resource Output (Added)
+    definedPorts = {
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
+        [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
+        [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
     },
     art = nil,
     flavorText = "Decoding the secrets held within matter.",
@@ -463,26 +431,23 @@ definitions["NODE_KNOW_003"] = {
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the owner." (Unchanged)
+        -- Description: "Grants 1 Data to the owner."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 2 } },
              { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 2 Data to the activator. Owner gains 1 VP." (Unchanged)
+        -- Description: "Grants 2 Data to the activator. Owner gains 1 VP."
     }),
     vpValue = 1, 
     imagePath = "assets/images/historical-archive.png",
-    openSlots = {
-        [CardSlots.TOP_LEFT] = true,      -- 1: Culture Output
-        [CardSlots.LEFT_TOP] = true,      -- 5: Knowledge Output
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input
-        [CardSlots.TOP_RIGHT] = false,    -- 2
-        [CardSlots.BOTTOM_LEFT] = true,   -- 3: Culture Input (Added)
-        [CardSlots.BOTTOM_RIGHT] = false, -- 4
-        [CardSlots.RIGHT_BOTTOM] = false, -- 8
+    definedPorts = {
+        [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output
+        [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
+        [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input
     },
     art = nil,
     flavorText = "Understanding the past to shape the future.",
@@ -495,28 +460,24 @@ definitions["NODE_CULT_005"] = {
     buildCost = { material = 3, data = 3 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
-            { effect = "drawCardsForOwner", options = { amount = 1 } } -- Added card draw
+            { effect = "drawCardsForOwner", options = { amount = 1 } }
         }
-        -- Description: "Owner draws 1 card." (Added draw)
+        -- Description: "Owner draws 1 card."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "gainVPForActivator", options = { amount = 1 } }
-             -- { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } -- Removed owner data gain
         }
-        -- Description: "Activator gains 1 VP." (Simplified)
+        -- Description: "Activator gains 1 VP."
     }),
-    vpValue = 1, -- Reduced VP from 2 to 1
+    vpValue = 1,
     imagePath = "assets/images/holographic-theater.png",
-    openSlots = {
-        [CardSlots.TOP_LEFT] = true,      -- 1: Culture Output
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input
-        [CardSlots.BOTTOM_RIGHT] = true,  -- 4: Technology Output
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input
-        [CardSlots.BOTTOM_LEFT] = true,   -- 3: Culture Input (Added)
-        [CardSlots.LEFT_TOP] = false,     -- 5
-        [CardSlots.LEFT_BOTTOM] = false,  -- 6
-        [CardSlots.RIGHT_BOTTOM] = false, -- 8
+    definedPorts = {
+        [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
+        [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
+        [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input
     },
     art = nil,
     flavorText = "Where artifice meets artistry.",
@@ -532,26 +493,23 @@ definitions["NODE_RES_003"] = {
             { effect = "gainVPForOwner", options = { amount = 1 } },
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
         }
-        -- Description: "Owner gains 1 VP. Grants 1 Material to the owner." (Unchanged)
+        -- Description: "Owner gains 1 VP. Grants 1 Material to the owner."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "gainVPForActivator", options = { amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
         }
-        -- Description: "Activator gains 1 VP. Grants 1 Material to the owner." (Unchanged)
+        -- Description: "Activator gains 1 VP. Grants 1 Material to the owner."
     }),
     vpValue = 2, 
     imagePath = "assets/images/monument-construction-site.png",
-    openSlots = {
-        [CardSlots.TOP_LEFT] = true,      -- 1: Culture Output
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input
-        [CardSlots.RIGHT_BOTTOM] = true,  -- 8: Resource Output
-        [CardSlots.BOTTOM_LEFT] = false,  -- 3
-        [CardSlots.BOTTOM_RIGHT] = false, -- 4
-        [CardSlots.LEFT_TOP] = false,     -- 5
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input (Added)
+    definedPorts = {
+        [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
+        [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
     },
     art = nil,
     flavorText = "Building legacies that echo through time.",
@@ -570,26 +528,22 @@ definitions["NODE_KNOW_004"] = {
             { condition = { type = "satisfiedInputs", count = 3 },
               effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 2 Data to the owner. If 3+ input slot(s) are connected: Owner gains 1 VP." (Added VP condition)
+        -- Description: "Grants 2 Data to the owner. If 3+ input port(s) are connected: Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
              { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the activator. Owner gains 1 VP." (Unchanged)
+        -- Description: "Grants 1 Data to the activator. Owner gains 1 VP."
     }),
-    vpValue = 1, -- Reduced VP from 2 to 1
+    vpValue = 1,
     imagePath = "assets/images/ai-research-center.png",
-    openSlots = {
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input
-        [CardSlots.BOTTOM_RIGHT] = true,  -- 4: Technology Output
-        [CardSlots.LEFT_TOP] = true,      -- 5: Knowledge Output
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input
-        [CardSlots.TOP_LEFT] = false,
-        [CardSlots.BOTTOM_LEFT] = false,
-        [CardSlots.LEFT_BOTTOM] = false,
-        [CardSlots.RIGHT_BOTTOM] = false,
+    definedPorts = {
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
+        [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
+        [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
     },
     art = nil,
     flavorText = "Synthesizing intelligence, one cycle at a time.",
@@ -604,26 +558,23 @@ definitions["NODE_TECH_004"] = {
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } },
         }
-        -- Description: "Grants 2 Material to the owner." (Increased Material)
+        -- Description: "Grants 2 Material to the owner."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
         }
-        -- Description: "Grants 1 Material to the activator. Grants 1 Data to the owner." (Unchanged)
+        -- Description: "Grants 1 Material to the activator. Grants 1 Data to the owner."
     }),
-    vpValue = 1, -- Reduced VP from 2 to 1
+    vpValue = 1,
     imagePath = "assets/images/automated-fabricator.png",
-    openSlots = {
-        [CardSlots.BOTTOM_RIGHT] = true,  -- 4: Technology Output
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input
-        [CardSlots.RIGHT_BOTTOM] = true,  -- 8: Resource Output
-        [CardSlots.TOP_LEFT] = false,
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input (Added for adjacency)
-        [CardSlots.BOTTOM_LEFT] = false,
-        [CardSlots.LEFT_TOP] = false,
+    definedPorts = {
+        [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
+        [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
     },
     art = nil,
     flavorText = "From raw materials to finished marvels.",
@@ -636,26 +587,23 @@ definitions["NODE_KNOW_005"] = {
     buildCost = { material = 3, data = 3 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } } }
-        -- Description: "Grants 2 Data to the owner." (Unchanged)
+        -- Description: "Grants 2 Data to the owner."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
-             { effect = "forceDiscardCardsActivator", options = { amount = 1 } } -- Added activator discard
+             { effect = "forceDiscardCardsActivator", options = { amount = 1 } } 
         }
-        -- Description: "Grants 1 Data to the activator. Activator discards 1 card(s)." (Replaced owner data gain with activator discard)
+        -- Description: "Grants 1 Data to the activator. Activator discards 1 card(s)."
     }),
     vpValue = 1,
     imagePath = "assets/images/bio-research-lab.png",
-    openSlots = {
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input
-        [CardSlots.LEFT_TOP] = true,      -- 5: Knowledge Output
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input
-        [CardSlots.RIGHT_BOTTOM] = true,  -- 8: Resource Output
-        [CardSlots.TOP_LEFT] = false,
-        [CardSlots.BOTTOM_LEFT] = false,
-        [CardSlots.BOTTOM_RIGHT] = false,
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input (Re-added)
+    definedPorts = {
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
+        [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
+        [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
     },
     art = nil,
     flavorText = "Unlocking the blueprints of life itself.",
@@ -668,27 +616,22 @@ definitions["NODE_TECH_RES_001"] = {
     buildCost = { material = 3, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
-            { effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 1 } },
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
             { condition = { type = "adjacency", nodeType = CardTypes.RESOURCE, count = 1 },
               effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 1 } }
         }
-        -- Description: "Grants 1 Energy to the owner. Grants 1 Material to the owner. If adjacent to 1+ Resource node(s): Grants 1 Energy to the owner." (Added conditional Energy)
+        -- Description: "Grants 1 Energy to the owner. Grants 1 Material to the owner. If adjacent to 1+ Resource node(s): Grants 1 Energy to the owner."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { { effect = "addResourceToActivator", options = { resource = ResourceType.ENERGY, amount = 1 } } }
-        -- Description: "Grants 1 Energy to the activator." (Unchanged)
+        -- Description: "Grants 1 Energy to the activator."
     }),
     vpValue = 1, 
     imagePath = "assets/images/geothermal-tap.png",
-    openSlots = {
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input
-        [CardSlots.RIGHT_BOTTOM] = true,  -- 8: Resource Output
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input (Added for adjacency bonus)
-        [CardSlots.TOP_LEFT] = false,
-        [CardSlots.BOTTOM_LEFT] = false,
-        [CardSlots.LEFT_TOP] = false,
-        [CardSlots.RIGHT_TOP] = false,
+    definedPorts = {
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
+        [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
     },
     art = nil,
     flavorText = "Harnessing the planet's inner fire.",
@@ -707,23 +650,19 @@ definitions["NODE_TECH_CULT_001"] = {
             { condition = { type = "adjacency", nodeType = CardTypes.CULTURE, count = 1 },
               effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Owner draws 1 card. If adjacent to 1+ Culture node(s): Owner gains 1 VP." (Added conditional VP)
+        -- Description: "Owner draws 1 card. If adjacent to 1+ Culture node(s): Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { { effect = "drawCardsForActivator", options = { amount = 1 } } }
-        -- Description: "Activator draws 1 card." (Unchanged)
+        -- Description: "Activator draws 1 card."
     }),
-    vpValue = 0, -- Removed base VP
+    vpValue = 0,
     imagePath = "assets/images/digital-art-synthesizer.png",
-    openSlots = {
-        [CardSlots.TOP_LEFT] = true,      -- 1: Culture Output
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input
-        [CardSlots.BOTTOM_RIGHT] = true,  -- 4: Technology Output
-        [CardSlots.BOTTOM_LEFT] = true,   -- 3: Culture Input (Added for adjacency)
-        [CardSlots.LEFT_TOP] = false,
-        [CardSlots.LEFT_BOTTOM] = false,
-        [CardSlots.RIGHT_TOP] = false,
-        [CardSlots.RIGHT_BOTTOM] = false,
+    definedPorts = {
+        [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
+        [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
+        [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input
     },
     art = nil,
     flavorText = "Weaving algorithms into aesthetic experience.",
@@ -749,15 +688,11 @@ definitions["NODE_TECH_KNOW_001"] = {
     }),
     vpValue = 1,
     imagePath = "assets/images/quantum-simulation-lab.png",
-    openSlots = {
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input
-        [CardSlots.LEFT_TOP] = true,      -- 5: Knowledge Output
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input
-        [CardSlots.BOTTOM_RIGHT] = true,  -- 4: Technology Output
-        [CardSlots.TOP_LEFT] = false,
-        [CardSlots.BOTTOM_LEFT] = false,
-        [CardSlots.LEFT_BOTTOM] = false,
-        [CardSlots.RIGHT_BOTTOM] = false,
+    definedPorts = {
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
+        [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
+        [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
     },
     art = nil,
     flavorText = "Modeling reality at its most fundamental level.",
@@ -774,26 +709,22 @@ definitions["NODE_CULT_TECH_001"] = {
              { condition = { type = "adjacency", nodeType = CardTypes.TECHNOLOGY, count = 1 },
                 effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the owner. If adjacent to 1+ Technology node(s): Owner gains 1 VP." (Added conditional VP)
+        -- Description: "Grants 1 Data to the owner. If adjacent to 1+ Technology node(s): Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
         }
-        -- Description: "Grants 1 Material to the activator. Grants 1 Data to the owner." (Unchanged)
+        -- Description: "Grants 1 Material to the activator. Grants 1 Data to the owner."
     }),
     vpValue = 1,
     imagePath = "assets/images/applied-aesthetics-studio.png",
-    openSlots = {
-        [CardSlots.TOP_LEFT] = true,      -- 1: Culture Output
-        [CardSlots.BOTTOM_LEFT] = true,   -- 3: Culture Input
-        [CardSlots.BOTTOM_RIGHT] = true,  -- 4: Technology Output
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input (Added for adjacency)
-        [CardSlots.LEFT_TOP] = false,
-        [CardSlots.LEFT_BOTTOM] = false,
-        [CardSlots.RIGHT_TOP] = false,
-        [CardSlots.RIGHT_BOTTOM] = false,
+    definedPorts = {
+        [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output
+        [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input
+        [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
     },
     art = nil,
     flavorText = "Function follows form, elegantly.",
@@ -809,26 +740,22 @@ definitions["NODE_CULT_KNOW_001"] = {
             { effect = "drawCardsForOwner", options = { amount = 1 } },
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
         }
-        -- Description: "Owner draws 1 card. Grants 1 Data to the owner." (Unchanged)
+        -- Description: "Owner draws 1 card. Grants 1 Data to the owner."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "drawCardsForActivator", options = { amount = 1 } },
              { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Activator draws 1 card. Owner gains 1 VP." (Unchanged)
+        -- Description: "Activator draws 1 card. Owner gains 1 VP."
     }),
     vpValue = 1,
     imagePath = "assets/images/ethnographic-database.png",
-    openSlots = {
-        [CardSlots.BOTTOM_LEFT] = true,   -- 3: Culture Input
-        [CardSlots.LEFT_TOP] = true,      -- 5: Knowledge Output
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input
-        [CardSlots.TOP_LEFT] = true,      -- 1: Culture Output (Added)
-        [CardSlots.TOP_RIGHT] = false,
-        [CardSlots.BOTTOM_RIGHT] = false,
-        [CardSlots.LEFT_BOTTOM] = false,
-        [CardSlots.RIGHT_BOTTOM] = false,
+    definedPorts = {
+        [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input
+        [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
+        [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output
     },
     art = nil,
     flavorText = "Mapping the myriad patterns of society.",
@@ -844,26 +771,22 @@ definitions["NODE_CULT_RES_001"] = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } },
             { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 2 Material to the owner. Owner gains 1 VP." (Unchanged)
+        -- Description: "Grants 2 Material to the owner. Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
         }
-        -- Description: "Grants 1 Material to the activator. Grants 1 Data to the owner." (Unchanged)
+        -- Description: "Grants 1 Material to the activator. Grants 1 Data to the owner."
     }),
     vpValue = 1,
     imagePath = "assets/images/artisan-guild-workshop.png",
-    openSlots = {
-        [CardSlots.BOTTOM_LEFT] = true,   -- 3: Culture Input
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input
-        [CardSlots.RIGHT_BOTTOM] = true,  -- 8: Resource Output
-        [CardSlots.TOP_LEFT] = true,      -- 1: Culture Output (Added)
-        [CardSlots.TOP_RIGHT] = false,
-        [CardSlots.BOTTOM_RIGHT] = false,
-        [CardSlots.LEFT_TOP] = false,
-        [CardSlots.RIGHT_TOP] = false,
+    definedPorts = {
+        [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
+        [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
+        [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output
     },
     art = nil,
     flavorText = "Master craftsmanship, tangible results.",
@@ -879,26 +802,22 @@ definitions["NODE_RES_CULT_001"] = {
             { effect = "gainVPForOwner", options = { amount = 1 } },
             { effect = "drawCardsForOwner", options = { amount = 1 } }
         }
-        -- Description: "Owner gains 1 VP. Owner draws 1 card." (Unchanged)
+        -- Description: "Owner gains 1 VP. Owner draws 1 card."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "gainVPForActivator", options = { amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
         }
-        -- Description: "Activator gains 1 VP. Grants 1 Material to the owner." (Unchanged)
+        -- Description: "Activator gains 1 VP. Grants 1 Material to the owner."
     }),
     vpValue = 1,
     imagePath = "assets/images/resource-reclamation-art-project.png",
-    openSlots = {
-        [CardSlots.TOP_LEFT] = true,      -- 1: Culture Output
-        [CardSlots.BOTTOM_LEFT] = true,   -- 3: Culture Input
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input
-        [CardSlots.RIGHT_BOTTOM] = true,  -- 8: Resource Output
-        [CardSlots.TOP_RIGHT] = false,
-        [CardSlots.BOTTOM_RIGHT] = false,
-        [CardSlots.LEFT_TOP] = false,
-        [CardSlots.RIGHT_TOP] = false,
+    definedPorts = {
+        [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output
+        [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
+        [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
     },
     art = nil,
     flavorText = "Finding beauty in the discarded.",
@@ -914,26 +833,22 @@ definitions["NODE_RES_TECH_001"] = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
             { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the owner. Owner gains 1 VP." (Unchanged)
+        -- Description: "Grants 1 Data to the owner. Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the activator. Grants 1 Material to the owner." (Unchanged)
+        -- Description: "Grants 1 Data to the activator. Grants 1 Material to the owner."
     }),
     vpValue = 1,
     imagePath = "assets/images/materials-science-r&d.png",
-    openSlots = {
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input
-        [CardSlots.BOTTOM_RIGHT] = true,  -- 4: Technology Output
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input
-        [CardSlots.RIGHT_BOTTOM] = true,  -- 8: Resource Output
-        [CardSlots.TOP_LEFT] = false,
-        [CardSlots.BOTTOM_LEFT] = false,
-        [CardSlots.LEFT_TOP] = false,
-        [CardSlots.RIGHT_TOP] = false,
+    definedPorts = {
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
+        [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
+        [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
     },
     art = nil,
     flavorText = "Transforming raw potential into technological advancement.",
@@ -946,26 +861,22 @@ definitions["NODE_RES_KNOW_001"] = {
     buildCost = { material = 3, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } } }
-        -- Description: "Grants 2 Data to the owner." (Unchanged)
+        -- Description: "Grants 2 Data to the owner."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
              { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the activator. Owner gains 1 VP." (Unchanged)
+        -- Description: "Grants 1 Data to the activator. Owner gains 1 VP."
     }),
     vpValue = 1,
     imagePath = "assets/images/geological-survey-outpost.png",
-    openSlots = {
-        [CardSlots.LEFT_TOP] = true,      -- 5: Knowledge Output
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input
-        [CardSlots.RIGHT_BOTTOM] = true,  -- 8: Resource Output
-        [CardSlots.TOP_LEFT] = false,
-        [CardSlots.TOP_RIGHT] = false,
-        [CardSlots.BOTTOM_LEFT] = false,
-        [CardSlots.BOTTOM_RIGHT] = false,
+    definedPorts = {
+        [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
+        [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
     },
     art = nil,
     flavorText = "Charting the wealth beneath the surface.",
@@ -981,26 +892,22 @@ definitions["NODE_KNOW_CULT_001"] = {
             { effect = "gainVPForOwner", options = { amount = 1 } },
             { effect = "drawCardsForOwner", options = { amount = 1 } }
         }
-        -- Description: "Owner gains 1 VP. Owner draws 1 card." (Unchanged)
+        -- Description: "Owner gains 1 VP. Owner draws 1 card."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "gainVPForActivator", options = { amount = 1 } },
              { effect = "drawCardsForOwner", options = { amount = 1 } }
         }
-        -- Description: "Activator gains 1 VP. Owner draws 1 card." (Unchanged)
+        -- Description: "Activator gains 1 VP. Owner draws 1 card."
     }),
     vpValue = 1,
     imagePath = "assets/images/historical-simulation-center.png",
-    openSlots = {
-        [CardSlots.TOP_LEFT] = true,      -- 1: Culture Output
-        [CardSlots.BOTTOM_LEFT] = true,   -- 3: Culture Input
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input
-        [CardSlots.LEFT_TOP] = true,      -- 5: Knowledge Output
-        [CardSlots.TOP_RIGHT] = false,
-        [CardSlots.BOTTOM_RIGHT] = false,
-        [CardSlots.LEFT_BOTTOM] = false,
-        [CardSlots.RIGHT_BOTTOM] = false,
+    definedPorts = {
+        [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output
+        [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
+        [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
     },
     art = nil,
     flavorText = "Experiencing the echoes of the past.",
@@ -1016,26 +923,22 @@ definitions["NODE_KNOW_TECH_001"] = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
             { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the owner. Owner gains 1 VP." (Unchanged)
+        -- Description: "Grants 1 Data to the owner. Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
              { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the activator. Owner gains 1 VP." (Unchanged)
+        -- Description: "Grants 1 Data to the activator. Owner gains 1 VP."
     }),
     vpValue = 2,
     imagePath = "assets/images/advanced-algorithm-design.png",
-    openSlots = {
-        [CardSlots.TOP_RIGHT] = true,     -- 2: Technology Input
-        [CardSlots.BOTTOM_RIGHT] = true,  -- 4: Technology Output
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input
-        [CardSlots.LEFT_TOP] = true,      -- 5: Knowledge Output
-        [CardSlots.TOP_LEFT] = false,
-        [CardSlots.BOTTOM_LEFT] = false,
-        [CardSlots.LEFT_BOTTOM] = false,
-        [CardSlots.RIGHT_BOTTOM] = false,
+    definedPorts = {
+        [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
+        [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
+        [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
     },
     art = nil,
     flavorText = "Crafting the logic engines of tomorrow.",
@@ -1051,26 +954,22 @@ definitions["NODE_KNOW_RES_001"] = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
             { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Material to the owner. Owner gains 1 VP." (Unchanged)
+        -- Description: "Grants 1 Material to the owner. Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
         }
-        -- Description: "Grants 1 Material to the activator. Grants 1 Data to the owner." (Unchanged)
+        -- Description: "Grants 1 Material to the activator. Grants 1 Data to the owner."
     }),
     vpValue = 1,
     imagePath = "assets/images/resource-optimization-ai.png",
-    openSlots = {
-        [CardSlots.LEFT_BOTTOM] = true,   -- 6: Resource Input
-        [CardSlots.RIGHT_TOP] = true,     -- 7: Knowledge Input
-        [CardSlots.RIGHT_BOTTOM] = true,  -- 8: Resource Output
-        [CardSlots.LEFT_TOP] = true,      -- 5: Knowledge Output
-        [CardSlots.TOP_LEFT] = false,
-        [CardSlots.TOP_RIGHT] = false,
-        [CardSlots.BOTTOM_LEFT] = false,
-        [CardSlots.BOTTOM_RIGHT] = false,
+    definedPorts = {
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
+        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
+        [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
+        [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
     },
     art = nil,
     flavorText = "Efficiency unlocked through understanding.",
@@ -1093,15 +992,10 @@ definitions["NODE_RES_004"] = {
     }),
     vpValue = 0,
     imagePath = "assets/images/solar-collector-array.png",
-    openSlots = {
-        [CardSlots.LEFT_BOTTOM] = true,   -- Resource Input
-        [CardSlots.RIGHT_BOTTOM] = true,  -- Resource Output
-        [CardSlots.TOP_RIGHT] = true,     -- Technology Input
-        [CardSlots.TOP_LEFT] = false,
-        [CardSlots.BOTTOM_LEFT] = false,
-        [CardSlots.BOTTOM_RIGHT] = false,
-        [CardSlots.LEFT_TOP] = false,
-        [CardSlots.RIGHT_TOP] = false,
+    definedPorts = {
+        [CardPorts.LEFT_BOTTOM] = true,   -- Resource Input
+        [CardPorts.RIGHT_BOTTOM] = true,  -- Resource Output
+        [CardPorts.TOP_RIGHT] = true,     -- Technology Input
     },
     art = nil,
     flavorText = "Converting light into power.",
@@ -1129,15 +1023,11 @@ definitions["NODE_TECH_005"] = {
     }),
     vpValue = 2,
     imagePath = "assets/images/fusion-reactor-prototype.png",
-    openSlots = {
-        [CardSlots.TOP_RIGHT] = true,     -- Tech Input
-        [CardSlots.BOTTOM_RIGHT] = true,  -- Tech Output
-        [CardSlots.RIGHT_BOTTOM] = true,  -- Resource Output
-        [CardSlots.LEFT_BOTTOM] = true,   -- Resource Input
-        [CardSlots.TOP_LEFT] = false,
-        [CardSlots.BOTTOM_LEFT] = false,
-        [CardSlots.LEFT_TOP] = false,
-        [CardSlots.RIGHT_TOP] = false,
+    definedPorts = {
+        [CardPorts.TOP_RIGHT] = true,     -- Tech Input
+        [CardPorts.BOTTOM_RIGHT] = true,  -- Tech Output
+        [CardPorts.RIGHT_BOTTOM] = true,  -- Resource Output
+        [CardPorts.LEFT_BOTTOM] = true,   -- Resource Input
     },
     art = nil,
     flavorText = "The power of a star, contained.",
@@ -1169,15 +1059,10 @@ definitions["NODE_KNOW_006"] = {
     }),
     vpValue = 1,
     imagePath = "assets/images/information-brokerage.png",
-    openSlots = {
-        [CardSlots.LEFT_TOP] = true,      -- Knowledge Output
-        [CardSlots.RIGHT_TOP] = true,     -- Knowledge Input
-        [CardSlots.BOTTOM_LEFT] = true,   -- Culture Input
-        [CardSlots.TOP_LEFT] = false,
-        [CardSlots.TOP_RIGHT] = false,
-        [CardSlots.BOTTOM_RIGHT] = false,
-        [CardSlots.LEFT_BOTTOM] = false,
-        [CardSlots.RIGHT_BOTTOM] = false,
+    definedPorts = {
+        [CardPorts.LEFT_TOP] = true,      -- Knowledge Output
+        [CardPorts.RIGHT_TOP] = true,     -- Knowledge Input
+        [CardPorts.BOTTOM_LEFT] = true,   -- Culture Input
     },
     art = nil,
     flavorText = "Knowledge is power, especially when selectively shared.",
@@ -1194,7 +1079,7 @@ definitions["NODE_TECH_006"] = {
             { condition = { type = "satisfiedInputs", count = 3 },
               effect = "gainVPForOwner", options = { amount = 2 } }
         }
-        -- Description: "Grants 2 Data to the owner. If 3+ input slot(s) are connected: Owner gains 2 VP."
+        -- Description: "Grants 1 Data to the owner. If 3+ input port(s) are connected: Owner gains 2 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
@@ -1205,15 +1090,12 @@ definitions["NODE_TECH_006"] = {
     }),
     vpValue = 1,
     imagePath = "assets/images/network-hub.png",
-    openSlots = {
-        [CardSlots.TOP_RIGHT] = true,     -- Tech Input
-        [CardSlots.BOTTOM_RIGHT] = true,  -- Tech Output
-        [CardSlots.LEFT_BOTTOM] = true,   -- Resource Input
-        [CardSlots.BOTTOM_LEFT] = true,   -- Culture Input
-        [CardSlots.RIGHT_TOP] = true,     -- Knowledge Input
-        [CardSlots.TOP_LEFT] = false,
-        [CardSlots.LEFT_TOP] = false,
-        [CardSlots.RIGHT_BOTTOM] = false,
+    definedPorts = {
+        [CardPorts.TOP_RIGHT] = true,     -- Tech Input
+        [CardPorts.BOTTOM_RIGHT] = true,  -- Tech Output
+        [CardPorts.LEFT_BOTTOM] = true,   -- Resource Input
+        [CardPorts.BOTTOM_LEFT] = true,   -- Culture Input
+        [CardPorts.RIGHT_TOP] = true,     -- Knowledge Input
     },
     art = nil,
     flavorText = "The nexus point where diverse streams converge.",
@@ -1248,15 +1130,10 @@ definitions["NODE_TECH_007"] = {
     }),
     vpValue = 0,
     imagePath = "assets/images/sabotage-drone-bay.png",
-    openSlots = {
-        [CardSlots.TOP_RIGHT] = true,     -- Tech Input
-        [CardSlots.BOTTOM_RIGHT] = true,  -- Tech Output
-        [CardSlots.RIGHT_BOTTOM] = true,  -- Resource Output
-        [CardSlots.TOP_LEFT] = false,
-        [CardSlots.BOTTOM_LEFT] = false,
-        [CardSlots.LEFT_TOP] = false,
-        [CardSlots.LEFT_BOTTOM] = false,
-        [CardSlots.RIGHT_TOP] = false,
+    definedPorts = {
+        [CardPorts.TOP_RIGHT] = true,     -- Tech Input
+        [CardPorts.BOTTOM_RIGHT] = true,  -- Tech Output
+        [CardPorts.RIGHT_BOTTOM] = true,  -- Resource Output
     },
     art = nil,
     flavorText = "Disruption delivered remotely.",

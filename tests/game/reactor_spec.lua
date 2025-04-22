@@ -36,15 +36,15 @@ describe("Reactor Card", function()
         
         it("should have properties matching CardDefinitions", function()
             local baseData = CardDefinitions["REACTOR_BASE"]
-            -- Verify all slots defined in REACTOR_BASE are open
-            for slotIndex, shouldBeOpen in pairs(baseData.openSlots) do
-                assert.are.equal(shouldBeOpen, reactor:isSlotDefinedOpen(slotIndex), "Slot " .. slotIndex .. " mismatch")
+            -- Verify all ports defined in REACTOR_BASE are open
+            for portIndex, shouldBeOpen in pairs(baseData.definedPorts) do
+                assert.are.equal(shouldBeOpen, reactor:isPortDefined(portIndex), "Port " .. portIndex .. " mismatch")
             end
             -- Verify a sample of other properties
             assert.are.equal(baseData.flavorText, reactor.flavorText)
-            -- Verify a slot NOT defined in REACTOR_BASE is closed (assuming baseData is comprehensive)
-            -- This assumes the definition includes all 8 slots. If not, this needs adjustment.
-            assert.is_false(reactor:isSlotDefinedOpen(99))
+            -- Verify a port NOT defined in REACTOR_BASE is closed (assuming baseData is comprehensive)
+            -- This assumes the definition includes all 8 ports. If not, this needs adjustment.
+            assert.is_false(reactor:isPortDefined(99))
         end)
         
         it("should have reactor-specific properties", function()

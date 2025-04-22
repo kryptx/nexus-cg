@@ -43,7 +43,7 @@ end
 -- Place a card instance onto the network grid at specified coordinates
 -- Note: This function assumes placement validity checks have already been done.
 function Network:placeCard(cardInstance, x, y)
-    if not cardInstance or type(cardInstance) ~= 'table' then -- or not getmetatable(cardInstance) == Card then
+    if not cardInstance or type(cardInstance) ~= 'table' then 
         error(string.format("Attempted to place invalid object at (%d,%d). Expected Card instance.", x, y))
         return false
     end
@@ -65,7 +65,6 @@ function Network:placeCard(cardInstance, x, y)
     -- Update card's state
     cardInstance.network = self
     cardInstance.position = { x = x, y = y }
-    -- cardInstance.owner was likely set when added to hand/created, but ensure it matches network owner
     if cardInstance.owner ~= self.owner then
          print(string.format("Warning: Card %s (%s) owner mismatch during placement.", cardInstance.title, cardInstance.id))
          cardInstance.owner = self.owner
@@ -110,40 +109,40 @@ function Network:hasAdjacentCard(x, y)
 end
 
 -- =====================
--- SLOT HELPER METHODS --
+-- PORT HELPER METHODS --
 -- =====================
 
--- Get the grid coordinates of the cell adjacent to a given slot
--- Assumes slotIndex is 1-8 according to Card.Slots convention
-function Network:getAdjacentCoordForSlot(x, y, slotIndex)
-    if slotIndex == Card.Slots.TOP_LEFT or slotIndex == Card.Slots.TOP_RIGHT then
+-- Get the grid coordinates of the cell adjacent to a given port
+-- Assumes portIndex is 1-8 according to Card.Ports convention
+function Network:getAdjacentCoordForPort(x, y, portIndex)
+    if portIndex == Card.Ports.TOP_LEFT or portIndex == Card.Ports.TOP_RIGHT then
         return { x = x, y = y - 1 } -- Cell Above
-    elseif slotIndex == Card.Slots.BOTTOM_LEFT or slotIndex == Card.Slots.BOTTOM_RIGHT then
+    elseif portIndex == Card.Ports.BOTTOM_LEFT or portIndex == Card.Ports.BOTTOM_RIGHT then
         return { x = x, y = y + 1 } -- Cell Below
-    elseif slotIndex == Card.Slots.LEFT_TOP or slotIndex == Card.Slots.LEFT_BOTTOM then
+    elseif portIndex == Card.Ports.LEFT_TOP or portIndex == Card.Ports.LEFT_BOTTOM then
         return { x = x - 1, y = y } -- Cell Left
-    elseif slotIndex == Card.Slots.RIGHT_TOP or slotIndex == Card.Slots.RIGHT_BOTTOM then
+    elseif portIndex == Card.Ports.RIGHT_TOP or portIndex == Card.Ports.RIGHT_BOTTOM then
         return { x = x + 1, y = y } -- Cell Right
     end
-    print(string.format("Warning: getAdjacentCoordForSlot called with invalid slotIndex: %s", tostring(slotIndex)))
+    print(string.format("Warning: getAdjacentCoordForPort called with invalid portIndex: %s", tostring(portIndex)))
     return nil
 end
 
--- Get the slot index on an adjacent card that faces the given slotIndex
-function Network:getOpposingSlotIndex(slotIndex)
+-- Get the port index on an adjacent card that faces the given portIndex
+function Network:getOpposingPortIndex(portIndex)
     local mapping = {
-        [Card.Slots.TOP_LEFT] = Card.Slots.BOTTOM_LEFT,
-        [Card.Slots.TOP_RIGHT] = Card.Slots.BOTTOM_RIGHT,
-        [Card.Slots.BOTTOM_LEFT] = Card.Slots.TOP_LEFT,
-        [Card.Slots.BOTTOM_RIGHT] = Card.Slots.TOP_RIGHT,
-        [Card.Slots.LEFT_TOP] = Card.Slots.RIGHT_TOP,
-        [Card.Slots.LEFT_BOTTOM] = Card.Slots.RIGHT_BOTTOM,
-        [Card.Slots.RIGHT_TOP] = Card.Slots.LEFT_TOP,
-        [Card.Slots.RIGHT_BOTTOM] = Card.Slots.LEFT_BOTTOM,
+        [Card.Ports.TOP_LEFT] = Card.Ports.BOTTOM_LEFT,
+        [Card.Ports.TOP_RIGHT] = Card.Ports.BOTTOM_RIGHT,
+        [Card.Ports.BOTTOM_LEFT] = Card.Ports.TOP_LEFT,
+        [Card.Ports.BOTTOM_RIGHT] = Card.Ports.TOP_RIGHT,
+        [Card.Ports.LEFT_TOP] = Card.Ports.RIGHT_TOP,
+        [Card.Ports.LEFT_BOTTOM] = Card.Ports.RIGHT_BOTTOM,
+        [Card.Ports.RIGHT_TOP] = Card.Ports.LEFT_TOP,
+        [Card.Ports.RIGHT_BOTTOM] = Card.Ports.LEFT_BOTTOM,
     }
-    local opposing = mapping[slotIndex]
+    local opposing = mapping[portIndex]
     if not opposing then
-        print(string.format("Warning: getOpposingSlotIndex called with invalid slotIndex: %s", tostring(slotIndex)))
+        print(string.format("Warning: getOpposingPortIndex called with invalid portIndex: %s", tostring(portIndex)))
     end
     return opposing
 end
@@ -176,54 +175,54 @@ function Network:isValidPlacement(cardToPlace, x, y)
     end
 
     -- 4. Check Connection Point Matching Rule (GDD 4.3 - Simplified)
-    --    Rule: At least one open INPUT on the card being placed (cardToPlace)
-    --          must align with a corresponding open OUTPUT on an adjacent card.
+    --    Rule: At least one present INPUT on the card being placed (cardToPlace)
+    --          must align with a corresponding present OUTPUT on an adjacent card.
     --    Special Case: The Reactor acts as a universal OUTPUT for any adjacent INPUT requirement.
     local connectionRequirementMet = false
     for _, adjData in ipairs(adjacentCards) do
         local adjCard = adjData.card
         local ax, ay = adjData.x, adjData.y
 
-        -- Determine connecting edges and slots based on relative position
-        local newCardSlotsToCheck, adjCardSlotsToCheck
+        -- Determine connecting edges and ports based on relative position
+        local newCardPortsToCheck, adjCardPortsToCheck
         if ax == x and ay == y - 1 then -- adjCard is ABOVE newCard
-            newCardSlotsToCheck = { Card.Slots.TOP_LEFT, Card.Slots.TOP_RIGHT }       -- Top edge of new card
-            adjCardSlotsToCheck = { Card.Slots.BOTTOM_LEFT, Card.Slots.BOTTOM_RIGHT } -- Bottom edge of adjacent card
+            newCardPortsToCheck = { Card.Ports.TOP_LEFT, Card.Ports.TOP_RIGHT }       -- Top edge of new card
+            adjCardPortsToCheck = { Card.Ports.BOTTOM_LEFT, Card.Ports.BOTTOM_RIGHT } -- Bottom edge of adjacent card
         elseif ax == x and ay == y + 1 then -- adjCard is BELOW newCard
-            newCardSlotsToCheck = { Card.Slots.BOTTOM_LEFT, Card.Slots.BOTTOM_RIGHT }
-            adjCardSlotsToCheck = { Card.Slots.TOP_LEFT, Card.Slots.TOP_RIGHT }
+            newCardPortsToCheck = { Card.Ports.BOTTOM_LEFT, Card.Ports.BOTTOM_RIGHT }
+            adjCardPortsToCheck = { Card.Ports.TOP_LEFT, Card.Ports.TOP_RIGHT }
         elseif ax == x - 1 and ay == y then -- adjCard is LEFT of newCard
-            newCardSlotsToCheck = { Card.Slots.LEFT_TOP, Card.Slots.LEFT_BOTTOM }
-            adjCardSlotsToCheck = { Card.Slots.RIGHT_TOP, Card.Slots.RIGHT_BOTTOM }
+            newCardPortsToCheck = { Card.Ports.LEFT_TOP, Card.Ports.LEFT_BOTTOM }
+            adjCardPortsToCheck = { Card.Ports.RIGHT_TOP, Card.Ports.RIGHT_BOTTOM }
         elseif ax == x + 1 and ay == y then -- adjCard is RIGHT of newCard
-            newCardSlotsToCheck = { Card.Slots.RIGHT_TOP, Card.Slots.RIGHT_BOTTOM }
-            adjCardSlotsToCheck = { Card.Slots.LEFT_TOP, Card.Slots.LEFT_BOTTOM }
+            newCardPortsToCheck = { Card.Ports.RIGHT_TOP, Card.Ports.RIGHT_BOTTOM }
+            adjCardPortsToCheck = { Card.Ports.LEFT_TOP, Card.Ports.LEFT_BOTTOM }
         end
 
         -- Check for a valid Output -> Input link across the connecting edge
-        if newCardSlotsToCheck then
-            for i = 1, #newCardSlotsToCheck do
-                local newSlotIdx = newCardSlotsToCheck[i]
-                local adjSlotIdx = adjCardSlotsToCheck[i] -- Corresponding slot on the adjacent card
+        if newCardPortsToCheck then
+            for i = 1, #newCardPortsToCheck do
+                local newPortIdx = newCardPortsToCheck[i]
+                local adjPortIdx = adjCardPortsToCheck[i] -- Corresponding port on the adjacent card
 
-                local newProps = cardToPlace:getSlotProperties(newSlotIdx)
-                local adjProps = adjCard:getSlotProperties(adjSlotIdx)
+                local newProps = cardToPlace:getPortProperties(newPortIdx)
+                local adjProps = adjCard:getPortProperties(adjPortIdx)
 
-                -- Check if the slot on the card being placed is an AVAILABLE INPUT
-                if newProps and not newProps.is_output and cardToPlace:isSlotAvailable(newSlotIdx) then
-                    -- Now check the corresponding slot on the adjacent card
+                -- Check if the port on the card being placed is an INPUT
+                if newProps and not newProps.is_output and cardToPlace:isPortAvailable(newPortIdx) then
+                    -- Now check the corresponding port on the adjacent card
                     if adjProps then
                         if adjCard.type == Card.Type.REACTOR then
-                            -- Reactor Case: Check if the corresponding slot on the reactor is AVAILABLE (acts as universal Output)
-                            if adjCard:isSlotAvailable(adjSlotIdx) then
-                                print(string.format("  Connection found via Reactor: New Input Slot %d -> Reactor Output Slot %d", newSlotIdx, adjSlotIdx))
+                            -- Reactor Case: Check if the corresponding port on the reactor is AVAILABLE (acts as universal Output)
+                            if adjCard:isPortAvailable(adjPortIdx) then
+                                print(string.format("  Connection found via Reactor: New Input Port %d -> Reactor Output Port %d", newPortIdx, adjPortIdx))
                                 connectionRequirementMet = true
                                 goto found_connection -- Use goto to break out of nested loops
                             end
                         else
-                            -- Normal Node Case: Check if the adjacent slot is an AVAILABLE OUTPUT of the SAME TYPE
-                            if adjProps.is_output and adjCard:isSlotAvailable(adjSlotIdx) and newProps.type == adjProps.type then
-                                print(string.format("  Connection found via Node: New Input Slot %d (%s) -> Adj Output Slot %d (%s)", newSlotIdx, newProps.type, adjSlotIdx, adjProps.type))
+                            -- Normal Node Case: Check if the adjacent port is an OUTPUT
+                            if adjProps.is_output and adjCard:isPortAvailable(adjPortIdx) then
+                                print(string.format("  Connection found via Node: New Input Port %d -> Adj Output Port %d", newPortIdx, adjPortIdx))
                                 connectionRequirementMet = true
                                 goto found_connection -- Use goto to break out of nested loops
                             end
@@ -262,12 +261,12 @@ function Network:findPathToReactor(targetCard)
     print(string.format("Finding path from %s (%d,%d) to Reactor...", targetCard.title, targetCard.position.x, targetCard.position.y))
 
     -- We need to perform a search (e.g., BFS or DFS) backwards from the target.
-    -- Each step must go from an OPEN INPUT slot on the current card
-    -- to a corresponding OPEN OUTPUT slot on the previous card in the path.
+    -- Each step must go from an INPUT port on the current card
+    -- to a corresponding OUTPUT port on the *previous* card in the path.
 
     -- Let's use Breadth-First Search (BFS) to find the shortest path (in terms of nodes).
     -- queue stores tables: { card = currentCard, path = {currentCard, ...} }
-    local queue = { { card = targetCard, path = { targetCard } } }
+    local queue = { { card = targetCard, path = { targetCard } } } 
     local visited = { [targetCard.id] = true } -- Track visited card IDs to prevent cycles
 
     while #queue > 0 do
@@ -275,49 +274,46 @@ function Network:findPathToReactor(targetCard)
         local currentCard = current.card
         local currentPath = current.path
 
-        -- print(string.format("  Checking card: %s at (%d,%d)", currentCard.title, currentCard.position.x, currentCard.position.y))
-
         -- Check neighbors to find the *previous* card in the path (following Input <- Output)
         local adjacentCoords = self:getAdjacentCoords(currentCard.position.x, currentCard.position.y)
         for _, coord in ipairs(adjacentCoords) do
             local neighborCard = self:getCardAt(coord.x, coord.y)
 
             if neighborCard and not visited[neighborCard.id] then
-                -- Determine connecting edge slots
-                local currentCardSlotsToCheck, neighborCardSlotsToCheck
+                -- Determine connecting edge ports
+                local currentCardPortsToCheck, neighborCardPortsToCheck
                 local cx, cy = currentCard.position.x, currentCard.position.y
                 local nx, ny = neighborCard.position.x, neighborCard.position.y
 
                 if nx == cx and ny == cy - 1 then -- neighborCard is ABOVE currentCard
-                    currentCardSlotsToCheck = { Card.Slots.TOP_LEFT, Card.Slots.TOP_RIGHT }       -- Top edge of current card
-                    neighborCardSlotsToCheck = { Card.Slots.BOTTOM_LEFT, Card.Slots.BOTTOM_RIGHT } -- Bottom edge of neighbor card
+                    currentCardPortsToCheck = { Card.Ports.TOP_LEFT, Card.Ports.TOP_RIGHT }       -- Top edge of current card
+                    neighborCardPortsToCheck = { Card.Ports.BOTTOM_LEFT, Card.Ports.BOTTOM_RIGHT } -- Bottom edge of neighbor card
                 elseif nx == cx and ny == cy + 1 then -- neighborCard is BELOW currentCard
-                    currentCardSlotsToCheck = { Card.Slots.BOTTOM_LEFT, Card.Slots.BOTTOM_RIGHT }
-                    neighborCardSlotsToCheck = { Card.Slots.TOP_LEFT, Card.Slots.TOP_RIGHT }
+                    currentCardPortsToCheck = { Card.Ports.BOTTOM_LEFT, Card.Ports.BOTTOM_RIGHT }
+                    neighborCardPortsToCheck = { Card.Ports.TOP_LEFT, Card.Ports.TOP_RIGHT }
                 elseif nx == cx - 1 and ny == cy then -- neighborCard is LEFT of currentCard
-                    currentCardSlotsToCheck = { Card.Slots.LEFT_TOP, Card.Slots.LEFT_BOTTOM }
-                    neighborCardSlotsToCheck = { Card.Slots.RIGHT_TOP, Card.Slots.RIGHT_BOTTOM }
+                    currentCardPortsToCheck = { Card.Ports.LEFT_TOP, Card.Ports.LEFT_BOTTOM }
+                    neighborCardPortsToCheck = { Card.Ports.RIGHT_TOP, Card.Ports.RIGHT_BOTTOM }
                 elseif nx == cx + 1 and ny == cy then -- neighborCard is RIGHT of currentCard
-                    currentCardSlotsToCheck = { Card.Slots.RIGHT_TOP, Card.Slots.RIGHT_BOTTOM }
-                    neighborCardSlotsToCheck = { Card.Slots.LEFT_TOP, Card.Slots.LEFT_BOTTOM }
+                    currentCardPortsToCheck = { Card.Ports.RIGHT_TOP, Card.Ports.RIGHT_BOTTOM }
+                    neighborCardPortsToCheck = { Card.Ports.LEFT_TOP, Card.Ports.LEFT_BOTTOM }
                 end
 
-                -- Check for a valid Output -> Input link (Current -> Neighbor)
-                if currentCardSlotsToCheck then
-                    for i = 1, #currentCardSlotsToCheck do
-                        local currentSlotIdx = currentCardSlotsToCheck[i]
-                        local neighborSlotIdx = neighborCardSlotsToCheck[i]
+                -- Check for a valid Output -> Input link (Neighbor Output -> Current Input)
+                if currentCardPortsToCheck then
+                    for i = 1, #currentCardPortsToCheck do
+                        local currentPortIdx = currentCardPortsToCheck[i]
+                        local neighborPortIdx = neighborCardPortsToCheck[i]
 
-                        local currentProps = currentCard:getSlotProperties(currentSlotIdx)
-                        local neighborProps = neighborCard:getSlotProperties(neighborSlotIdx)
+                        local currentProps = currentCard:getPortProperties(currentPortIdx)
+                        local neighborProps = neighborCard:getPortProperties(neighborPortIdx)
 
-                        -- Is current slot an AVAILABLE OUTPUT?
-                        if currentProps and currentProps.is_output and currentCard:isSlotAvailable(currentSlotIdx) then
-                            -- Is neighbor slot an AVAILABLE INPUT of the same TYPE?
-                            if neighborProps and not neighborProps.is_output and neighborCard:isSlotAvailable(neighborSlotIdx) and currentProps.type == neighborProps.type then
+                        -- Is current port an INPUT?
+                        if currentProps and not currentProps.is_output and currentCard:isPortAvailable(currentPortIdx) then
+                            -- Is neighbor port an OUTPUT of the same TYPE?
+                            if neighborProps and neighborProps.is_output and neighborCard:isPortAvailable(neighborPortIdx) and currentProps.type == neighborProps.type then
                                 -- Valid Output -> Input link found!
-                                -- print(string.format("    Found valid link: Current Output Slot %d (%s) -> Neighbor Input Slot %d (%s) [%s]", currentSlotIdx, currentProps.type, neighborSlotIdx, neighborProps.type, neighborCard.title))
-
+                                
                                 -- Check if neighbor is the Reactor
                                 if neighborCard.type == Card.Type.REACTOR then
                                     print("  Path found to Reactor!")
@@ -365,7 +361,6 @@ end
 -- Check if the network is empty (has no cards)
 -- Returns: boolean indicating if the network is empty
 function Network:isEmpty()
-    -- Use next() to check if the cards table has any entries
     return next(self.cards) == nil
 end
 
@@ -378,6 +373,36 @@ function Network:getSize()
     return count
 end
 
+-- Helper for BFS pathfinding (shallow copy)
+local function shallow_copy(original)
+    local copy = {}
+    for k, v in ipairs(original) do
+        copy[k] = v
+    end
+    return copy
+end
+
+-- Get neighbors (adjacent cards) of a given position
+-- position: A table {x=..., y=...}
+-- Returns: A list (table) of Card instances that are adjacent.
+function Network:getNeighbors(position)
+    if not position or position.x == nil or position.y == nil then
+        print("Warning: getNeighbors called with invalid position")
+        return {}
+    end
+
+    local neighbors = {}
+    local adjacentCoords = self:getAdjacentCoords(position.x, position.y)
+    for _, coord in ipairs(adjacentCoords) do
+        local neighborCard = self:getCardAt(coord.x, coord.y)
+        if neighborCard then
+            table.insert(neighbors, neighborCard)
+        end
+    end
+    return neighbors
+end
+
 -- TODO: Implement network iteration/visualization helpers
+-- TODO: Add Card:getInputPorts() and Card:hasOutputPort()
 
 return Network

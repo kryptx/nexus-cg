@@ -1,6 +1,6 @@
 # Game Design Document: NEXUS: The Convergence
 
-**Version:** 0.3 (Revision: Simplified 8-Slot Connections)
+**Version:** 0.3 (Revision: Simplified 8-Port Connections)
 
 ## 1. Introduction / Overview
 
@@ -14,7 +14,7 @@ The core theme revolves around shaping an evolving ecosystem where individual pl
 *   **Emergent Complexity:** Simple actions should lead to complex, evolving game states driven by player choices and network interactions.
 *   **Meaningful Adaptability:** Players must adapt to opponent actions and dynamic "Paradigm Shifts." Flexible, responsive play is key.
 *   **Tactical Depth via Multi-Use Cards:** Each card presents multiple choices (node, resource, action, scoring), demanding interesting tactical decisions.
-*   **Satisfying Network Building:** Constructing and visually expanding one's network should be inherently rewarding, presenting spatial puzzles based on connection slots.
+*   **Satisfying Network Building:** Constructing and visually expanding one's network should be inherently rewarding, presenting spatial puzzles based on connection ports.
 *   **Multiple Viable Paths:** Diverse strategies (e.g., expansion, convergence, resource focus, paradigm exploitation) should be viable routes to victory.
 
 ## 3. Target Audience
@@ -33,7 +33,7 @@ The core theme revolves around shaping an evolving ecosystem where individual pl
 
 *   **Player Setup:** Each player receives:
     *   A player board (Functionality TBD: resource tracking, VP tracking, etc.).
-    *   One "Reactor" card placed in their starting play area. This serves as the **base**. The Reactor has **all 8 connection slots 'open'** according to the standard convention (See 4.3) and allows adjacent placement without requiring an initial Output->Input link.
+    *   One "Reactor" card placed in their starting play area. This serves as the **base**. The Reactor has **all 8 connection ports** according to the standard convention (See 4.3) and allows adjacent placement without requiring an initial Output->Input link.
     *   **One Genesis Card:** Create a separate pool of "Genesis Cards" (See 5.1.A). Each player draws one Genesis Card at random from this pool and adds it to their hand. Shuffle any remaining Genesis Cards into the main Node deck before proceeding.
     *   A starting hand of **2** additional cards dealt from the node deck. This forms a starting hand of **3** cards. (deal these *after* the Genesis Card).
     *   Initial resources: **0** Energy, **1** Data, **2** Material. Quantities currently under play test.
@@ -63,17 +63,17 @@ A player's turn consists of the following phases, performed in order:
 *   **Placement:** Cards are played from hand into the player's network area, typically costing Material resources.
 *   **Connectivity:** A new card must be placed adjacent (sharing a full edge) to at least one existing card in the player's network.
 *   **Fixed Orientation:** Cards **must** be placed with a fixed "up" orientation and cannot be rotated.
-*   **8-Slot Convention & Potential Connections:** Each edge has two potential connection slots with fixed type/direction:
-    *   **Top Edge:** Slot 1 (Left Half) = Culture Output, Slot 2 (Right Half) = Technology Input
-    *   **Bottom Edge:** Slot 3 (Left Half) = Culture Input, Slot 4 (Right Half) = Technology Output
-    *   **Left Edge:** Slot 5 (Top Half) = Knowledge Output, Slot 6 (Bottom Half) = Resource Input
-    *   **Right Edge:** Slot 7 (Top Half) = Knowledge Input, Slot 8 (Bottom Half) = Resource Output
-    *   Node cards specify which of these 8 potential slots are **'open' (active)** (See 5.1).
+*   **8-Port Convention & Potential Connections:** Each edge has two potential connection ports with fixed type/direction:
+    *   **Top Edge:** Port 1 (Left Half) = Culture Output, Port 2 (Right Half) = Technology Input
+    *   **Bottom Edge:** Port 3 (Left Half) = Culture Input, Port 4 (Right Half) = Technology Output
+    *   **Left Edge:** Port 5 (Top Half) = Knowledge Output, Port 6 (Bottom Half) = Resource Input
+    *   **Right Edge:** Port 7 (Top Half) = Knowledge Input, Port 8 (Bottom Half) = Resource Output
+    *   Node cards specify which of these 8 potential ports are **present** on the card (See 5.1).
 *   **Connection Point Matching Rule (Simplified):** To place Card B adjacent to Card A:
     *   Align cards without rotation.
-    *   Check all **open Input slots** on Card B's connecting edge.
-    *   The placement is valid if **at least one** of these open Input slots aligns with a corresponding **open Output slot** on Card A's adjacent edge.
-    *   Other slots (unmatched Inputs on Card B, any Outputs on Card B, any Inputs/Outputs on Card A) do not need to align or match for placement legality.
+    *   Check all **Input ports present** on Card B's connecting edge.
+    *   The placement is valid if **at least one** of these Input ports aligns with a corresponding **Output port present** on Card A's adjacent edge.
+    *   Other ports (unmatched Inputs on Card B, any Outputs on Card B, any Inputs/Outputs on Card A) do not need to align or match for placement legality.
 *   **Uniqueness Rule:** A player's network **cannot contain more than one copy of the exact same card**.
 
 ### 4.4 Resource Management
@@ -98,11 +98,11 @@ A player's turn consists of the following phases, performed in order:
 *   **Initiation (Targeted Activation):** Player selects a target node they wish to serve as the endpoint of the activation sequence.
     *   The player identifies a specific node (the **target node**) in their network or an opponent's network (reachable via Convergence Link).
 *   **Path Requirement for Activation:** For activation to be valid, there must exist a single, contiguous chain of connections originating from the target node and terminating at the player's Reactor. This chain must adhere to the following:
-    *   It starts by using an **'open' Output slot** on the **target node**.
-    *   Each subsequent step in the chain uses an **'open' Output slot** on the current node...
-    *   ...to connect to a corresponding **'open' Input slot** on the **next node** in the sequence leading towards the Reactor (following the established `Output -> Input` links).
-    *   The **final node** in the chain (the one whose Output connects directly to the Reactor's Input) must use an **'open' Output slot**...
-    *   ...to connect to a corresponding **'open' Input slot** on the **Reactor**.
+    *   It starts by using an **Output port present** on the **target node**.
+    *   Each subsequent step in the chain uses an **Output port present** on the current node...
+    *   ...to connect to a corresponding **Input port present** on the **next node** in the sequence leading towards the Reactor (following the established `Output -> Input` links).
+    *   The **final node** in the chain (the one whose Output connects directly to the Reactor's Input) must use an **Output port present**...
+    *   ...to connect to a corresponding **Input port present** on the **Reactor**.
     *   The chain cannot branch.
 *   **Activation Path & Cost:** The sequence of nodes starting with the Target and ending with the node directly connected to the Reactor constitutes the **activation path**. Let the number of nodes in this path be **M**. The player must spend **M Energy** to activate this path.
 *   **Activation Sequence (Target to Reactor):**
@@ -111,7 +111,7 @@ A player's turn consists of the following phases, performed in order:
         *   If the target node belongs to an **opponent** *and* was targeted via a Convergence Link (respecting the Output->Input chain), resolve its "Convergence Effect" for the current player.
     *   The activation then proceeds node by node along the path towards the Reactor, resolving each node's appropriate effect (Action or Convergence) in turn.
     *   The **Reactor** itself is the necessary endpoint for a valid path but **does not** have its own effect resolved as part of this sequence.
-*   **Limitations:** A specific node can only be activated **once** as part of a single activation sequence per turn, even if it has multiple open slots involved in the path.
+*   **Limitations:** A specific node can only be activated **once** as part of a single activation sequence per turn, even if it has multiple ports involved in the path.
 *   **Harvest Effects:** Some card Actions or Convergence Effects may be designated as "Harvest" effects, involving the conversion of network elements into VP or resources.
 
 ### 4.6 Convergence Mechanic
@@ -120,16 +120,17 @@ A player's turn consists of the following phases, performed in order:
 *   **Initiation:** During their Converge Phase, a player may use **one** available (unused) `[Type] Convergence Link set` to connect their network to an opponent's.
 *   **Placement Requirements:** To use a `[Type] Convergence Link set`:
     *   The initiator must possess the corresponding unused `[Type] Link set`.
-    *   The player chooses one of their nodes with an **'open' `[Type]` Output slot** at the appropriate half-edge position (per convention 4.3).
-    *   The player targets an opponent's node with an **'open' `[Type]` Input slot** at the corresponding adjacent half-edge position.
-    *   The chosen slots must form a valid **Output -> Input** link across the potential connection.
+    *   The player chooses one of their nodes with a **present `[Type]` Output port** at the appropriate half-edge position (per convention 4.3). They may not choose a node from their Reactor.
+    *   The player targets an opponent's node with a **present `[Type]` Input port** at the corresponding adjacent half-edge position. They may not target a node from their opponent's Reactor.
+    *   The chosen ports must form a valid **Output -> Input** link across the potential connection.
+    *   Additionally, the chosen port on the initiating node **must not be directly facing an adjacent node card** in its network grid. Likewise, the chosen port on the target node **must not be directly facing an adjacent node card** in the target's network grid. Convergence links can only be placed across empty space or the boundaries between player networks, not across existing internal network connections.
 *   **Physical Placement & Occupation:**
-    *   The initiating player places one marker from the chosen `[Type]` set onto the **'open' Output slot** of their node.
+    *   The initiating player places one marker from the chosen `[Type]` set onto the **Output port** of their node.
     *   The initiating player gives the second, identical marker from the set to the target player.
-    *   The target player places this marker onto the **'open' Input slot** of their targeted node.
-    *   These paired markers visually signify the link and that **these specific half-edge slots are now occupied** by this convergence link, unavailable for standard network building or other convergences.
-*   **Effect:** Establishes a permanent (unless broken by card effects) connection enabling activation flow between the marked slots. An activation path (See 4.5) can cross this link (between the paired markers) if it follows the established Output -> Input direction. Activating across the link triggers the target node's "Convergence Effect" for the active player.
-*   **Limitations:** Typically only one convergence initiation per turn. Nodes/slots may have limits on how many convergence links can attach. Some cards might block convergence or allow breaking existing links (requiring removal of both markers).
+    *   The target player places this marker onto the **Input port** of their targeted node.
+    *   These paired markers visually signify the link and that **these specific half-edge ports are now occupied** by this convergence link, unavailable for standard network building or other convergences.
+*   **Effect:** Establishes a permanent (unless broken by card effects) connection enabling activation flow between the marked ports. An activation path (See 4.5) can cross this link (between the paired markers) if it follows the established Output -> Input direction. Activating across the link triggers the target node's "Convergence Effect" for the active player.
+*   **Limitations:** Typically only one convergence initiation per turn. Nodes/ports may have limits on how many convergence links can attach. Some cards might block convergence or allow breaking existing links (requiring removal of both markers).
 
 ### 4.7 Paradigm Shifts
 
@@ -187,20 +188,20 @@ These form the main draw deck and are the building blocks of player networks.
 *   **Layout Elements:**
     *   **Card Title:** Unique name.
     *   **Node Type:** Icon/color-coding.
-    *   **Connection Slots (8 Potential):** Visual indication of which of the 8 standard slots (defined in 4.3) are **'open'**. Clear graphic design needed.
+    *   **Connection Ports (8 Potential):** Visual indication of which of the 8 standard ports (defined in 4.3) are **present** on the card. Clear graphic design needed.
     *   **Art:** Space for illustration reflecting the node's theme.
     *   **Build Cost:** Resources required to play the card into the network (e.g., X Material, Y Data). Clearly displayed.
-    *   **Action Effect:** Text describing the effect triggered when activated by its owner via path activation (originating from one of its 'open' Input slots).
-    *   **Convergence Effect:** Text describing the effect triggered when activated by an opponent via a Convergence Link targeting one of its 'open' Input slots.
+    *   **Action Effect:** Text describing the effect triggered when activated by its owner via path activation (originating from one of its Input ports).
+    *   **Convergence Effect:** Text describing the effect triggered when activated by an opponent via a Convergence Link targeting one of its Input ports.
     *   **(Optional) VP Value:** Some cards might grant VP at game end (indicated by a VP icon/number).
     *   **(Optional) Flavor Text:** Thematic text.
 
-*   **Seed Cards:** A specific subset of Node Cards used for the starting player hands. Functionally identical layout, likely with simpler/fewer open slots. *Note: Seed Cards are dealt after Genesis Cards.*
+*   **Seed Cards:** A specific subset of Node Cards used for the starting player hands. Functionally identical layout, likely with simpler/fewer present ports. *Note: Seed Cards are dealt after Genesis Cards.*
 *   **Genesis Cards:** A designated subset of Node Cards specifically designed to facilitate early game activation paths.
     *   **Purpose:** Ensure each player starts with at least one card capable of being placed adjacent to the Reactor, immediately forming a valid activation path back to it, and offering a basic resource upon activation.
     *   **Criteria:** Genesis Cards must meet two key criteria:
         1.  **Low Build Cost:** The Material/Data cost must be low enough that the card can potentially be played on the first turn using starting resources. (Exact costs TBD).
-        2.  **Paired Input/Output:** Must possess at least one pair of 'open' Input and 'open' Output slots *on the same edge* according to the 8-slot convention (4.3). This guarantees it can both connect *to* the Reactor (Output->Input) and provide a connection point *from* the Reactor (for activation paths starting at the Genesis Card, Output->Input).
+        2.  **Paired Input/Output:** Must possess at least one pair of Input and Output ports *on the same edge* according to the 8-port convention (4.3). This guarantees it can both connect *to* the Reactor (Output->Input) and provide a connection point *from* the Reactor (for activation paths starting at the Genesis Card, Output->Input).
     *   **Setup:** A separate pool of Genesis Cards is created. One is dealt to each player at the start, and the rest are shuffled into the main Node deck (See 4.1).
 
 **B. Reactor Card**
@@ -210,7 +211,7 @@ Each player starts with one unique Reactor card.
 *   **Layout Elements:**
     *   **Card Title:** "Reactor".
     *   **Node Type:** Special/Unique.
-    *   **Connection Slots:** All 8 potential slots are **'open'** according to the convention in 4.3. Allows adjacent placement without requiring link formation.
+    *   **Connection Ports:** All 8 potential ports are **present** according to the convention in 4.3. Allows adjacent placement without requiring link formation.
     *   **Art:** Unique art representing the player's core base.
     *   **No Build Cost.**
     *   **No Action/Convergence Effect:** Serves only as the destination for activation path traces and contributes 1 base Energy during the Energy Gain Phase (See 4.4).
@@ -227,7 +228,7 @@ These cards modify global rules.
 
 ### 5.2. Other Components
 
-*   **Convergence Link Sets:** 4 sets per player (Tech, Cult, Res, Know), each containing 2 identical markers (total 8 markers per player). Markers should ideally indicate type and perhaps fit visually onto half-edge slots.
+*   **Convergence Link Sets:** 4 sets per player (Tech, Cult, Res, Know), each containing 2 identical markers (total 8 markers per player). Markers should ideally indicate type and perhaps fit visually onto half-edge ports.
 *   **Resource Tokens:** Energy, Data, Material.
 *   **Victory Point Tokens:** Various denominations.
 *   **Player Boards (Optional):** For resource/VP tracking, storing unused Link markers.
@@ -236,23 +237,23 @@ These cards modify global rules.
 
 ## 6. Art Style & Visuals
 
-*   **Overall Style:** A clean, functional, and minimalist aesthetic drawing inspiration from electronic schematics, network diagrams, and modern user interfaces. The primary goal is **clarity of information**, especially regarding connection slots and network flow, while maintaining a cohesive, tech-focused theme. Think vector graphics, clear iconography, and avoiding photorealism or complex textures.
+*   **Overall Style:** A clean, functional, and minimalist aesthetic drawing inspiration from electronic schematics, network diagrams, and modern user interfaces. The primary goal is **clarity of information**, especially regarding connection ports and network flow, while maintaining a cohesive, tech-focused theme. Think vector graphics, clear iconography, and avoiding photorealism or complex textures.
 *   **Color Palette:** A reserved base palette (e.g., dark blues, grays, off-whites for backgrounds and base card elements) punctuated by distinct, vibrant accent colors for key game elements:
     *   **Node Types:** Technology (e.g., Electric Green), Culture (e.g., Warm Yellow/Orange), Resource (e.g., Earthy Brown/Bronze), Knowledge (e.g., Deep Purple/Indigo).
     *   **Resources:** Energy (e.g., Bright Cyan), Data (e.g., Magenta), Material (e.g., Gray/Silver).
     *   **Highlights/Activation:** A bright, contrasting color (e.g., White or light Gold).
 *   **Cards (Nodes & Reactor):**
     *   Rendered as clean rectangular tiles or panels.
-    *   **Connection Slots:** The critical element. Each of the 8 potential slots should be clearly visualized on the edges (e.g., as small circles, squares, or notches).
-        *   **State:** 'Open' slots are visually distinct (e.g., filled with the corresponding Type color, potentially with a subtle border). 'Closed' slots are empty, grayed out, or absent.
+    *   **Connection Ports:** The critical element. Each of the 8 potential ports should be clearly visualized on the edges (e.g., as small circles, squares, or notches).
+        *   **State:** Ports that are **present** are visually distinct (e.g., filled with the corresponding Type color, potentially with a subtle border). Ports that are **absent** are empty, grayed out, or not drawn.
         *   **Input/Output:** Primarily defined by position (per convention 4.3). Subtle visual cues like a tiny dot inside inputs vs. a tiny line inside outputs, or a slightly different shape, could be added *if* extensive playtesting deems it necessary for clarity, but the aim is to rely on position.
     *   **Information:** Node type represented by a large, clear icon. Text (Title, Cost, Effects) uses a clean, readable sans-serif font.
 *   **Network Visualization:**
-    *   **Connections:** When a valid Output->Input link is formed between adjacent open slots, draw a clean line (perhaps matching the Type color, or a neutral connection color) directly connecting the centers of the two linked slots. Unlinked but adjacent open slots remain visually unconnected.
-    *   **Convergence Links:** The paired markers placed on linked slots should be visually distinct sprites (perhaps matching the Type color but with a unique shape) that clearly indicate the slot is occupied by a convergence. A different line style (e.g., dashed, glowing) could connect the paired markers across the player areas.
+    *   **Connections:** When a valid Output->Input link is formed between adjacent present ports, draw a clean line (perhaps matching the Type color, or a neutral connection color) directly connecting the centers of the two linked ports. Unlinked but adjacent present ports remain visually unconnected.
+    *   **Convergence Links:** The paired markers placed on linked ports should be visually distinct sprites (perhaps matching the Type color but with a unique shape) that clearly indicate the port is occupied by a convergence. A different line style (e.g., dashed, glowing) could connect the paired markers across the player areas.
 *   **Activation Effect:**
     *   Highlight the nodes involved in the activation path (e.g., brighten their border or background).
-    *   Visualize the path trace with a temporary effect: animate a pulse or particle effect traveling along the connecting lines between the activated slots, moving from the target node back towards the Reactor. Use the highlight color (e.g., White/Gold) or Energy color (Cyan).
+    *   Visualize the path trace with a temporary effect: animate a pulse or particle effect traveling along the connecting lines between the activated ports, moving from the target node back towards the Reactor. Use the highlight color (e.g., White/Gold) or Energy color (Cyan).
 *   **UI Elements:** Resource displays, VP trackers, Player Boards (if implemented) should use the same clean, minimalist style with clear iconography and typography.
 *   **LÖVE Engine Feasibility:** This style is well-suited for LÖVE. It primarily relies on drawing primitives (`love.graphics.rectangle`, `love.graphics.line`, `love.graphics.circle`), loading images/sprites for icons and markers (`love.graphics.newImage`), rendering text (`love.graphics.print`), and potentially simple particle effects or color manipulation for activation highlights. No complex 3D or heavy shader work is required.
 

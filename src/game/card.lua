@@ -13,38 +13,54 @@ Card.Type = {
     REACTOR = "Reactor", -- Special type
 }
 
--- Connection Slot Indices (Constants, based on GDD 4.3)
+-- Connection Port Indices (Constants, based on GDD 4.3)
 -- Top: 1 (Cult Out), 2 (Tech In)
 -- Bot: 3 (Cult In),  4 (Tech Out)
 -- Lft: 5 (Know Out), 6 (Res In)
--- Rgt: 7 (Know In),  8 (Res Out) -- CORRECTED: Swapped Res Out / Know In based on GDD 4.3
-Card.Slots = {
+-- Rgt: 7 (Know In),  8 (Res Out)
+Card.Ports = {
     TOP_LEFT    = 1, TOP_RIGHT   = 2,
     BOTTOM_LEFT = 3, BOTTOM_RIGHT= 4,
     LEFT_TOP    = 5, LEFT_BOTTOM = 6,
-    RIGHT_TOP   = 7, RIGHT_BOTTOM= 8, -- CORRECTED: Swapped indices 7 and 8 based on GDD 4.3
+    RIGHT_TOP   = 7, RIGHT_BOTTOM= 8,
 }
 
--- Static helper function to get slot properties based on index
+-- Static helper function to get port properties based on index
 -- Returns { type = Card.Type.*, is_output = boolean } or nil
-local slotPropertiesCache = {}
-do -- Precompute slot properties
-    local function computeSlotProperties(slotIndex)
-        if slotIndex == Card.Slots.TOP_LEFT     then return { type = Card.Type.CULTURE,   is_output = true } end
-        if slotIndex == Card.Slots.TOP_RIGHT    then return { type = Card.Type.TECHNOLOGY, is_output = false } end
-        if slotIndex == Card.Slots.BOTTOM_LEFT  then return { type = Card.Type.CULTURE,   is_output = false } end
-        if slotIndex == Card.Slots.BOTTOM_RIGHT then return { type = Card.Type.TECHNOLOGY, is_output = true } end
-        if slotIndex == Card.Slots.LEFT_TOP     then return { type = Card.Type.KNOWLEDGE, is_output = true } end
-        if slotIndex == Card.Slots.LEFT_BOTTOM  then return { type = Card.Type.RESOURCE,  is_output = false } end
-        if slotIndex == Card.Slots.RIGHT_TOP    then return { type = Card.Type.KNOWLEDGE, is_output = false } end -- CORRECTED based on GDD 4.3
-        if slotIndex == Card.Slots.RIGHT_BOTTOM then return { type = Card.Type.RESOURCE,  is_output = true } end  -- CORRECTED based on GDD 4.3
+local portPropertiesCache = {}
+do -- Precompute port properties
+    local function computePortProperties(portIndex)
+        if portIndex == Card.Ports.TOP_LEFT     then return { type = Card.Type.CULTURE,   is_output = true } end
+        if portIndex == Card.Ports.TOP_RIGHT    then return { type = Card.Type.TECHNOLOGY, is_output = false } end
+        if portIndex == Card.Ports.BOTTOM_LEFT  then return { type = Card.Type.CULTURE,   is_output = false } end
+        if portIndex == Card.Ports.BOTTOM_RIGHT then return { type = Card.Type.TECHNOLOGY, is_output = true } end
+        if portIndex == Card.Ports.LEFT_TOP     then return { type = Card.Type.KNOWLEDGE, is_output = true } end
+        if portIndex == Card.Ports.LEFT_BOTTOM  then return { type = Card.Type.RESOURCE,  is_output = false } end
+        if portIndex == Card.Ports.RIGHT_TOP    then return { type = Card.Type.KNOWLEDGE, is_output = false } end
+        if portIndex == Card.Ports.RIGHT_BOTTOM then return { type = Card.Type.RESOURCE,  is_output = true } end
         return nil
     end
-    for i=1, 8 do slotPropertiesCache[i] = computeSlotProperties(i) end
+    for i=1, 8 do portPropertiesCache[i] = computePortProperties(i) end
 end
 
-function Card:getSlotProperties(slotIndex)
-    return slotPropertiesCache[slotIndex]
+function Card:getPortProperties(portIndex)
+    return portPropertiesCache[portIndex]
+end
+
+-- Static helper function to check if two ports on adjacent edges align
+-- e.g., TopLeft (1) aligns with BottomLeft (3)
+--       TopRight (2) aligns with BottomRight (4)
+--       LeftTop (5) aligns with RightTop (7)
+--       LeftBottom (6) aligns with RightBottom (8)
+function Card:portsAlign(portIndex1, portIndex2)
+    local P = Card.Ports
+    local alignments = {
+        [P.TOP_LEFT] = P.BOTTOM_LEFT, [P.BOTTOM_LEFT] = P.TOP_LEFT,
+        [P.TOP_RIGHT] = P.BOTTOM_RIGHT, [P.BOTTOM_RIGHT] = P.TOP_RIGHT,
+        [P.LEFT_TOP] = P.RIGHT_TOP, [P.RIGHT_TOP] = P.LEFT_TOP,
+        [P.LEFT_BOTTOM] = P.RIGHT_BOTTOM, [P.RIGHT_BOTTOM] = P.LEFT_BOTTOM,
+    }
+    return alignments[portIndex1] == portIndex2
 end
 
 -- Constructor for a new Card instance
@@ -100,10 +116,10 @@ function Card:new(data)
     
     instance.vpValue = data.vpValue or 0 -- End-game VP value
 
-    -- Connection Slots (which of the 8 are defined as potentially open by the card definition)
-    instance.definedOpenSlots = data.openSlots or {}
-    -- Runtime state tracking which slots are currently occupied by which link ID
-    instance.occupiedSlots = {} -- Stores { [slotIndex] = linkId, ... }
+    -- Connection Ports (which of the 8 potential ports are defined as present by the card definition)
+    instance.definedPorts = data.definedPorts or {}
+    -- Runtime state tracking which ports are currently occupied by which link ID
+    instance.occupiedPorts = {} -- Stores { [portIndex] = linkId, ... }
 
     -- Visual/Flavor
     instance.imagePath = data.imagePath or "assets/images/placeholder.png"
@@ -160,74 +176,113 @@ function Card:activateConvergence(gameService, activatingPlayer, targetNetworkOw
     print(string.format("  [CARD DEBUG] !!! Convergence effect activate function not found for %s (ID: %s)", self.title, self.id))
 end
 
--- Marks a specific slot as occupied (e.g., by a convergence link)
-function Card:markSlotOccupied(slotIndex, linkId)
+-- Marks a specific port as occupied (e.g., by a convergence link)
+function Card:markPortOccupied(portIndex, linkId)
     if not linkId then
-        print(string.format("Warning: Attempted to mark slot %s occupied without a linkId on card %s.", tostring(slotIndex), self.id or '?'))
+        print(string.format("Warning: Attempted to mark port %s occupied without a linkId on card %s.", tostring(portIndex), self.id or '?'))
         return
     end
-    if slotIndex and slotIndex >= 1 and slotIndex <= 8 then
-        if self.occupiedSlots[slotIndex] then
-             print(string.format("Warning: Slot %d on card %s is already occupied by link %s. Overwriting with %s.", slotIndex, self.id or '?', self.occupiedSlots[slotIndex], linkId))
+    if portIndex and portIndex >= 1 and portIndex <= 8 then
+        if self.occupiedPorts[portIndex] then
+             print(string.format("Warning: Port %d on card %s is already occupied by link %s. Overwriting with %s.", portIndex, self.id or '?', self.occupiedPorts[portIndex], linkId))
         end
-        self.occupiedSlots[slotIndex] = linkId
-        print(string.format("Card %s: Slot %d marked as occupied by link %s.", self.id or '?', slotIndex, linkId))
+        self.occupiedPorts[portIndex] = linkId
+        print(string.format("Card %s: Port %d marked as occupied by link %s.", self.id or '?', portIndex, linkId))
     else
-        print(string.format("Warning: Attempted to mark invalid slot index %s as occupied on card %s.", tostring(slotIndex), self.id or '?'))
+        print(string.format("Warning: Attempted to mark invalid port index %s as occupied on card %s.", tostring(portIndex), self.id or '?'))
     end
 end
 
--- Marks a specific slot as unoccupied
-function Card:markSlotUnoccupied(slotIndex)
-    if slotIndex and slotIndex >= 1 and slotIndex <= 8 then
-        if self.occupiedSlots[slotIndex] then
-            print(string.format("Card %s: Slot %d (occupied by %s) marked as unoccupied.", self.id or '?', slotIndex, self.occupiedSlots[slotIndex]))
-            self.occupiedSlots[slotIndex] = nil -- Use nil to mark as unoccupied
+-- Marks a specific port as unoccupied
+function Card:markPortUnoccupied(portIndex)
+    if portIndex and portIndex >= 1 and portIndex <= 8 then
+        if self.occupiedPorts[portIndex] then
+            print(string.format("Card %s: Port %d (occupied by %s) marked as unoccupied.", self.id or '?', portIndex, self.occupiedPorts[portIndex]))
+            self.occupiedPorts[portIndex] = nil -- Use nil to mark as unoccupied
         end
     else
-        print(string.format("Warning: Attempted to mark invalid slot index %s as unoccupied on card %s.", tostring(slotIndex), self.id or '?'))
+        print(string.format("Warning: Attempted to mark invalid port index %s as unoccupied on card %s.", tostring(portIndex), self.id or '?'))
     end
 end
 
--- Checks if a specific slot is currently marked as occupied by any link
-function Card:isSlotOccupied(slotIndex)
-    return self.occupiedSlots[slotIndex] ~= nil
+-- Checks if a specific port is currently marked as occupied by any link
+function Card:isPortOccupied(portIndex)
+    return self.occupiedPorts[portIndex] ~= nil
 end
 
--- Gets the ID of the link occupying the slot, or nil if unoccupied
-function Card:getOccupyingLinkId(slotIndex)
-    return self.occupiedSlots[slotIndex]
+-- Gets the ID of the link occupying the port, or nil if unoccupied
+function Card:getOccupyingLinkId(portIndex)
+    return self.occupiedPorts[portIndex]
 end
 
--- Helper function to check if a specific slot is available for connection
--- A slot is available if it's defined as open by the card type AND not currently occupied.
-function Card:isSlotAvailable(slotIndex)
-    local isDefinedOpen = self.definedOpenSlots[slotIndex] == true
-    local isOccupied = self:isSlotOccupied(slotIndex)
-    return isDefinedOpen and not isOccupied
+-- Checks if a specific port is defined as present on the card
+function Card:isPortDefined(portIndex)
+    return self.definedPorts[portIndex] == true
 end
 
--- Renamed original function for clarity
-function Card:isSlotDefinedOpen(slotIndex)
-    return self.definedOpenSlots[slotIndex] == true
+-- Helper function to check if a specific port is available for connection
+-- A port is available if it's defined as present by the card type AND not currently occupied.
+function Card:isPortAvailable(portIndex)
+    local isDefined = self:isPortDefined(portIndex)
+    local isOccupied = self:isPortOccupied(portIndex)
+    return isDefined and not isOccupied
+end
+
+-- Get a list of all defined INPUT ports on this card
+-- Returns: list of tables { index = portIndex, type = portType }
+function Card:getInputPorts()
+    local inputPorts = {}
+    for portIndex = 1, 8 do
+        if self:isPortDefined(portIndex) then
+            local props = self:getPortProperties(portIndex)
+            if props and not props.is_output then -- Check if it's an input
+                table.insert(inputPorts, { index = portIndex, type = props.type })
+            end
+        end
+    end
+    return inputPorts
+end
+
+-- Get a list of all defined OUTPUT ports on this card
+-- Returns: list of tables { index = portIndex, type = portType }
+function Card:getOutputPorts()
+    local outputPorts = {}
+    for portIndex = 1, 8 do
+        if self:isPortDefined(portIndex) then
+            local props = self:getPortProperties(portIndex)
+            if props and props.is_output then -- Check if it's an output
+                table.insert(outputPorts, { index = portIndex, type = props.type })
+            end
+        end
+    end
+    return outputPorts
+end
+
+-- Check if this card has a specific OUTPUT port defined and present
+function Card:hasOutputPort(portType, portIndex)
+    if self:isPortDefined(portIndex) then
+        local props = self:getPortProperties(portIndex)
+        return props and props.is_output and props.type == portType
+    end
+    return false
 end
 
 -- === Connection Management Methods (Moved from Reactor) ===
 
 -- Register a connection to another card
 -- targetCard: The Card instance to connect to
--- selfSlotIndex: The slot index on this card used for the connection
--- targetSlotIndex: The slot index on the target card used for the connection
-function Card:addConnection(targetCard, selfSlotIndex, targetSlotIndex)
+-- selfPortIndex: The port index on this card used for the connection
+-- targetPortIndex: The port index on the target card used for the connection
+function Card:addConnection(targetCard, selfPortIndex, targetPortIndex)
     -- Ensure connections table exists (should be initialized in new, but belt-and-suspenders)
     self.connections = self.connections or {}
     table.insert(self.connections, {
         target = targetCard,
-        selfSlot = selfSlotIndex,
-        targetSlot = targetSlotIndex
+        selfPort = selfPortIndex,
+        targetPort = targetPortIndex
     })
     -- Optional: Add print for debugging if needed
-    -- print(string.format("Card %s: Added connection to %s (Slots: %d -> %d)", self.id or '?', targetCard.id or '?', selfSlotIndex, targetSlotIndex))
+    -- print(string.format("Card %s: Added connection to %s (Ports: %d -> %d)", self.id or '?', targetCard.id or '?', selfPortIndex, targetPortIndex))
 end
 
 -- Remove a connection to another card
@@ -259,75 +314,75 @@ function Card:getConnectedCards()
     return cards
 end
 
--- Get connection details (target card, self slot, target slot) for a specific connected card
+-- Get connection details (target card, self port, target port) for a specific connected card
 function Card:getConnectionDetails(targetCard)
     if not self.connections then return nil end
     for _, conn in ipairs(self.connections) do
         if conn.target == targetCard then
-            return conn.target, conn.selfSlot, conn.targetSlot
+            return conn.target, conn.selfPort, conn.targetPort
         end
     end
     return nil
 end
 
 -- Check if this card can connect to a target card in a specific direction
--- This needs to be updated to use the new `isSlotAvailable` check.
+-- This needs to be updated to use the new `isPortAvailable` check.
 function Card:canConnectTo(target, direction)
-    if not target or not target.isSlotAvailable or not target.getSlotProperties then -- Updated check
+    if not target or not target.isPortAvailable or not target.getPortProperties then -- Updated check
         -- print("Warning: Invalid target provided to canConnectTo")
         return false, "Invalid target card"
     end
 
-    -- Determine facing slots based on direction (from self's perspective)
-    local selfSlotsIndices, targetSlotsIndices
+    -- Determine facing ports based on direction (from self's perspective)
+    local selfPortIndices, targetPortIndices
     if direction == "down" then -- self is ABOVE target
-        selfSlotsIndices = {Card.Slots.BOTTOM_LEFT, Card.Slots.BOTTOM_RIGHT}
-        targetSlotsIndices = {Card.Slots.TOP_LEFT, Card.Slots.TOP_RIGHT}
+        selfPortIndices = {Card.Ports.BOTTOM_LEFT, Card.Ports.BOTTOM_RIGHT}
+        targetPortIndices = {Card.Ports.TOP_LEFT, Card.Ports.TOP_RIGHT}
     elseif direction == "up" then -- self is BELOW target
-        selfSlotsIndices = {Card.Slots.TOP_LEFT, Card.Slots.TOP_RIGHT}
-        targetSlotsIndices = {Card.Slots.BOTTOM_LEFT, Card.Slots.BOTTOM_RIGHT}
+        selfPortIndices = {Card.Ports.TOP_LEFT, Card.Ports.TOP_RIGHT}
+        targetPortIndices = {Card.Ports.BOTTOM_LEFT, Card.Ports.BOTTOM_RIGHT}
     elseif direction == "right" then -- self is LEFT of target
-        selfSlotsIndices = {Card.Slots.RIGHT_TOP, Card.Slots.RIGHT_BOTTOM}
-        targetSlotsIndices = {Card.Slots.LEFT_TOP, Card.Slots.LEFT_BOTTOM}
+        selfPortIndices = {Card.Ports.RIGHT_TOP, Card.Ports.RIGHT_BOTTOM}
+        targetPortIndices = {Card.Ports.LEFT_TOP, Card.Ports.LEFT_BOTTOM}
     elseif direction == "left" then -- self is RIGHT of target
-        selfSlotsIndices = {Card.Slots.LEFT_TOP, Card.Slots.LEFT_BOTTOM}
-        targetSlotsIndices = {Card.Slots.RIGHT_TOP, Card.Slots.RIGHT_BOTTOM}
+        selfPortIndices = {Card.Ports.LEFT_TOP, Card.Ports.LEFT_BOTTOM}
+        targetPortIndices = {Card.Ports.RIGHT_TOP, Card.Ports.RIGHT_BOTTOM}
     else
         -- print("Warning: Invalid direction provided to canConnectTo:", direction)
         return false, "Invalid direction"
     end
 
-    -- Check all pairs of facing slots for a valid connection (GDD 4.3 Simplified Rule)
-    -- "The placement is valid if at least one of these open Input slots [on Card B]
-    -- aligns with a corresponding open Output slot on Card A's adjacent edge."
+    -- Check all pairs of facing ports for a valid connection (GDD 4.3 Simplified Rule)
+    -- "The placement is valid if at least one of these open Input ports [on Card B]
+    -- aligns with a corresponding open Output port on Card A's adjacent edge."
     -- Here, 'self' is Card A, 'target' is Card B.
 
     local foundValidLink = false
-    for _, targetSlotIndex in ipairs(targetSlotsIndices) do
-        if target:isSlotAvailable(targetSlotIndex) then -- Use the new check
-            local targetProps = target:getSlotProperties(targetSlotIndex)
-            if targetProps and not targetProps.is_output then -- Check if it's an INPUT slot on the target (Card B)
-                -- Now find the corresponding slot on self (Card A)
-                local correspondingSelfSlotIndex
-                if targetSlotIndex == Card.Slots.TOP_LEFT then correspondingSelfSlotIndex = Card.Slots.BOTTOM_LEFT
-                elseif targetSlotIndex == Card.Slots.TOP_RIGHT then correspondingSelfSlotIndex = Card.Slots.BOTTOM_RIGHT
-                elseif targetSlotIndex == Card.Slots.BOTTOM_LEFT then correspondingSelfSlotIndex = Card.Slots.TOP_LEFT
-                elseif targetSlotIndex == Card.Slots.BOTTOM_RIGHT then correspondingSelfSlotIndex = Card.Slots.TOP_RIGHT
-                elseif targetSlotIndex == Card.Slots.LEFT_TOP then correspondingSelfSlotIndex = Card.Slots.RIGHT_TOP
-                elseif targetSlotIndex == Card.Slots.LEFT_BOTTOM then correspondingSelfSlotIndex = Card.Slots.RIGHT_BOTTOM
-                elseif targetSlotIndex == Card.Slots.RIGHT_TOP then correspondingSelfSlotIndex = Card.Slots.LEFT_TOP
-                elseif targetSlotIndex == Card.Slots.RIGHT_BOTTOM then correspondingSelfSlotIndex = Card.Slots.LEFT_BOTTOM
+    for _, targetPortIndex in ipairs(targetPortIndices) do
+        if target:isPortAvailable(targetPortIndex) then -- Use the new check
+            local targetProps = target:getPortProperties(targetPortIndex)
+            if targetProps and not targetProps.is_output then -- Check if it's an INPUT port on the target (Card B)
+                -- Now find the corresponding port on self (Card A)
+                local correspondingSelfPortIndex
+                if targetPortIndex == Card.Ports.TOP_LEFT then correspondingSelfPortIndex = Card.Ports.BOTTOM_LEFT
+                elseif targetPortIndex == Card.Ports.TOP_RIGHT then correspondingSelfPortIndex = Card.Ports.BOTTOM_RIGHT
+                elseif targetPortIndex == Card.Ports.BOTTOM_LEFT then correspondingSelfPortIndex = Card.Ports.TOP_LEFT
+                elseif targetPortIndex == Card.Ports.BOTTOM_RIGHT then correspondingSelfPortIndex = Card.Ports.TOP_RIGHT
+                elseif targetPortIndex == Card.Ports.LEFT_TOP then correspondingSelfPortIndex = Card.Ports.RIGHT_TOP
+                elseif targetPortIndex == Card.Ports.LEFT_BOTTOM then correspondingSelfPortIndex = Card.Ports.RIGHT_BOTTOM
+                elseif targetPortIndex == Card.Ports.RIGHT_TOP then correspondingSelfPortIndex = Card.Ports.LEFT_TOP
+                elseif targetPortIndex == Card.Ports.RIGHT_BOTTOM then correspondingSelfPortIndex = Card.Ports.LEFT_BOTTOM
                 end
                 
-                -- Check if the corresponding slot on 'self' exists in the facing slots list
+                -- Check if the corresponding port on 'self' exists in the facing ports list
                 local isFacing = false
-                for _, sIdx in ipairs(selfSlotsIndices) do 
-                    if sIdx == correspondingSelfSlotIndex then isFacing = true; break; end
+                for _, sIdx in ipairs(selfPortIndices) do 
+                    if sIdx == correspondingSelfPortIndex then isFacing = true; break; end
                 end
                 
-                if isFacing and self:isSlotAvailable(correspondingSelfSlotIndex) then -- Use new check
-                    local selfProps = self:getSlotProperties(correspondingSelfSlotIndex)
-                    if selfProps and selfProps.is_output then -- Check if it's an OUTPUT slot on self (Card A)
+                if isFacing and self:isPortAvailable(correspondingSelfPortIndex) then -- Use new check
+                    local selfProps = self:getPortProperties(correspondingSelfPortIndex)
+                    if selfProps and selfProps.is_output then -- Check if it's an OUTPUT port on self (Card A)
                         -- Check if types match (implicitly handled by GDD rule? No, GDD rule only requires *one* match)
                         -- The simplified rule doesn't require type matching for placement, only Input -> Output.
                         foundValidLink = true
@@ -341,8 +396,31 @@ function Card:canConnectTo(target, direction)
     if foundValidLink then
         return true
     else
-        return false, "No matching open Input->Output slots found on adjacent edges"
+        return false, "No matching Input->Output ports"
     end
+end
+
+-- Get the number of active convergence links attached to this card.
+function Card:getConvergenceLinkCount()
+    local count = 0
+    for _ in pairs(self.occupiedPorts) do
+        count = count + 1
+    end
+    return count
+end
+
+-- Retrieve a list of port indices that represent defined INPUT ports for this card.
+function Card:getInputPorts()
+    local inputPorts = {}
+    for portIndex = 1, 8 do
+        if self:isPortDefined(portIndex) then
+            local props = self:getPortProperties(portIndex)
+            if props and not props.is_output then -- Check if it's an input
+                table.insert(inputPorts, { index = portIndex, type = props.type })
+            end
+        end
+    end
+    return inputPorts
 end
 
 -- TODO: Add functions related to activation, linking, etc.

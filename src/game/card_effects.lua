@@ -4,8 +4,8 @@
 local CardEffects = {}
 
 -- Assumed to be defined elsewhere and accessible (e.g., via require)
--- local CardTypes = require("src.game.card_types") 
--- local SlotTypes = require("src.game.slot_types") 
+local Card = require("src.game.card") -- Need access to Card.Type
+-- local PortTypes = require("src.game.port_types") -- If we abstract port types further
 
 -- Define resource types as constants
 CardEffects.ResourceType = {
@@ -77,12 +77,13 @@ local function generateOtherDescription(actionEffect, options)
     return "Unknown other effect."
 end
 
--- === CONDITION EVALUATION HELPERS (Unchanged from previous version) ===
+-- === CONDITION EVALUATION HELPERS ===
 
 -- Checks adjacency condition
 local function evaluateAdjacencyCondition(conditionConfig, gameService, activatingPlayer, targetNetwork, targetNode)
-    if not targetNetwork or not targetNode or not targetNode.gridPos then return false end
-    local neighbors = targetNetwork:getNeighbors(targetNode.gridPos) 
+    if not targetNetwork or not targetNode or not targetNode.position then return false end
+    -- Use the newly added Network:getNeighbors
+    local neighbors = targetNetwork:getNeighbors(targetNode.position) 
     local count = 0
     local requiredType = conditionConfig.nodeType
     local requiredCount = conditionConfig.count or 1
@@ -97,22 +98,22 @@ end
 -- Checks convergence link condition
 local function evaluateConvergenceLinkCondition(conditionConfig, gameService, activatingPlayer, targetNetwork, targetNode)
     if not targetNode then return false end
-    local currentLinks = targetNode.convergenceLinkCount or targetNode:getConvergenceLinkCount() or 0 
+    local currentLinks = targetNode:getConvergenceLinkCount() 
     local requiredCount = conditionConfig.count or 1
     return currentLinks >= requiredCount
 end
 
 -- Checks satisfied inputs condition
 local function evaluateSatisfiedInputsCondition(conditionConfig, gameService, activatingPlayer, targetNetwork, targetNode)
-    if not targetNetwork or not targetNode or not targetNode.card or not targetNode.card.getOpenInputSlots then return false end
-    local openInputs = targetNode.card:getOpenInputSlots() 
+    local presentInputs = targetNode.card:getInputPorts() 
     local satisfiedCount = 0
     local requiredCount = conditionConfig.count or 1
-    for _, inputSlot in pairs(openInputs) do
-        local neighborPos = targetNetwork:getNeighborPosition(targetNode.gridPos, inputSlot.edge) 
-        local neighborNode = targetNetwork:getNodeAt(neighborPos) 
-        if neighborNode and neighborNode.card and neighborNode.card.hasOpenOutputSlot then
-            if neighborNode.card:hasOpenOutputSlot(inputSlot.type, inputSlot.edge) then 
+    for _, inputPortInfo in ipairs(presentInputs) do
+        local neighborPos = targetNetwork:getAdjacentCoordForPort(targetNode.position, inputPortInfo.index) 
+        local neighborNode = targetNetwork:getCardAt(neighborPos.x, neighborPos.y) 
+        if neighborNode and neighborNode.card and neighborNode.card.hasOutputPort then
+            local opposingPortIndex = targetNetwork:getOpposingPortIndex(inputPortInfo.index)
+            if neighborNode.card:hasOutputPort(inputPortInfo.type, opposingPortIndex) then 
                 satisfiedCount = satisfiedCount + 1
             end
         end
@@ -137,7 +138,7 @@ local function evaluateCondition(conditionConfig, gameService, activatingPlayer,
     end
 end
 
--- === CONDITION DESCRIPTION HELPER (Unchanged, generates prefix) ===
+-- === CONDITION DESCRIPTION HELPER (Updated for port terminology) ===
 
 local function generateConditionDescription(conditionConfig)
     if not conditionConfig then return "" end
@@ -149,7 +150,7 @@ local function generateConditionDescription(conditionConfig)
     elseif type == "convergenceLinks" then
         return string.format("If %d+ convergence link(s) attached: ", count)
     elseif type == "satisfiedInputs" then
-        return string.format("If %d+ input slot(s) are connected: ", count)
+        return string.format("If %d+ input port(s) are connected: ", count)
     else
         print(string.format("Warning: Unknown condition type '%s' for description.", type))
         return "If condition met: "

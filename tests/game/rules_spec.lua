@@ -72,44 +72,59 @@ describe("Rules Module", function()
     local reactorCard
     local techCard1, techCard2
     
+    -- Helper function to add required methods to mock cards
+    local function makeMockCard(data)
+        local card = data
+        -- Add isPortDefined based on definedPorts
+        card.isPortDefined = function(self, portIndex)
+            return self.definedPorts and self.definedPorts[portIndex] == true
+        end
+        -- Add isPortOccupied (assume false for these tests)
+        card.isPortOccupied = function(self, portIndex) return false end
+        -- Add isPortAvailable combining the two
+        card.isPortAvailable = function(self, portIndex)
+            return self:isPortDefined(portIndex) and not self:isPortOccupied(portIndex)
+        end
+        -- Use the real Card's getPortProperties for accuracy
+        card.getPortProperties = Card.getPortProperties -- Assign the actual function
+        return card
+    end
+
     before_each(function()
         rules = Rules:new()
         network = Network:new()
         
-        -- Create test cards
-        reactorCard = {
+        -- Create test cards using the helper
+        reactorCard = makeMockCard({
             id = "REACTOR_TEST",
             type = Card.Type.REACTOR,
-            openSlots = {
-                [Card.Slots.TOP_LEFT] = true, [Card.Slots.TOP_RIGHT] = true,
-                [Card.Slots.BOTTOM_LEFT] = true, [Card.Slots.BOTTOM_RIGHT] = true,
-                [Card.Slots.LEFT_TOP] = true, [Card.Slots.LEFT_BOTTOM] = true,
-                [Card.Slots.RIGHT_TOP] = true, [Card.Slots.RIGHT_BOTTOM] = true
-            },
-            isSlotOpen = function(self, slot) return self.openSlots[slot] == true end
-        }
+            definedPorts = {
+                [Card.Ports.TOP_LEFT] = true, [Card.Ports.TOP_RIGHT] = true,
+                [Card.Ports.BOTTOM_LEFT] = true, [Card.Ports.BOTTOM_RIGHT] = true,
+                [Card.Ports.LEFT_TOP] = true, [Card.Ports.LEFT_BOTTOM] = true,
+                [Card.Ports.RIGHT_TOP] = true, [Card.Ports.RIGHT_BOTTOM] = true
+            }
+        })
         
-        -- Tech card with input/output on top/bottom
-        techCard1 = {
-            id = "TECH_001",
-            type = Card.Type.TECHNOLOGY,
-            openSlots = {
-                [Card.Slots.TOP_RIGHT] = true,     -- Tech Input
-                [Card.Slots.BOTTOM_RIGHT] = true   -- Tech Output
-            },
-            isSlotOpen = function(self, slot) return self.openSlots[slot] == true end
-        }
+        -- Tech card with Culture Input (Bottom Left) - Should connect ABOVE Reactor
+        techCard1 = makeMockCard({
+            id = "CONNECT_VALID",
+            type = Card.Type.TECHNOLOGY, -- Type doesn't matter for connection check itself
+            definedPorts = {
+                [Card.Ports.BOTTOM_LEFT] = true,   -- Culture Input (Connects to Reactor's Port 1 - Culture Output)
+                [Card.Ports.RIGHT_BOTTOM] = true,  -- Resource Output (Irrelevant here),
+            }
+        })
         
-        -- Tech card with input/output on left/right
-        techCard2 = {
-            id = "TECH_002",
-            type = Card.Type.TECHNOLOGY,
-            openSlots = {
-                [Card.Slots.RIGHT_TOP] = true,    -- Knowledge Input
-                [Card.Slots.LEFT_TOP] = true      -- Knowledge Output
-            },
-            isSlotOpen = function(self, slot) return self.openSlots[slot] == true end
-        }
+        -- Card WITHOUT the required Input port
+        techCard2 = makeMockCard({
+            id = "CONNECT_INVALID",
+            type = Card.Type.KNOWLEDGE,
+            definedPorts = {
+                [Card.Ports.BOTTOM_RIGHT] = true, -- Tech Output (No corresponding Input on Reactor Top)
+                [Card.Ports.LEFT_TOP] = true      -- Knowledge Output (Irrelevant here)
+            }
+        })
     end)
     
     describe("isPlacementValid()", function()
@@ -130,8 +145,8 @@ describe("Rules Module", function()
             network:addCard(reactorCard, 0, 0)
             
             -- Add tech card somewhere, then try to add a duplicate
-            network:addCard(techCard1, 0, 1)
-            local valid, reason = rules:isPlacementValid(techCard1, network, 1, 0)
+            network:addCard(techCard1, 0, -1) -- Place it validly first
+            local valid, reason = rules:isPlacementValid(techCard1, network, 1, 0) -- Try to place same card elsewhere
             assert.is_false(valid)
             assert.is_string(reason)
             assert.is_truthy(reason:find("Uniqueness"))
@@ -146,34 +161,60 @@ describe("Rules Module", function()
             assert.is_truthy(reason:find("adjacent"))
         end)
         
-        -- More extensive connection validation would be tested here...
+        it("should allow placement if at least one Input->Output connection exists", function()
+            network:addCard(reactorCard, 0, 0)
+            -- Place techCard1 (has Culture Input on Bottom Left) ABOVE reactor (at 0, -1)
+            -- Reactor has Culture Output on Top Left (Port 1)
+            -- techCard1 Port 3 (Input) should connect to Reactor Port 1 (Output)
+            local valid, reason = rules:isPlacementValid(techCard1, network, 0, -1)
+            assert.is_true(valid, "Placement should be valid. Reason: " .. tostring(reason))
+        end)
+        
+        it("should reject placement if no valid Input->Output connection exists", function()
+            network:addCard(reactorCard, 0, 0)
+            -- Place techCard2 (NO Culture Input on Bottom Left) ABOVE reactor (at 0, -1)
+            local valid, reason = rules:isPlacementValid(techCard2, network, 0, -1)
+            assert.is_false(valid)
+            assert.is_string(reason)
+            assert.matches("No valid connection", reason, 1, true) -- Case-insensitive match
+        end)
     end)
     
     describe("isActivationPathValid()", function()
         local bpuCard -- Basic Processing Unit mock
 
         before_each(function() 
-            -- Add reactor to network
+            -- Add reactor to network using the helper
+            reactorCard = makeMockCard({ -- Re-create reactor in this scope
+                id = "REACTOR_TEST",
+                type = Card.Type.REACTOR,
+                definedPorts = {
+                    [Card.Ports.TOP_LEFT] = true, [Card.Ports.TOP_RIGHT] = true,
+                    [Card.Ports.BOTTOM_LEFT] = true, [Card.Ports.BOTTOM_RIGHT] = true,
+                    [Card.Ports.LEFT_TOP] = true, [Card.Ports.LEFT_BOTTOM] = true,
+                    [Card.Ports.RIGHT_TOP] = true, [Card.Ports.RIGHT_BOTTOM] = true
+                }
+            })
             network:addCard(reactorCard, 0, 0)
 
-            -- Define BPU mock (Tech Input top-right)
-            bpuCard = {
+            -- Define BPU mock (Tech Input top-right) using the helper
+            bpuCard = makeMockCard({
                 id = "BPU_TEST",
                 type = Card.Type.TECHNOLOGY,
-                position = { x = 0, y = 1 }, -- Pre-set position for mock logic
-                openSlots = {
-                    [Card.Slots.TOP_RIGHT] = true,     -- Tech Input
-                    [Card.Slots.BOTTOM_RIGHT] = true   -- Tech Output (not relevant for this test)
-                },
-                isSlotOpen = function(self, slot) return self.openSlots[slot] == true end
-            }
+                -- position will be set by addCard
+                definedPorts = {
+                    [Card.Ports.TOP_RIGHT] = true,     -- Tech Input
+                    [Card.Ports.BOTTOM_RIGHT] = true   -- Tech Output
+                }
+            })
             -- Add BPU below reactor
             network:addCard(bpuCard, 0, 1)
         end)
 
         it("should return false when target adjacent to reactor has no valid departing Output", function() 
             -- Path BPU -> Reactor requires BPU(Output) -> Reactor(Input).
-            -- BPU has Input on top edge, Reactor has Output on bottom edge. Fails.
+            -- BPU has Input on top edge (port 2), Reactor has Output on bottom edge (port 4). Fails.
+            -- The mock findPathToReactor simulates this failure case.
             local isValid, path, reason = rules:isActivationPathValid(network, reactorCard.id, bpuCard.id)
             
             assert.is_false(isValid)
@@ -228,17 +269,15 @@ describe("Rules Module", function()
         
         it("should return true when the deck is empty", function()
             local gameService = {
-                getPlayers = function() 
+                getPlayers = function()
                     return {
-                        { 
-                            id = "p1", 
+                        {
+                            id = "p1",
                             getVictoryPoints = function() return 10 end,
-                            getHandSize = function() return Rules.MIN_HAND_SIZE - 1 end -- Less than minimum
                         },
-                        { 
-                            id = "p2", 
+                        {
+                            id = "p2",
                             getVictoryPoints = function() return 15 end,
-                            getHandSize = function() return Rules.MIN_HAND_SIZE end -- At minimum
                         }
                     }
                 end,
@@ -250,17 +289,15 @@ describe("Rules Module", function()
         
         it("should return false when neither end condition is met", function()
             local gameService = {
-                getPlayers = function() 
+                getPlayers = function()
                     return {
-                        { 
-                            id = "p1", 
+                        {
+                            id = "p1",
                             getVictoryPoints = function() return 10 end,
-                            getHandSize = function() return Rules.MIN_HAND_SIZE end -- At minimum
                         },
-                        { 
-                            id = "p2", 
+                        {
+                            id = "p2",
                             getVictoryPoints = function() return 15 end,
-                            getHandSize = function() return Rules.MIN_HAND_SIZE + 1 end -- Above minimum
                         }
                     }
                 end,
@@ -280,7 +317,6 @@ describe("Rules Module", function()
             local player1 = {
                 id = "p1",
                 getVictoryPoints = function() return 5 end,
-                getNetwork = function() return network1 end,
                 network = network1 -- Add the network field directly
             }
             network1.getSize = function() return 3 end
@@ -290,18 +326,20 @@ describe("Rules Module", function()
             local player2 = {
                 id = "p2", 
                 getVictoryPoints = function() return 8 end,
-                getNetwork = function() return network2 end,
                 network = network2 -- Add the network field directly
             }
             network2.getSize = function() return 5 end
             
             local gameService = {
-                getPlayers = function() return {player1, player2} end
+                getPlayers = function() return {player1, player2} end,
+                getCurrentParadigm = function() return {endGameScoring = function() return 0 end} end
             }
             
             local scores = rules:calculateFinalScores(gameService)
             assert.are.equal(7, scores.p1)
             assert.are.equal(12, scores.p2)
         end)
+
+        -- TODO: Add tests for paradigm and resource conversion scoring
     end)
 end) 

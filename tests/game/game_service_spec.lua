@@ -9,7 +9,7 @@ local Player = require "src/game/player"
 local GameServiceModule = require "src/game/game_service"
 local GameService = GameServiceModule.GameService
 local TurnPhase = GameServiceModule.TurnPhase
-local CardSlots = require('src.game.card').Slots
+local CardPorts = require('src.game.card').Ports
 
 -- Helper to create basic mock objects
 local function createMockCard(id, title, materialCost, dataCost, activationFunc)
@@ -21,7 +21,8 @@ local function createMockCard(id, title, materialCost, dataCost, activationFunc)
             material = materialCost or 0,
             data = dataCost or 0
         },
-        openSlots = {},
+        definedPorts = {}, -- Add this to be used by isPortDefined
+        occupiedPorts = {}, -- Initialize for getOccupyingLinkId
         position = { x = 0, y = 0 }, -- Default position
         
         -- New format of activation effect
@@ -56,6 +57,20 @@ local function createMockCard(id, title, materialCost, dataCost, activationFunc)
             if self.convergenceEffect and self.convergenceEffect.activate then
                 return self.convergenceEffect.activate(player, network)
             end
+        end,
+
+        -- Add mock methods for new checks
+        isPortDefined = function(self, portIndex)
+            return self.definedPorts[portIndex] == true
+        end,
+        getOccupyingLinkId = function(self, portIndex)
+            return self.occupiedPorts[portIndex]
+        end,
+        -- Re-add isPortAvailable, mimicking the real Card logic
+        isPortAvailable = function(self, portIndex)
+            local isDefined = self:isPortDefined(portIndex)
+            local isOccupied = self:getOccupyingLinkId(portIndex) ~= nil
+            return isDefined and not isOccupied
         end,
     }
     return card
@@ -497,15 +512,24 @@ describe("GameService Module", function()
             return ids
         end
         
-        local CardSlots = Card.Slots -- Cache for brevity
+        local CardPorts = Card.Ports -- Cache for brevity
+
+        -- Updated mockIsPortAvail function
+        local function mockIsPortAvail(card, portIdx) 
+            if card.occupiedPorts and card.occupiedPorts[portIdx] then
+                return false -- Port is explicitly occupied
+            end
+            -- Rely on defined open ports (or assume open if not defined)
+            return card.definedPorts == nil or card.definedPorts[portIdx] == true 
+        end
 
         -- Mock Card/Player/Network creators
         local function createMockCard(id, title, x, y) 
             local card = { id = id, title = title, position = { x = x, y = y }, type="NODE",
-                definedOpenSlots = {}, occupiedSlots = nil, owner = nil, network = nil }
+                definedPorts = {}, occupiedPorts = nil, owner = nil, network = nil }
             -- Default mock methods, can be overridden in tests
-            function card:getSlotProperties(slotIdx) return Card:getSlotProperties(slotIdx) end 
-            function card:isSlotAvailable(slotIdx) return mockIsSlotAvail(self, slotIdx) end 
+            function card:getPortProperties(portIdx) return Card:getPortProperties(portIdx) end 
+            function card:isPortAvailable(portIdx) return mockIsPortAvail(self, portIdx) end 
             return card
         end
 
@@ -524,29 +548,20 @@ describe("GameService Module", function()
                  end
                  return nil
             end
-            net.getAdjacentCoordForSlot = function(self, x, y, slotIndex) 
-                 if slotIndex == CardSlots.TOP_LEFT or slotIndex == CardSlots.TOP_RIGHT then return {x=x, y=y-1} end
-                 if slotIndex == CardSlots.BOTTOM_LEFT or slotIndex == CardSlots.BOTTOM_RIGHT then return {x=x, y=y+1} end
-                 if slotIndex == CardSlots.LEFT_TOP or slotIndex == CardSlots.LEFT_BOTTOM then return {x=x-1, y=y} end
-                 if slotIndex == CardSlots.RIGHT_TOP or slotIndex == CardSlots.RIGHT_BOTTOM then return {x=x+1, y=y} end
+            net.getAdjacentCoordForPort = function(self, x, y, portIndex) 
+                 if portIndex == CardPorts.TOP_LEFT or portIndex == CardPorts.TOP_RIGHT then return {x=x, y=y-1} end
+                 if portIndex == CardPorts.BOTTOM_LEFT or portIndex == CardPorts.BOTTOM_RIGHT then return {x=x, y=y+1} end
+                 if portIndex == CardPorts.LEFT_TOP or portIndex == CardPorts.LEFT_BOTTOM then return {x=x-1, y=y} end
+                 if portIndex == CardPorts.RIGHT_TOP or portIndex == CardPorts.RIGHT_BOTTOM then return {x=x+1, y=y} end
                  return nil 
             end
-            net.getOpposingSlotIndex = function(self, slotIndex)
+            net.getOpposingPortIndex = function(self, portIndex)
                 local opposites = {
                     [1]=3, [2]=4, [3]=1, [4]=2, [5]=7, [6]=8, [7]=5, [8]=6
                 } -- Use integer keys for direct mapping
-                return opposites[slotIndex]
+                return opposites[portIndex]
             end
             return net
-        end
-
-        -- Updated mockIsSlotAvail function
-        local function mockIsSlotAvail(card, slotIdx) 
-            if card.occupiedSlots and card.occupiedSlots[slotIdx] then
-                return false -- Slot is explicitly occupied
-            end
-            -- Rely on defined open slots (or assume open if not defined)
-            return card.definedOpenSlots == nil or card.definedOpenSlots[slotIdx] == true 
         end
 
         before_each(function()
@@ -561,27 +576,32 @@ describe("GameService Module", function()
 
             -- Common Cards needed for multiple tests (P1/P2 link)
             p1_reactor = createMockCard("P1_R", "P1 Reactor", 0, 0); p1_reactor.type = Card.Type.REACTOR
+            -- *** FIX: Explicitly define reactor ports as open ***
+            p1_reactor.definedPorts = {
+                [1]=true, [2]=true, [3]=true, [4]=true, [5]=true, [6]=true, [7]=true, [8]=true
+            }
             p1_out_node = createMockCard("P1_OUT", "P1 Out", 1, 0) 
-            p1_out_node.definedOpenSlots = { 
-                [CardSlots.RIGHT_BOTTOM] = true, -- Slot 8 (Res Out) for convergence
-                [CardSlots.LEFT_TOP] = true      -- Slot 5 (Know Out) for adjacency to Reactor (Input 7)
+            -- *** FIX: Ensure Port 5 is open for reactor connection ***
+            p1_out_node.definedPorts = { 
+                [CardPorts.RIGHT_BOTTOM] = true, -- Port 8 (Res Out) for convergence
+                [CardPorts.LEFT_TOP] = true      -- Port 5 (Know Out) for adjacency to Reactor
             }
             p2_in_node = createMockCard("P2_IN", "P2 In", 0, 0) -- In P2's network
-            p2_in_node.definedOpenSlots = { [CardSlots.LEFT_BOTTOM] = true } -- Slot 6 (Res In)
+            p2_in_node.definedPorts = { [CardPorts.LEFT_BOTTOM] = true } -- Port 6 (Res In)
 
             -- Cards specific to multi-link test (P1_A, P2_B, P3_C)
             p1_node_a = createMockCard("P1_A", "P1 Node A", 1, 0) -- In P1's network, different from P1_OUT
-            p1_node_a.definedOpenSlots = { 
-                [CardSlots.RIGHT_TOP] = true, -- Slot 7 (Know In) for link from P2_B
-                [CardSlots.LEFT_TOP] = true  -- Slot 5 (Know Out) for adjacency to Reactor
+            p1_node_a.definedPorts = { 
+                [CardPorts.RIGHT_TOP] = true, -- Port 7 (Know In) for link from P2_B
+                [CardPorts.LEFT_TOP] = true  -- Port 5 (Know Out) for adjacency to Reactor
             }
             p2_node_b = createMockCard("P2_B", "P2 Node B", 0, 0) -- In P2's network
-            p2_node_b.definedOpenSlots = { 
-                [CardSlots.LEFT_TOP] = true,     -- Slot 5 (Know Out) for link to P1_A
-                [CardSlots.LEFT_BOTTOM] = true   -- Slot 6 (Res In) for link from P3_C
+            p2_node_b.definedPorts = { 
+                [CardPorts.LEFT_TOP] = true,     -- Port 5 (Know Out) for link to P1_A
+                [CardPorts.LEFT_BOTTOM] = true   -- Port 6 (Res In) for link from P3_C
             }
             p3_node_c = createMockCard("P3_C", "P3 Node C", 0, 0) -- In P3's network
-            p3_node_c.definedOpenSlots = { [CardSlots.RIGHT_BOTTOM] = true } -- Slot 8 (Res Out)
+            p3_node_c.definedPorts = { [CardPorts.RIGHT_BOTTOM] = true } -- Port 8 (Res Out)
 
             -- Create and assign networks
             -- Net1 needs R, OUT, and A for different tests
@@ -602,15 +622,24 @@ describe("GameService Module", function()
             p3.network = net3
             p3_node_c.network = net3; p3_node_c.owner = p3; p3_node_c.position = {x=0,y=0}
 
-            -- Assign mock methods to all cards
-            local all_cards = {p1_reactor, p1_out_node, p2_in_node, p1_node_a, p2_node_b, p3_node_c}
-            for _, card in pairs(all_cards) do
-                 if card.type ~= Card.Type.REACTOR then
-                     card.isSlotAvailable = mockIsSlotAvail -- Use shared mock
-                 else 
-                      card.isSlotAvailable = function() return true end -- Reactor always available
-                 end
-                 card.getSlotProperties = function(self, slotIdx) return Card:getSlotProperties(slotIdx) end
+            -- *** FIX: Explicitly assign required methods to ALL mock cards ***
+            local all_card_mocks = {p1_reactor, p1_out_node, p2_in_node, p1_node_a, p2_node_b, p3_node_c}
+            for _, card_mock in pairs(all_card_mocks) do
+                -- Define methods directly on the mock instance
+                card_mock.isPortDefined = function(self, portIndex)
+                    return self.definedPorts[portIndex] == true
+                end
+                card_mock.getOccupyingLinkId = function(self, portIndex)
+                    return self.occupiedPorts and self.occupiedPorts[portIndex] or nil
+                end
+                card_mock.isPortAvailable = function(self, portIndex)
+                    -- Need to check methods exist during call because mocks are tricky
+                    local isDefined = self.isPortDefined and self:isPortDefined(portIndex)
+                    local isOccupied = self.getOccupyingLinkId and (self:getOccupyingLinkId(portIndex) ~= nil)
+                    return isDefined and not isOccupied
+                end
+                 -- Ensure getPortProperties exists too, as it's used by pathfinder
+                 card_mock.getPortProperties = function(self, portIdx) return Card:getPortProperties(portIdx) end
             end
         end)
 
@@ -619,9 +648,9 @@ describe("GameService Module", function()
             table.insert(service.activeConvergenceLinks, {
                 linkId = "testLink1",
                 initiatingPlayerIndex = 1, initiatingNodeId = "P1_OUT", 
-                initiatingSlotIndex = CardSlots.RIGHT_BOTTOM, -- 8
+                initiatingPortIndex = CardPorts.RIGHT_BOTTOM, -- 8
                 targetPlayerIndex = 2, targetNodeId = "P2_IN", 
-                targetSlotIndex = CardSlots.LEFT_BOTTOM,   -- 6
+                targetPortIndex = CardPorts.LEFT_BOTTOM,   -- 6
                 linkType = Card.Type.RESOURCE
             })
             local isValid, pathData, reason = service:findGlobalActivationPath(p2_in_node, p1_reactor, p1)
@@ -659,48 +688,48 @@ describe("GameService Module", function()
              assert.are.same({ "P1_OUT", "P1_R" }, getPathIds(pathData))
         end)
 
-        it("should not find a path if blocked by an occupied slot (adjacency)", function()
-            -- Block p1_out_node's slot 5 needed to connect to reactor slot 7
-            p1_out_node.occupiedSlots = { [CardSlots.LEFT_TOP] = "blocker_link" } -- Slot 5
+        it("should not find a path if blocked by an occupied port (adjacency)", function()
+            -- Block p1_out_node's port 5 needed to connect to reactor port 7
+            p1_out_node.occupiedPorts = { [CardPorts.LEFT_TOP] = "blocker_link" } -- Port 5
             service.activeConvergenceLinks = {}
             local isValid, pathData, reason = service:findGlobalActivationPath(p1_out_node, p1_reactor, p1)
             assert.is_false(isValid)
             assert.matches("No valid activation path", reason or "", 1, true)
-            p1_out_node.occupiedSlots = nil -- Cleanup
+            p1_out_node.occupiedPorts = nil -- Cleanup
         end)
 
-        it("should not find a path if blocked by an occupied slot (convergence)", function()
-            -- Add link P1_OUT(8) -> P2_IN(6), then block P2_IN's slot 6
+        it("should not find a path if blocked by an occupied port (convergence)", function()
+            -- Add link P1_OUT(8) -> P2_IN(6), then block P2_IN's port 6
              table.insert(service.activeConvergenceLinks, {
                 linkId = "testLink1", initiatingPlayerIndex = 1, initiatingNodeId = "P1_OUT", 
-                initiatingSlotIndex = CardSlots.RIGHT_BOTTOM, -- 8
+                initiatingPortIndex = CardPorts.RIGHT_BOTTOM, -- 8
                 targetPlayerIndex = 2, targetNodeId = "P2_IN", 
-                targetSlotIndex = CardSlots.LEFT_BOTTOM, -- 6
+                targetPortIndex = CardPorts.LEFT_BOTTOM, -- 6
                 linkType = Card.Type.RESOURCE
             })
-            p2_in_node.occupiedSlots = { [CardSlots.LEFT_BOTTOM] = "blocker_link" } -- Slot 6
+            p2_in_node.occupiedPorts = { [CardPorts.LEFT_BOTTOM] = "blocker_link" } -- Port 6
             local isValid, pathData, reason = service:findGlobalActivationPath(p2_in_node, p1_reactor, p1)
             assert.is_false(isValid)
             assert.matches("No valid activation path", reason or "", 1, true)
-            p2_in_node.occupiedSlots = nil -- Cleanup
+            p2_in_node.occupiedPorts = nil -- Cleanup
         end)
 
         it("should find a path involving multiple convergence links", function()
             -- Uses p3_node_c -> p2_node_b -> p1_node_a -> p1_reactor
-            -- Link 1: P2_B (Slot 5 Out) -> P1_A (Slot 7 In) - Knowledge
+            -- Link 1: P2_B (Port 5 Out) -> P1_A (Port 7 In) - Knowledge
             table.insert(service.activeConvergenceLinks, {
                 linkId = "link_P2B_P1A", initiatingPlayerIndex = 2, initiatingNodeId = "P2_B", 
-                initiatingSlotIndex = CardSlots.LEFT_TOP, -- 5
+                initiatingPortIndex = CardPorts.LEFT_TOP, -- 5
                 targetPlayerIndex = 1, targetNodeId = "P1_A", 
-                targetSlotIndex = CardSlots.RIGHT_TOP, -- 7
+                targetPortIndex = CardPorts.RIGHT_TOP, -- 7
                 linkType = Card.Type.KNOWLEDGE
             })
-            -- Link 2: P3_C (Slot 8 Out) -> P2_B (Slot 6 In) - Resource
+            -- Link 2: P3_C (Port 8 Out) -> P2_B (Port 6 In) - Resource
             table.insert(service.activeConvergenceLinks, {
                 linkId = "link_P3C_P2B", initiatingPlayerIndex = 3, initiatingNodeId = "P3_C", 
-                initiatingSlotIndex = CardSlots.RIGHT_BOTTOM, -- 8
+                initiatingPortIndex = CardPorts.RIGHT_BOTTOM, -- 8
                 targetPlayerIndex = 2, targetNodeId = "P2_B", 
-                targetSlotIndex = CardSlots.LEFT_BOTTOM, -- 6
+                targetPortIndex = CardPorts.LEFT_BOTTOM, -- 6
                 linkType = Card.Type.RESOURCE
             })
             local isValid, pathData, reason = service:findGlobalActivationPath(p3_node_c, p1_reactor, p1)
@@ -713,6 +742,76 @@ describe("GameService Module", function()
             assert.are.same(p2, pathData.path[2].owner)
             assert.are.same(p1, pathData.path[3].owner)
             assert.are.same(p1, pathData.path[4].owner)
+        end)
+        
+        -- Test case based on user-reported issue
+        it("should find path from P2 Initial Circuit -> P1 Seed Thought -> P1 Reactor via Knowledge link", function()
+            -- Define specific cards based on the scenario
+            local p1_st = createMockCard("P1_ST", "Seed Thought", 1, 0) -- At (1,0)
+            -- Seed Thought (GENESIS_KNOW_001) open ports: 5(Out), 6(In), 1(Out), 3(In), 7(In)
+            p1_st.definedPorts = {
+                [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output (to Reactor)
+                [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
+                [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output
+                [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input
+                [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input (from P2_IC)
+            }
+
+            local p2_ic = createMockCard("P2_IC", "Initial Circuit", 0, -1) -- At (0,-1)
+            -- Initial Circuit (GENESIS_TECH_001) open ports: 3(In), 4(Out), 1(Out), 5(Out), 8(Out)
+            p2_ic.definedPorts = {
+                [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input
+                [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
+                [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output
+                [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output (to P1_ST)
+                [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
+            }
+
+            -- Add P1_ST to net1 and P2_IC to net2
+            net1.cards["P1_ST"] = p1_st; net1.cardsById["P1_ST"] = p1_st
+            p1_st.network = net1; p1_st.owner = p1
+            net2.cards["P2_IC"] = p2_ic; net2.cardsById["P2_IC"] = p2_ic
+            p2_ic.network = net2; p2_ic.owner = p2
+
+            -- Add mock methods to new cards -- *** FIX: Add method assignments HERE ***
+            local new_mocks = {p1_st, p2_ic}
+            for _, card_mock in pairs(new_mocks) do
+                card_mock.isPortDefined = function(self, portIndex)
+                    return self.definedPorts[portIndex] == true
+                end
+                card_mock.getOccupyingLinkId = function(self, portIndex)
+                    return self.occupiedPorts and self.occupiedPorts[portIndex] or nil
+                end
+                card_mock.isPortAvailable = function(self, portIndex)
+                    local isDefined = self.isPortDefined and self:isPortDefined(portIndex)
+                    local isOccupied = self.getOccupyingLinkId and (self:getOccupyingLinkId(portIndex) ~= nil)
+                    return isDefined and not isOccupied
+                end
+                 card_mock.getPortProperties = function(self, portIdx) return Card:getPortProperties(portIdx) end
+            end
+
+            -- Add the Convergence Link: P2_IC (Port 5 Out) -> P1_ST (Port 7 In)
+            table.insert(service.activeConvergenceLinks, {
+                linkId = "link_P2IC_P1ST",
+                initiatingPlayerIndex = 2, initiatingNodeId = "P2_IC",
+                initiatingPortIndex = CardPorts.LEFT_TOP, -- 5
+                targetPlayerIndex = 1, targetNodeId = "P1_ST",
+                targetPortIndex = CardPorts.RIGHT_TOP, -- 7
+                linkType = Card.Type.KNOWLEDGE
+            })
+
+            -- Perform the pathfind
+            local isValid, pathData, reason = service:findGlobalActivationPath(p2_ic, p1_reactor, p1)
+
+            -- Assertions
+            assert.is_true(isValid, reason) -- Expect path to be found
+            assert.are.equal(3, pathData.cost) -- Path: P2_IC, P1_ST, P1_R
+            assert.is_true(pathData.isConvergenceStart)
+            assert.are.same({ "P2_IC", "P1_ST", "P1_R" }, getPathIds(pathData))
+            -- Check owners in path
+            assert.are.same(p2, pathData.path[1].owner)
+            assert.are.same(p1, pathData.path[2].owner)
+            assert.are.same(p1, pathData.path[3].owner)
         end)
         
         -- TODO: Add more tests:

@@ -35,7 +35,7 @@ local LINK_UI_START_X = 10
 local LINK_UI_Y_OFFSET = 21 -- Relative to resource line Y
 local BUTTON_GAP = 10 -- Moved here as an UPVALUE constant
 
--- Define Card module here for use in getSlotInfo, or require it
+-- Define Card module here for use in getPortInfo, or require it
 local Card = require('src.game.card')
 
 -- Helper function for phase descriptions
@@ -51,16 +51,16 @@ local function getPhaseDescription(phase)
 - Pass: Click 'Next Phase'.]]
     elseif phase == TurnPhase.CONVERGE then
         return [[Converge Phase:
-- Create Link: Click a Link icon in the Link menu, then click a valid Output slot on your network, then a valid Input slot on an opponent's network. Uses a Link Set.
+- Create Link: Click a Link icon in the Link menu, then click a valid Output port on your network, then a valid Input port on an opponent's network. Uses a Link Set.
 - Pass: Click 'End Turn'.]]
     else
         return "Unknown Phase"
     end
 end
 
--- Helper function to get slot position and implicit type based on GDD 4.3 (Corrected)
+-- Helper function to get port position and implicit type based on GDD 4.3 (Corrected)
 -- Note: This version uses renderer instance for dimensions
-local function getSlotInfo(renderer, slotIndex)
+local function getPortInfo(renderer, portIndex)
     if not renderer then return nil end -- Need renderer for constants
     -- Returns { x_offset, y_offset, type, is_output }
     local cardW = renderer.CARD_WIDTH
@@ -70,14 +70,14 @@ local function getSlotInfo(renderer, slotIndex)
     local quartW = cardW / 4
     local quartH = cardH / 4
 
-    if slotIndex == Card.Slots.TOP_LEFT then return { quartW, 0, Card.Type.CULTURE, true } end
-    if slotIndex == Card.Slots.TOP_RIGHT then return { halfW + quartW, 0, Card.Type.TECHNOLOGY, false } end
-    if slotIndex == Card.Slots.BOTTOM_LEFT then return { quartW, cardH, Card.Type.CULTURE, false } end
-    if slotIndex == Card.Slots.BOTTOM_RIGHT then return { halfW + quartW, cardH, Card.Type.TECHNOLOGY, true } end
-    if slotIndex == Card.Slots.LEFT_TOP then return { 0, quartH, Card.Type.KNOWLEDGE, true } end
-    if slotIndex == Card.Slots.LEFT_BOTTOM then return { 0, halfH + quartH, Card.Type.RESOURCE, false } end
-    if slotIndex == Card.Slots.RIGHT_TOP then return { cardW, quartH, Card.Type.KNOWLEDGE, false } end
-    if slotIndex == Card.Slots.RIGHT_BOTTOM then return { cardW, halfH + quartH, Card.Type.RESOURCE, true } end
+    if portIndex == Card.Ports.TOP_LEFT then return { quartW, 0, Card.Type.CULTURE, true } end
+    if portIndex == Card.Ports.TOP_RIGHT then return { halfW + quartW, 0, Card.Type.TECHNOLOGY, false } end
+    if portIndex == Card.Ports.BOTTOM_LEFT then return { quartW, cardH, Card.Type.CULTURE, false } end
+    if portIndex == Card.Ports.BOTTOM_RIGHT then return { halfW + quartW, cardH, Card.Type.TECHNOLOGY, true } end
+    if portIndex == Card.Ports.LEFT_TOP then return { 0, quartH, Card.Type.KNOWLEDGE, true } end
+    if portIndex == Card.Ports.LEFT_BOTTOM then return { 0, halfH + quartH, Card.Type.RESOURCE, false } end
+    if portIndex == Card.Ports.RIGHT_TOP then return { cardW, quartH, Card.Type.KNOWLEDGE, false } end
+    if portIndex == Card.Ports.RIGHT_BOTTOM then return { cardW, halfH + quartH, Card.Type.RESOURCE, true } end
     return nil
 end
 
@@ -116,10 +116,10 @@ function PlayState:init(gameService)
     self.selectedConvergenceLinkType = nil -- Card.Type.TECHNOLOGY, etc.
     self.hoveredLinkType = nil -- Track which link UI element is hovered
     self.initiatingConvergenceNodePos = nil -- {x, y} table
-    self.initiatingConvergenceSlotIndex = nil -- 1-8
+    self.initiatingConvergencePortIndex = nil -- 1-8
     self.targetConvergencePlayerIndex = nil
     self.targetConvergenceNodePos = nil -- {x, y} table
-    self.targetConvergenceSlotIndex = nil -- 1-8
+    self.targetConvergencePortIndex = nil -- 1-8
 
     -- Hover State for Debugging
     self.hoverGridX = nil
@@ -579,7 +579,7 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
             -- Initiate convergence selection
             self.selectedConvergenceLinkType = self.hoveredLinkType
             self.convergenceSelectionState = "selecting_own_output"
-            self:updateStatusMessage(string.format("Select a %s OUTPUT slot on your network.", tostring(self.selectedConvergenceLinkType)))
+            self:updateStatusMessage(string.format("Select a %s OUTPUT port on your network.", tostring(self.selectedConvergenceLinkType)))
             print(string.format("Starting convergence selection for type: %s", tostring(self.selectedConvergenceLinkType)))
             self.hoveredLinkType = nil -- Clear hover after selection
             -- Disable phase/turn buttons
@@ -624,119 +624,132 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                 end
                 self:updateStatusMessage(message)
             elseif self.convergenceSelectionState == "selecting_own_output" then
-                -- Handle clicking on network to select output slot
+                -- Handle clicking on network to select output port
                 local worldX, worldY = self.renderer:screenToWorldCoords(x, y, self.cameraX, self.cameraY, self.cameraZoom)
-                local gridX, gridY, clickedCard, clickedSlotIndex = self.renderer:getSlotAtWorldPos(currentPlayer.network, worldX, worldY, currentOrigin.x, currentOrigin.y)
+                local gridX, gridY, clickedCard, clickedPortIndex = self.renderer:getPortAtWorldPos(currentPlayer.network, worldX, worldY, currentOrigin.x, currentOrigin.y)
 
-                if clickedCard and clickedSlotIndex then
-                    print(string.format("Clicked on card '%s' at (%d,%d), slot %d", clickedCard.title, gridX, gridY, clickedSlotIndex))
-                    -- Validate the selected slot
-                    local slotInfo = getSlotInfo(self.renderer, clickedSlotIndex) -- Pass renderer
+                if clickedCard and clickedPortIndex then
+                    print(string.format("Clicked on card '%s' at (%d,%d), port %d", clickedCard.title, gridX, gridY, clickedPortIndex))
+                    -- Validate the selected port
+                    local portInfo = getPortInfo(self.renderer, clickedPortIndex) -- Pass renderer
                     local isValid = true
                     local reason = ""
 
-                    if not slotInfo then
+                    if not portInfo then
                         isValid = false
-                        reason = "Internal error: Invalid slot index."
-                    elseif not clickedCard:isSlotDefinedOpen(clickedSlotIndex) then
+                        reason = "Internal error: Invalid port index."
+                    elseif not clickedCard:isPortDefined(clickedPortIndex) then
                         isValid = false
-                        reason = "Selected slot is closed."
-                    -- TODO: Add check for slot availability (not occupied by another link) -> requires card/network state
-                    -- elseif not clickedCard:isSlotAvailable(clickedSlotIndex) then
+                        reason = "Selected port is closed."
+                    -- TODO: Add check for port availability (not occupied by another link) -> requires card/network state
+                    -- elseif not clickedCard:isPortAvailable(clickedPortIndex) then
                     --    isValid = false
-                    --    reason = "Selected slot is already occupied."
-                    elseif not slotInfo[4] then -- Check if it IS an output slot (slotInfo[4] is is_output)
+                    --    reason = "Selected port is already occupied."
+                    elseif not portInfo[4] then -- Check if it IS an output port (portInfo[4] is is_output)
                         isValid = false
-                        reason = "Selected slot must be an OUTPUT."
-                    elseif slotInfo[3] ~= self.selectedConvergenceLinkType then -- Check if type matches
+                        reason = "Selected port must be an OUTPUT."
+                    elseif portInfo[3] ~= self.selectedConvergenceLinkType then -- Check if type matches
                         isValid = false
-                        reason = string.format("Selected slot type (%s) does not match required link type (%s).", tostring(slotInfo[3]), tostring(self.selectedConvergenceLinkType))
+                        reason = string.format("Selected port type (%s) does not match required link type (%s).", tostring(portInfo[3]), tostring(self.selectedConvergenceLinkType))
+                    
+                    -- NEW: Check if initiating node is the Reactor
+                    elseif clickedCard == currentPlayer.reactorCard then
+                        isValid = false
+                        reason = "Cannot initiate convergence from the Reactor."
+                        
+                    -- NEW: Check if port is blocked by adjacent card in own network
+                    else
+                        local initiatingAdjCoord = currentPlayer.network:getAdjacentCoordForPort({x=gridX, y=gridY}, clickedPortIndex) -- Use the clicked grid coords
+                        if initiatingAdjCoord and currentPlayer.network:getCardAt(initiatingAdjCoord.x, initiatingAdjCoord.y) then
+                            isValid = false
+                            reason = "Port blocked by adjacent card in network."
+                        end
                     end
 
                     if isValid then
                         -- Store selection and move to next state
                         self.initiatingConvergenceNodePos = {x=gridX, y=gridY}
-                        self.initiatingConvergenceSlotIndex = clickedSlotIndex
+                        self.initiatingConvergencePortIndex = clickedPortIndex
                         self.convergenceSelectionState = "selecting_opponent_input"
-                        self:updateStatusMessage(string.format("Now select an opponent's %s INPUT slot.", tostring(self.selectedConvergenceLinkType)))
-                        print(string.format("Initiating slot selected: P%d (%d,%d) Slot %d. State -> selecting_opponent_input", currentPlayerIndex, gridX, gridY, clickedSlotIndex))
+                        self:updateStatusMessage(string.format("Now select an opponent's %s INPUT port.", tostring(self.selectedConvergenceLinkType)))
+                        print(string.format("Initiating port selected: P%d (%d,%d) Port %d. State -> selecting_opponent_input", currentPlayerIndex, gridX, gridY, clickedPortIndex))
                         -- Buttons remain disabled
                         -- TODO: Play confirmation sound?
                     else
-                        -- Invalid slot clicked, remain in selecting_own_output state
-                        self:updateStatusMessage("Invalid slot: " .. reason)
-                        print("Invalid initiating slot selected: " .. reason)
+                        -- Invalid port clicked, remain in selecting_own_output state
+                        self:updateStatusMessage("Invalid port: " .. reason)
+                        print("Invalid initiating port selected: " .. reason)
                         -- Buttons remain disabled
                     end
                 else
-                    -- Clicked on the grid but not near a specific slot
-                    self:updateStatusMessage("Click closer to a valid output slot.")
+                    -- Clicked on the grid but not near a specific port
+                    self:updateStatusMessage("Click closer to a valid output port.")
                 end
             elseif self.convergenceSelectionState == "selecting_opponent_input" then
-                -- Handle clicking on network to select input slot
+                -- Handle clicking on network to select input port
                 local worldX, worldY = self.renderer:screenToWorldCoords(x, y, self.cameraX, self.cameraY, self.cameraZoom)
 
                 -- Determine which opponent grid was clicked (iterate through players)
                 local foundTargetPlayerIndex = nil
                 local foundTargetGridX, foundTargetGridY = nil, nil
-                local foundTargetCard, foundTargetSlotIndex = nil, nil
+                local foundTargetCard, foundTargetPortIndex = nil, nil
 
                 for pIdx, player in ipairs(self.players) do
                     if pIdx ~= currentPlayerIndex then -- Only check opponents
                         local opponentOrigin = self.playerOrigins[pIdx] or {x=0, y=0}
-                        local gridX, gridY, clickedCard, clickedSlotIndex = self.renderer:getSlotAtWorldPos(player.network, worldX, worldY, opponentOrigin.x, opponentOrigin.y)
+                        local gridX, gridY, clickedCard, clickedPortIndex = self.renderer:getPortAtWorldPos(player.network, worldX, worldY, opponentOrigin.x, opponentOrigin.y)
                         
-                        -- If a slot was found on this opponent's grid, store it and stop checking others
-                        if clickedCard and clickedSlotIndex then
+                        -- If a port was found on this opponent's grid, store it and stop checking others
+                        if clickedCard and clickedPortIndex then
                             foundTargetPlayerIndex = pIdx
                             foundTargetGridX = gridX
                             foundTargetGridY = gridY
                             foundTargetCard = clickedCard
-                            foundTargetSlotIndex = clickedSlotIndex
-                            print(string.format("Potential target: Player %d Card '%s' at (%d,%d), slot %d", pIdx, clickedCard.title, gridX, gridY, clickedSlotIndex))
+                            foundTargetPortIndex = clickedPortIndex
+                            print(string.format("Potential target: Player %d Card '%s' at (%d,%d), port %d", pIdx, clickedCard.title, gridX, gridY, clickedPortIndex))
                             break -- Found a potential target, stop checking other players
                         end
                     end
                 end
 
-                if foundTargetCard and foundTargetSlotIndex then
-                    -- Validate the selected slot
-                    local slotInfo = getSlotInfo(self.renderer, foundTargetSlotIndex)
+                if foundTargetCard and foundTargetPortIndex then
+                    -- Validate the selected port
+                    local portInfo = getPortInfo(self.renderer, foundTargetPortIndex)
                     local isValid = true
                     local reason = ""
 
-                    if not slotInfo then
+                    if not portInfo then
                         isValid = false
-                        reason = "Internal error: Invalid slot index."
-                    elseif not foundTargetCard:isSlotDefinedOpen(foundTargetSlotIndex) then
+                        reason = "Internal error: Invalid port index."
+                    elseif not foundTargetCard:isPortDefined(foundTargetPortIndex) then
                         isValid = false
-                        reason = "Selected slot is closed."
-                    -- TODO: Add check for slot availability (not occupied by another link) -> requires card/network state
-                    -- elseif not foundTargetCard:isSlotAvailable(foundTargetSlotIndex) then
+                        reason = "Selected port is closed."
+                    -- TODO: Add check for port availability (not occupied by another link) -> requires card/network state
+                    -- elseif not foundTargetCard:isPortAvailable(foundTargetPortIndex) then
                     --    isValid = false
-                    --    reason = "Selected slot is already occupied."
-                    elseif slotInfo[4] then -- Check if it is NOT an output slot (i.e., it IS an input)
+                    --    reason = "Selected port is already occupied."
+                    elseif portInfo[4] then -- Check if it is NOT an output port (i.e., it IS an input)
                         isValid = false
-                        reason = "Selected slot must be an INPUT."
-                    elseif slotInfo[3] ~= self.selectedConvergenceLinkType then -- Check if type matches
+                        reason = "Selected port must be an INPUT."
+                    elseif portInfo[3] ~= self.selectedConvergenceLinkType then -- Check if type matches
                         isValid = false
-                        reason = string.format("Selected slot type (%s) does not match required link type (%s).", tostring(slotInfo[3]), tostring(self.selectedConvergenceLinkType))
+                        reason = string.format("Selected port type (%s) does not match required link type (%s).", tostring(portInfo[3]), tostring(self.selectedConvergenceLinkType))
                     end
 
                     if isValid then
                         -- All checks passed! Attempt the convergence via GameService
-                        print("Target slot validated. Attempting convergence...")
+                        print("Target port validated. Attempting convergence...")
                         self.targetConvergencePlayerIndex = foundTargetPlayerIndex
                         self.targetConvergenceNodePos = {x=foundTargetGridX, y=foundTargetGridY}
-                        self.targetConvergenceSlotIndex = foundTargetSlotIndex
+                        self.targetConvergencePortIndex = foundTargetPortIndex
 
                         local success, message, shiftOccurred = self.gameService:attemptConvergence(
                             currentPlayerIndex, -- Initiating player
                             self.initiatingConvergenceNodePos,
-                            self.initiatingConvergenceSlotIndex, -- Added Initiating Slot Index
+                            self.initiatingConvergencePortIndex, -- Added Initiating Port Index
                             self.targetConvergencePlayerIndex,
                             self.targetConvergenceNodePos,
-                            self.targetConvergenceSlotIndex, -- Added Target Slot Index
+                            self.targetConvergencePortIndex, -- Added Target Port Index
                             self.selectedConvergenceLinkType
                         )
 
@@ -753,14 +766,14 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                         self.buttonEndTurn:setEnabled(true)
 
                     else
-                        -- Invalid target slot clicked
-                        self:updateStatusMessage("Invalid target slot: " .. reason)
-                        print("Invalid target slot selected: " .. reason)
+                        -- Invalid target port clicked
+                        self:updateStatusMessage("Invalid target port: " .. reason)
+                        print("Invalid target port selected: " .. reason)
                         -- Remain in selecting_opponent_input state
                     end
                 else
-                    -- Clicked, but not near a valid slot on any opponent grid
-                    self:updateStatusMessage("Click closer to a valid opponent input slot.")
+                    -- Clicked, but not near a valid port on any opponent grid
+                    self:updateStatusMessage("Click closer to a valid opponent input port.")
                 end
             else
                 -- Clicked network area with no card selected or wrong phase
@@ -951,10 +964,10 @@ function PlayState:resetConvergenceSelection()
     self.selectedConvergenceLinkType = nil
     self.hoveredLinkType = nil
     self.initiatingConvergenceNodePos = nil
-    self.initiatingConvergenceSlotIndex = nil
+    self.initiatingConvergencePortIndex = nil
     self.targetConvergencePlayerIndex = nil
     self.targetConvergenceNodePos = nil
-    self.targetConvergenceSlotIndex = nil
+    self.targetConvergencePortIndex = nil
     -- We might need to re-evaluate button states here too, but handled in abort logic for now
 end
 

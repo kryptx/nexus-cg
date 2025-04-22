@@ -221,9 +221,9 @@ package.loaded['src.game.card'] = {
          table.insert(created_cards_capture, c)
          return c
     end,
-    -- Add mock Type/Slots constants if needed by PlayState directly
+    -- Add mock Type/Ports constants if needed by PlayState directly
     Type = { TECHNOLOGY="Technology", CULTURE="Culture", RESOURCE="Resource", KNOWLEDGE="Knowledge", REACTOR="Reactor" },
-    Slots = { TOP_LEFT=1, TOP_RIGHT=2, BOTTOM_LEFT=3, BOTTOM_RIGHT=4, LEFT_TOP=5, LEFT_BOTTOM=6, RIGHT_TOP=7, RIGHT_BOTTOM=8 }
+    Ports = { TOP_LEFT=1, TOP_RIGHT=2, BOTTOM_LEFT=3, BOTTOM_RIGHT=4, LEFT_TOP=5, LEFT_BOTTOM=6, RIGHT_TOP=7, RIGHT_BOTTOM=8 }
 }
 
 package.loaded['src.game.network'] = mockNetwork
