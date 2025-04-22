@@ -92,6 +92,7 @@ local function evaluateAdjacencyCondition(conditionConfig, gameService, activati
             count = count + 1
         end
     end
+    print(string.format("Evaluated adjacency condition: %d/%d %s nodes found adjacent to %s", count, requiredCount, requiredType, sourceNode.position))
     return count >= requiredCount
 end
 
@@ -111,7 +112,8 @@ local function evaluateSatisfiedInputsCondition(conditionConfig, gameService, ac
     local satisfiedCount = 0
     local requiredCount = conditionConfig.count or 1
     for _, inputPortInfo in ipairs(presentInputs) do
-        local neighborPos = sourceNetwork:getAdjacentCoordForPort(sourceNode.position, inputPortInfo.index) 
+        -- Call getAdjacentCoordForPort with separate x and y from sourceNode.position
+        local neighborPos = sourceNetwork:getAdjacentCoordForPort(sourceNode.position.x, sourceNode.position.y, inputPortInfo.index) 
         local neighborNode = sourceNetwork:getCardAt(neighborPos.x, neighborPos.y) 
         if neighborNode and neighborNode.card and neighborNode.card.hasOutputPort then
             local opposingPortIndex = sourceNetwork:getOpposingPortIndex(inputPortInfo.index)

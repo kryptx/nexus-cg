@@ -571,27 +571,14 @@ function GameService:attemptConvergence(initiatingPlayerIndex, initiatingNodePos
         return false, msg
     end
 
-    -- NEW: Reactor Check
-    -- if initiatingNode == initiatingPlayer.reactorCard then  -- REMOVED: Moved to play_state
-    --     local msg = "Cannot initiate convergence from the Reactor."
-    --     print("  Convergence Failed: " .. msg)
-    --     return false, msg
-    -- end
     if targetNode == targetPlayer.reactorCard then
         local msg = "Cannot target the opponent's Reactor for convergence."
         print("  Convergence Failed: " .. msg)
         return false, msg
     end
 
-    -- NEW: Adjacency Check (Check space directly in front of ports)
-    -- local initiatingAdjCoord = initiatingPlayer.network:getAdjacentCoordForPort(initiatingNodePos, initiatingPortIndex) -- REMOVED: Moved to play_state
-    -- if initiatingAdjCoord and initiatingPlayer.network:getCardAt(initiatingAdjCoord.x, initiatingAdjCoord.y) then
-    --     local msg = string.format("Initiating port %d is blocked by an adjacent card in own network.", initiatingPortIndex)
-    --     print("  Convergence Failed: " .. msg)
-    --     return false, msg
-    -- end
-
-    local targetAdjCoord = targetPlayer.network:getAdjacentCoordForPort(targetNodePos, targetPortIndex)
+    -- Call getAdjacentCoordForPort with separate x and y from targetNodePos table
+    local targetAdjCoord = targetPlayer.network:getAdjacentCoordForPort(targetNodePos.x, targetNodePos.y, targetPortIndex)
     if targetAdjCoord and targetPlayer.network:getCardAt(targetAdjCoord.x, targetAdjCoord.y) then
         local msg = string.format("Target port %d is blocked by an adjacent card in target network.", targetPortIndex)
         print("  Convergence Failed: " .. msg)
@@ -958,21 +945,29 @@ function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayer
             end
             table.insert(activationMessages, string.format("  - %s activated!", targetNodeData.card.title))
 
-            -- Activate subsequent nodes in the path (owned by activating player)
+            -- Activate subsequent nodes in the path (checking owner for correct effect)
             for i = 2, pathLength do
                 local pathElement = path[i]
                 local cardToActivate = pathElement.card
-                local cardOwner = pathElement.owner
+                local cardOwner = pathElement.owner -- Need owner to check and for network context
 
                 if cardOwner == activatingPlayer then
-                    print(string.format("    Activating subsequent node %s via standard effect...", cardToActivate.title))
-                    -- Pass the card being activated as the targetNode
+                    -- Node belongs to the activator: Use standard effect
+                    print(string.format("    Activating subsequent node %s (Owned by P%d) via standard effect...", 
+                                        cardToActivate.title, cardOwner.id))
+                    -- Pass activatingPlayer and the actual owner's network
                     cardToActivate:activateEffect(self, activatingPlayer, cardOwner.network, cardToActivate) 
-                    table.insert(activationMessages, string.format("  - %s activated!", cardToActivate.title))
                 else
-                    print(string.format("    Node %s belongs to P%d, stopping effect chain.", cardToActivate.title, cardOwner.id))
-                    break 
+                    -- Node belongs to another player: Use convergence effect
+                    print(string.format("    Activating subsequent node %s (Owned by P%d) via CONVERGENCE effect...", 
+                                        cardToActivate.title, cardOwner.id))
+                    -- Pass activatingPlayer and the actual owner's network
+                    cardToActivate:activateConvergence(self, activatingPlayer, cardOwner.network, cardToActivate) 
                 end
+                
+                table.insert(activationMessages, string.format("  - %s activated!", cardToActivate.title))
+                
+                -- No break needed here, activation proceeds along the paid path
             end
             
             return true, table.concat(activationMessages, "\n")
@@ -1015,7 +1010,7 @@ function GameService:findGlobalActivationPath(targetCard, activatorReactor, acti
     end
 
     local queue = {}
-    local visited = {} -- Track visited card IDs to prevent cycles
+    local visited = {} -- Track visited card INSTANCES to prevent cycles
 
     local startOwner = targetCard.owner
     if not startOwner then
@@ -1024,15 +1019,19 @@ function GameService:findGlobalActivationPath(targetCard, activatorReactor, acti
     end
     local initialPath = { { card = targetCard, owner = startOwner } }
     table.insert(queue, { node = targetCard, owner = startOwner, path = initialPath })
-    visited[targetCard.id] = true
-    print(string.format("[Pathfinder] Initial Queue: Target %s (P%d)", targetCard.id, startOwner.id))
+    
+    -- Use composite key for visited set: playerID_cardID
+    local startVisitedKey = startOwner.id .. "_" .. targetCard.id
+    visited[startVisitedKey] = true 
+    print(string.format("[Pathfinder] Initial Queue: Target %s (P%d). Visited Key: %s", targetCard.id, startOwner.id, startVisitedKey))
 
     while #queue > 0 do
         local currentState = table.remove(queue, 1)
         local currentNode = currentState.node
         local currentOwner = currentState.owner
         local currentPath = currentState.path
-        print(string.format("[Pathfinder] Dequeue: Current=%s (P%d), PathLen=%d", currentNode.id, currentOwner.id, #currentPath))
+        local currentVisitedKey = currentOwner.id .. "_" .. currentNode.id
+        print(string.format("[Pathfinder] Dequeue: Current=%s (P%d), PathLen=%d, VisitedKey=%s", currentNode.id, currentOwner.id, #currentPath, currentVisitedKey))
 
         if currentNode == activatorReactor then
             local isConvergenceStart = false
@@ -1044,7 +1043,7 @@ function GameService:findGlobalActivationPath(targetCard, activatorReactor, acti
 
             local pathData = {
                 path = activationPath,
-                cost = #activationPath,
+                cost = #activationPath, 
                 isConvergenceStart = isConvergenceStart
             }
             print(string.format("[Pathfinder] SUCCESS: Reached Reactor %s. Path Cost=%d, ConvStart=%s", activatorReactor.id, pathData.cost, tostring(isConvergenceStart)))
@@ -1060,23 +1059,25 @@ function GameService:findGlobalActivationPath(targetCard, activatorReactor, acti
                 local adjacentPos = currentNode.network:getAdjacentCoordForPort(currentNode.position.x, currentNode.position.y, portIndex)
                 if adjacentPos then
                     local neighborNode = currentOwner.network:getCardAt(adjacentPos.x, adjacentPos.y)
-                    if neighborNode and not visited[neighborNode.id] then
+                    -- Check if neighbor exists AND its INSTANCE has not been visited
+                    local neighborVisitedKey = neighborNode and (currentOwner.id .. "_" .. neighborNode.id) or nil
+                    if neighborNode and not visited[neighborVisitedKey] then 
                         -- Find the corresponding INPUT port on the neighbor
                         local neighborPortIndex = currentNode.network:getOpposingPortIndex(portIndex)
                         local neighborProps = neighborNode:getPortProperties(neighborPortIndex)
                         
-                        local currentPortAvail = currentNode:isPortAvailable(portIndex)
+                        local currentPortAvail = currentNode:isPortAvailable(portIndex) 
                         local neighborPortAvail = neighborNode:isPortAvailable(neighborPortIndex)
                         local typesMatch = neighborProps and portProps.type == neighborProps.type
-                        print(string.format("    - Adj Check: %s(P%d)[Port %d Out %s, Avail:%s] -> %s(P%d)[Port %d In %s, Avail:%s] | Types Match: %s",
+                        print(string.format("    - Adj Check: %s(P%d)[Port %d Out %s, Avail:%s] -> %s(P%d)[Port %d In %s, Avail:%s] | Types Match: %s | VisitedKey: %s",
                             currentNode.id, currentOwner.id, portIndex, portProps.type, tostring(currentPortAvail),
                             neighborNode.id, currentOwner.id, neighborPortIndex, neighborProps and neighborProps.type or "NIL", tostring(neighborPortAvail),
-                            tostring(typesMatch)))
+                            tostring(typesMatch), neighborVisitedKey))
 
                         -- Check if neighbor port is an available INPUT of the same TYPE
                         local condition = neighborProps and not neighborProps.is_output and neighborNode:isPortAvailable(neighborPortIndex) and neighborProps.type == portProps.type
                         if condition then
-                            visited[neighborNode.id] = true
+                            visited[neighborVisitedKey] = true -- Mark neighbor INSTANCE visited HERE
                             local newPath = shallow_copy(currentPath)
                             table.insert(newPath, { card = neighborNode, owner = currentOwner })
                             print(string.format("      >> Enqueueing ADJACENT: %s (P%d)", neighborNode.id, currentOwner.id))
@@ -1097,13 +1098,13 @@ function GameService:findGlobalActivationPath(targetCard, activatorReactor, acti
             if link.initiatingNodeId == currentNode.id and link.initiatingPlayerIndex == currentOwner.id then
                 neighborNodeId = link.targetNodeId
                 neighborPlayerIndex = link.targetPlayerIndex
-                neighborPortIndex = link.targetPortIndex -- Input port on neighbor
-                currentPortIndex = link.initiatingPortIndex -- Output port on current
+                neighborPortIndex = link.targetPortIndex 
+                currentPortIndex = link.initiatingPortIndex 
             elseif link.targetNodeId == currentNode.id and link.targetPlayerIndex == currentOwner.id then
                 neighborNodeId = link.initiatingNodeId
                 neighborPlayerIndex = link.initiatingPlayerIndex
-                neighborPortIndex = link.initiatingPortIndex -- Output port on neighbor
-                currentPortIndex = link.targetPortIndex -- Input port on current
+                neighborPortIndex = link.initiatingPortIndex 
+                currentPortIndex = link.targetPortIndex 
             else
                 neighborNodeId = nil 
             end
@@ -1115,15 +1116,17 @@ function GameService:findGlobalActivationPath(targetCard, activatorReactor, acti
                  neighborNode = nil
             end
 
-            if neighborNode and not visited[neighborNode.id] then
+            -- Check if neighbor exists AND its INSTANCE has not been visited
+            local neighborVisitedKeyConv = neighborNode and (neighborOwner.id .. "_" .. neighborNode.id) or nil
+            if neighborNode and not visited[neighborVisitedKeyConv] then
                 local outputNode, inputNode, outputPortIdx, inputPortIdx
                 -- Determine which is the output node based on link direction
                 if link.initiatingNodeId == currentNode.id then 
                     outputNode, inputNode = currentNode, neighborNode
-                    outputPortIdx, inputPortIdx = currentPortIndex, neighborPortIndex
+                    outputPortIdx, inputPortIdx = currentPortIndex, neighborPortIndex 
                 else 
                     outputNode, inputNode = neighborNode, currentNode
-                    outputPortIdx, inputPortIdx = neighborPortIndex, currentPortIndex
+                    outputPortIdx, inputPortIdx = neighborPortIndex, currentPortIndex 
                 end
 
                 local outputPortProps = outputNode:getPortProperties(outputPortIdx)
@@ -1137,11 +1140,11 @@ function GameService:findGlobalActivationPath(targetCard, activatorReactor, acti
                                                 (inputNode:getOccupyingLinkId(inputPortIdx) == nil or inputNode:getOccupyingLinkId(inputPortIdx) == link.linkId)
 
                 local typesMatchConv = outputPortProps and inputPortProps and outputPortProps.type == inputPortProps.type
-                print(string.format("    - Conv Check (Link %s): %s(P%d)[Port %d Out %s, Trav:%s] -> %s(P%d)[Port %d In %s, Trav:%s] | Types Match: %s",
+                print(string.format("    - Conv Check (Link %s): %s(P%d)[Port %d Out %s, Trav:%s] -> %s(P%d)[Port %d In %s, Trav:%s] | Types Match: %s | VisitedKey: %s",
                     link.linkId,
                     outputNode.id, outputNode.owner.id, outputPortIdx, outputPortProps and outputPortProps.type or "NIL", tostring(isOutputPortTraversable),
                     inputNode.id, inputNode.owner.id, inputPortIdx, inputPortProps and inputPortProps.type or "NIL", tostring(isInputPortTraversable),
-                    tostring(typesMatchConv)))
+                    tostring(typesMatchConv), neighborVisitedKeyConv))
                 
                 local condition = outputPortProps and outputPortProps.is_output and
                                 inputPortProps and not inputPortProps.is_output and
@@ -1149,7 +1152,7 @@ function GameService:findGlobalActivationPath(targetCard, activatorReactor, acti
                                 outputPortProps.type == inputPortProps.type
                 
                 if condition then
-                    visited[neighborNode.id] = true
+                    visited[neighborVisitedKeyConv] = true -- Mark neighbor INSTANCE visited HERE
                     local newPath = shallow_copy(currentPath)
                     table.insert(newPath, { card = neighborNode, owner = neighborOwner })
                     print(string.format("      >> Enqueueing CONVERGENCE: %s (P%d) via Link %s", neighborNode.id, neighborOwner.id, link.linkId))

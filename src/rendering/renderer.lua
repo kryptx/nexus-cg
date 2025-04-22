@@ -427,14 +427,6 @@ function Renderer:drawCardPorts(card, sx, sy, alphaOverride, activeLinks)
                 -- Draw normal present port using the helper
                  self:_drawSinglePortShape(portIndex, portX, portY, r, alphaOverride)
 
-            else -- Port is absent/not defined
-                -- Draw absent port indicator (small gray circle)
-                local absentColor = ABSENT_PORT_COLOR
-                love.graphics.setColor(absentColor[1], absentColor[2], absentColor[3], (absentColor[4] or 1) * alphaOverride)
-                love.graphics.circle("fill", portX, portY, r * 0.8)
-                local borderColor = PORT_BORDER_COLOR
-                love.graphics.setColor(borderColor[1], borderColor[2], borderColor[3], (borderColor[4] or 1) * alphaOverride)
-                love.graphics.circle("line", portX, portY, r * 0.8)
             end
         end
     end
