@@ -80,10 +80,10 @@ end
 -- === CONDITION EVALUATION HELPERS ===
 
 -- Checks adjacency condition
-local function evaluateAdjacencyCondition(conditionConfig, gameService, activatingPlayer, targetNetwork, targetNode)
-    if not targetNetwork or not targetNode or not targetNode.position then return false end
-    -- Use the newly added Network:getNeighbors
-    local neighbors = targetNetwork:getNeighbors(targetNode.position) 
+local function evaluateAdjacencyCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
+    if not sourceNetwork or not sourceNode or not sourceNode.position then return false end
+    -- Use the newly added Network:getNeighbors relative to the node executing the effect
+    local neighbors = sourceNetwork:getNeighbors(sourceNode.position) 
     local count = 0
     local requiredType = conditionConfig.nodeType
     local requiredCount = conditionConfig.count or 1
@@ -96,23 +96,25 @@ local function evaluateAdjacencyCondition(conditionConfig, gameService, activati
 end
 
 -- Checks convergence link condition
-local function evaluateConvergenceLinkCondition(conditionConfig, gameService, activatingPlayer, targetNetwork, targetNode)
-    if not targetNode then return false end
-    local currentLinks = targetNode:getConvergenceLinkCount() 
+local function evaluateConvergenceLinkCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
+    if not sourceNode then return false end
+    local currentLinks = sourceNode:getConvergenceLinkCount() 
     local requiredCount = conditionConfig.count or 1
     return currentLinks >= requiredCount
 end
 
 -- Checks satisfied inputs condition
-local function evaluateSatisfiedInputsCondition(conditionConfig, gameService, activatingPlayer, targetNetwork, targetNode)
-    local presentInputs = targetNode.card:getInputPorts() 
+local function evaluateSatisfiedInputsCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
+    if not sourceNetwork or not sourceNode or not sourceNode.position then return false end -- Added sourceNetwork check
+    if not sourceNode.card or not sourceNode.card.getInputPorts then return false end -- Added card check
+    local presentInputs = sourceNode.card:getInputPorts() 
     local satisfiedCount = 0
     local requiredCount = conditionConfig.count or 1
     for _, inputPortInfo in ipairs(presentInputs) do
-        local neighborPos = targetNetwork:getAdjacentCoordForPort(targetNode.position, inputPortInfo.index) 
-        local neighborNode = targetNetwork:getCardAt(neighborPos.x, neighborPos.y) 
+        local neighborPos = sourceNetwork:getAdjacentCoordForPort(sourceNode.position, inputPortInfo.index) 
+        local neighborNode = sourceNetwork:getCardAt(neighborPos.x, neighborPos.y) 
         if neighborNode and neighborNode.card and neighborNode.card.hasOutputPort then
-            local opposingPortIndex = targetNetwork:getOpposingPortIndex(inputPortInfo.index)
+            local opposingPortIndex = sourceNetwork:getOpposingPortIndex(inputPortInfo.index)
             if neighborNode.card:hasOutputPort(inputPortInfo.type, opposingPortIndex) then 
                 satisfiedCount = satisfiedCount + 1
             end
@@ -122,16 +124,16 @@ local function evaluateSatisfiedInputsCondition(conditionConfig, gameService, ac
 end
 
 -- Central condition evaluator
-local function evaluateCondition(conditionConfig, gameService, activatingPlayer, targetNetwork, targetNode)
+local function evaluateCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
     if not conditionConfig then return true end -- No condition means it passes
 
     local conditionType = conditionConfig.type
     if conditionType == "adjacency" then
-        return evaluateAdjacencyCondition(conditionConfig, gameService, activatingPlayer, targetNetwork, targetNode)
+        return evaluateAdjacencyCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
     elseif conditionType == "convergenceLinks" then
-        return evaluateConvergenceLinkCondition(conditionConfig, gameService, activatingPlayer, targetNetwork, targetNode)
+        return evaluateConvergenceLinkCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
     elseif conditionType == "satisfiedInputs" then
-        return evaluateSatisfiedInputsCondition(conditionConfig, gameService, activatingPlayer, targetNetwork, targetNode)
+        return evaluateSatisfiedInputsCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
     else
         print(string.format("Warning: Unknown condition type '%s' to evaluate.", conditionType))
         return false -- Fail safely for unknown condition types
@@ -200,20 +202,25 @@ function CardEffects.createActivationEffect(config)
 
     -- 1. Generate the activate function
     -- Evaluates conditions per action inside the loop
-    local activateFunction = function(gameService, activatingPlayer, targetNetwork, targetNode)
+    local activateFunction = function(gameService, activatingPlayer, sourceNetwork, sourceNode, targetNode) 
         if not gameService then
             print("ERROR: Card effect executed without gameService!")
             return
+        end
+        if not sourceNetwork or not sourceNode then
+             print("ERROR: Card effect executed without sourceNetwork or sourceNode!")
+             return
         end
 
         for i, action in ipairs(actions) do 
             local conditionConfig = action.condition
             local effectType = action.effect
             local options = action.options or {}
-            local owner = targetNetwork and targetNetwork.owner
+            -- Owner is determined by the network of the node whose effect is executing
+            local owner = sourceNetwork.owner 
 
-            -- Check condition for this specific action
-            if evaluateCondition(conditionConfig, gameService, activatingPlayer, targetNetwork, targetNode) then
+            -- Check condition for this specific action, passing sourceNetwork/sourceNode
+            if evaluateCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode) then
                 -- Condition passed (or no condition), execute the action
                 
                 -- Resource Effects
@@ -251,18 +258,22 @@ function CardEffects.createActivationEffect(config)
                     local amount = options.amount or 1
                     if activatingPlayer and gameService.forcePlayerDiscard then gameService:forcePlayerDiscard(activatingPlayer, amount) else print("Warning: gameService:forcePlayerDiscard not found or activatingPlayer missing!") end
                 elseif effectType == "destroyRandomLinkOnNode" then
-                    if targetNode and gameService.destroyRandomLinkOnNode then gameService:destroyRandomLinkOnNode(targetNode) else print("Warning: gameService:destroyRandomLinkOnNode not found or targetNode missing!") end
+                    -- This effect specifically targets the NODE where the effect resides.
+                    if sourceNode and gameService.destroyRandomLinkOnNode then gameService:destroyRandomLinkOnNode(sourceNode) else print("Warning: gameService:destroyRandomLinkOnNode not found or sourceNode missing!") end
                 elseif effectType == "stealResource" then
                     local resource = options.resource; local amount = options.amount or 1
+                    -- 'owner' here refers to the owner of the sourceNode (the node with this effect)
                     if owner and activatingPlayer and owner ~= activatingPlayer and gameService.transferResource then gameService:transferResource(owner, activatingPlayer, resource, amount) else print("Warning: Could not execute stealResource.") end
                 elseif effectType == "gainResourcePerNodeOwner" then
                     local resource = options.resource; local nodeType = options.nodeType; local amountPerNode = options.amount or 1
+                    -- 'owner' here is the owner of the sourceNode
                     if owner and owner.network and owner.network.countNodesByType and owner.addResource and nodeType then
                         local count = owner.network:countNodesByType(nodeType); local totalAmount = count * amountPerNode
                         if totalAmount > 0 then owner:addResource(resource, totalAmount) end
                     else print("Warning: Could not execute gainResourcePerNodeOwner.") end
                 elseif effectType == "gainResourcePerNodeActivator" then
-                    local resource = options.resource; local nodeType = options.nodeType; local amountPerNode = options.amount or 1
+                     local resource = options.resource; local nodeType = options.nodeType; local amountPerNode = options.amount or 1
+                    -- 'owner' here is the owner of the sourceNode, we count nodes in their network
                     if owner and owner.network and owner.network.countNodesByType and activatingPlayer and activatingPlayer.addResource and nodeType then
                         local count = owner.network:countNodesByType(nodeType); local totalAmount = count * amountPerNode
                         if totalAmount > 0 then activatingPlayer:addResource(resource, totalAmount) end
@@ -279,8 +290,9 @@ function CardEffects.createActivationEffect(config)
                                 activatingPlayer:removeResource(costResource, costAmount)
                                 -- Execute consequence actions - RECURSIVE CALL to a temporary activate function
                                 -- This recursively handles conditions on consequence actions correctly.
+                                -- Pass the *current* sourceNetwork/sourceNode for context.
                                 local tempEffect = CardEffects.createActivationEffect({ actions = consequenceActions })
-                                tempEffect.activate(gameService, activatingPlayer, targetNetwork, targetNode)
+                                tempEffect.activate(gameService, activatingPlayer, sourceNetwork, sourceNode) -- Pass current sourceNode
                             else print("Warning: Player missing removeResource method for offerPayment.") end
                         end
                     end

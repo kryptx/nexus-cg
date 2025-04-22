@@ -82,6 +82,22 @@ function Network:getCardAt(x, y)
     return nil
 end
 
+-- Retrieve the node structure (card + position) at a specific grid coordinate
+-- This is needed by CardEffects functions which operate on 'nodes'
+function Network:getNodeAt(position)
+    if not position or type(position) ~= 'table' or not position.x or not position.y then
+        print("Warning: Network:getNodeAt called with invalid position table.")
+        return nil
+    end
+    local x, y = position.x, position.y
+    local card = self:getCardAt(x, y)
+    if card then
+        -- Return the node structure expected by CardEffects
+        return { card = card, position = position }
+    end
+    return nil
+end
+
 -- Retrieve a card instance by its unique ID
 function Network:getCardById(cardId)
     return self.cards[cardId]

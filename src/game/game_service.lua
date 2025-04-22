@@ -966,7 +966,8 @@ function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayer
 
                 if cardOwner == activatingPlayer then
                     print(string.format("    Activating subsequent node %s via standard effect...", cardToActivate.title))
-                    cardToActivate:activateEffect(self, activatingPlayer, cardOwner.network)
+                    -- Pass the card being activated as the targetNode
+                    cardToActivate:activateEffect(self, activatingPlayer, cardOwner.network, cardToActivate) 
                     table.insert(activationMessages, string.format("  - %s activated!", cardToActivate.title))
                 else
                     print(string.format("    Node %s belongs to P%d, stopping effect chain.", cardToActivate.title, cardOwner.id))

@@ -787,7 +787,19 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                 self.buttonEndTurn:setEnabled(true)
             end
         end
-    elseif button == 2 then -- Right mouse button: Activation / Convergence Abort
+    elseif button == 2 then -- Right mouse button: Activation / Convergence Abort / Deselect Card
+        -- *** New Check: Deselect card if one is selected ***
+        if self.selectedHandIndex then
+            print("Card deselected via right-click.")
+            self:resetSelectionAndStatus()
+            self:updateStatusMessage("Card deselected.")
+            -- Re-enable phase/turn buttons which might have been disabled by selection
+            self.buttonAdvancePhase:setEnabled(true)
+            self.buttonEndTurn:setEnabled(true)
+            return -- Handled the click: deselected the card
+        end
+        -- *** End New Check ***
+
         -- Check for Convergence Abort first
         if self.convergenceSelectionState then
             print("Convergence selection aborted by user.")

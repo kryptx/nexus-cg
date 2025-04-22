@@ -126,9 +126,10 @@ local function createMockNetwork(cards, validPlacementResult, pathResult)
     -- Override the activation effect with the correct one for a reactor
     mockReactor.activationEffect = {
         description = "Grants 1 Energy to the activator.",
-        activate = function(player, network)
-            if player and player.addResource then
-                player:addResource("energy", 1)
+        -- Accept all args passed by outer activateEffect, use the activatingPlayer (arg 2)
+        activate = function(gameService, activatingPlayer, targetNetwork, targetNode) 
+            if activatingPlayer and activatingPlayer.addResource then
+                activatingPlayer:addResource("energy", 1)
             end
         end
     }
@@ -526,10 +527,32 @@ describe("GameService Module", function()
         -- Mock Card/Player/Network creators
         local function createMockCard(id, title, x, y) 
             local card = { id = id, title = title, position = { x = x, y = y }, type="NODE",
-                definedPorts = {}, occupiedPorts = nil, owner = nil, network = nil }
-            -- Default mock methods, can be overridden in tests
-            function card:getPortProperties(portIdx) return Card:getPortProperties(portIdx) end 
-            function card:isPortAvailable(portIdx) return mockIsPortAvail(self, portIdx) end 
+                definedPorts = {}, occupiedPorts = nil, owner = nil, network = nil,
+                -- Add basic activation effect structure
+                activationEffect = { description = "Mock Activate", activate = function() end },
+                convergenceEffect = { description = "Mock Converge", activate = function() end },
+                -- Base activateEffect/Convergence methods on the card
+                activateEffect = function(self, gameService, activatingPlayer, targetNetwork, targetNode)
+                    if self.activationEffect and self.activationEffect.activate then
+                        -- Pass all arguments through
+                        self.activationEffect.activate(gameService, activatingPlayer, targetNetwork, targetNode)
+                    end
+                end,
+                activateConvergence = function(self, gameService, activatingPlayer, targetNetwork, targetNode)
+                    if self.convergenceEffect and self.convergenceEffect.activate then
+                        self.convergenceEffect.activate(gameService, activatingPlayer, targetNetwork, targetNode)
+                    end
+                end
+            }
+            -- Assign mock port methods
+            card.isPortDefined = function(self, portIndex) return self.definedPorts[portIndex] == true end
+            card.getOccupyingLinkId = function(self, portIndex) return self.occupiedPorts and self.occupiedPorts[portIndex] or nil end
+            card.isPortAvailable = function(self, portIndex) 
+                local isDefined = self:isPortDefined(portIndex)
+                local isOccupied = (self:getOccupyingLinkId(portIndex) ~= nil)
+                return isDefined and not isOccupied
+            end
+            card.getPortProperties = function(self, portIdx) return Card:getPortProperties(portIdx) end
             return card
         end
 
@@ -818,5 +841,179 @@ describe("GameService Module", function()
         -- - No path found (invalid link direction) -- Revisit this concept if needed
         
     end)
+
+    -- Start describe block for GameService:attemptActivationGlobal
+    describe("GameService:attemptActivationGlobal", function()
+        local service, p1, p2, net1, net2, p1_reactor, p1_inter, p2_target
+        local CardPorts = Card.Ports
+        local spy = require('luassert.spy') -- Add spy for checking calls
+
+        -- Use the same mock helpers as findGlobalActivationPath
+        local function createMockCard(id, title, x, y) 
+            local card = { id = id, title = title, position = { x = x, y = y }, type="NODE",
+                definedPorts = {}, occupiedPorts = nil, owner = nil, network = nil,
+                -- Add basic activation effect structure
+                activationEffect = { description = "Mock Activate", activate = function() end },
+                convergenceEffect = { description = "Mock Converge", activate = function() end },
+                -- Base activateEffect/Convergence methods on the card
+                activateEffect = function(self, gameService, activatingPlayer, targetNetwork, targetNode)
+                    if self.activationEffect and self.activationEffect.activate then
+                        -- Pass all arguments through
+                        self.activationEffect.activate(gameService, activatingPlayer, targetNetwork, targetNode)
+                    end
+                end,
+                activateConvergence = function(self, gameService, activatingPlayer, targetNetwork, targetNode)
+                    if self.convergenceEffect and self.convergenceEffect.activate then
+                        self.convergenceEffect.activate(gameService, activatingPlayer, targetNetwork, targetNode)
+                    end
+                end
+            }
+            -- Assign mock port methods
+            card.isPortDefined = function(self, portIndex) return self.definedPorts[portIndex] == true end
+            card.getOccupyingLinkId = function(self, portIndex) return self.occupiedPorts and self.occupiedPorts[portIndex] or nil end
+            card.isPortAvailable = function(self, portIndex) 
+                local isDefined = self:isPortDefined(portIndex)
+                local isOccupied = (self:getOccupyingLinkId(portIndex) ~= nil)
+                return isDefined and not isOccupied
+            end
+            card.getPortProperties = function(self, portIdx) return Card:getPortProperties(portIdx) end
+            return card
+        end
+        local function createMockPlayer(id, resources) return { id = id, name = "Player " .. id, resources = resources or {}, network = nil, spendResource = function(self, type, amount) self.resources[type] = (self.resources[type] or 0) - amount end } end
+        local function createMockNetwork(cards)
+            local net = { cards = cards or {} }
+            net.cardsById = {}
+            for _, card in pairs(net.cards) do net.cardsById[card.id] = card end
+            net.getCardById = function(self, id) return net.cardsById[id] end
+            net.getCardAt = function(self, x, y) -- Mock: find card by ID for test simplicity
+                for _, card in pairs(self.cards) do if card.position.x == x and card.position.y == y then return card end end return nil 
+            end
+            net.findReactor = function(self) for _,c in pairs(self.cards) do if c.type == Card.Type.REACTOR then return c end end return nil end
+            return net
+        end
+
+        before_each(function()
+            service = GameService:new()
+            p1 = createMockPlayer(1, { energy=20 })
+            p2 = createMockPlayer(2, { energy=10 })
+            service.players = { p1, p2 }
+            service.currentPlayerIndex = 1
+            service.currentPhase = TurnPhase.ACTIVATE -- Set correct phase
+
+            p1_reactor = createMockCard("P1_R", "P1 Reactor", 0, 0); p1_reactor.type = Card.Type.REACTOR
+            p1_inter = createMockCard("P1_I", "P1 Intermediate", 1, 0)
+            p2_target = createMockCard("P2_T", "P2 Target", 1, 1)
+
+            -- Define effect for intermediate node (the one whose activation we'll check)
+            p1_inter.activationEffect.activate = spy.new(function(gameService, activatingPlayer, targetNetwork, targetNode)
+                print("[TEST DEBUG] p1_inter:activateEffect called")
+                -- This spy will allow us to check the arguments it was called with
+            end)
+            
+            -- Assign networks and owners
+            net1 = createMockNetwork({ p1_reactor, p1_inter })
+            p1.network = net1; p1_reactor.owner = p1; p1_reactor.network = net1; p1_inter.owner = p1; p1_inter.network = net1
+            net2 = createMockNetwork({ p2_target })
+            p2.network = net2; p2_target.owner = p2; p2_target.network = net2
+
+            -- Mock pathfinding to return our specific path
+            service.findGlobalActivationPath = function(self, targetCard, activatorReactor, activatingPlayer)
+                -- Print the received arguments for debugging
+                print(string.format("[TEST DEBUG MOCK] findGlobalActivationPath received: target=%s, reactor=%s, player=%s", 
+                    targetCard and targetCard.id or "NIL", 
+                    activatorReactor and activatorReactor.id or "NIL", 
+                    activatingPlayer and activatingPlayer.id or "NIL"))
+
+                -- Use IDs for comparison robustness
+                if targetCard and targetCard.id == "P2_T" and 
+                   activatorReactor and activatorReactor.id == "P1_R" and 
+                   activatingPlayer and activatingPlayer.id == 1 then
+                    local path = {
+                        { card = p2_target, owner = p2 },
+                        { card = p1_inter, owner = p1 },
+                        { card = p1_reactor, owner = p1 }
+                    }
+                    local pathData = { path = path, cost = #path, isConvergenceStart = true } -- Assuming conv start
+                    return true, pathData, nil
+                end
+                return false, nil, "Mock path not found"
+            end
+        end)
+
+        it("should activate subsequent nodes owned by activator, passing correct targetNode", function()
+            local initialEnergy = p1.resources.energy
+            
+            -- Activating player 1 targets player 2's card at (1,1)
+            local success, msg = service:attemptActivationGlobal(1, 2, 1, 1) 
+            
+            assert.is_true(success)
+            -- Path cost is #path - 1 = 3 - 1 = 2
+            assert.are.equal(initialEnergy - 2, p1.resources.energy, "Should spend 2 energy")
+            assert.matches("P2 Target activated!", msg)
+            assert.matches("P1 Intermediate activated!", msg)
+            
+            -- Verify the intermediate node's effect was called
+            assert.spy(p1_inter.activationEffect.activate).was.called(1)
+            
+            -- CRITICAL CHECK: Verify the arguments passed to the intermediate node's activate function
+            assert.spy(p1_inter.activationEffect.activate).was.called_with(service, p1, net1, p1_inter)
+        end)
+        
+        -- Add other tests for attemptActivationGlobal here...
+        it("should fail if not in Activate phase", function()
+            service.currentPhase = TurnPhase.BUILD
+            local success, msg = service:attemptActivationGlobal(1, 2, 1, 1)
+            assert.is_false(success)
+            assert.matches("Activation not allowed", msg)
+        end)
+
+        it("should fail if activating player has no reactor", function()
+            p1.network.cards = {} -- Remove reactor
+            local success, msg = service:attemptActivationGlobal(1, 2, 1, 1)
+            assert.is_false(success)
+            assert.matches("Error: Activating player's reactor not found", msg) -- Match exact error
+        end)
+        
+        it("should fail if target card is a reactor", function()
+            local p2_reactor = createMockCard("P2_R", "P2 Reactor", 1, 1); p2_reactor.type = Card.Type.REACTOR
+            p2_reactor.owner = p2; p2_reactor.network = net2
+            net2.cards = {} -- Clear other cards at this position first
+            net2.cards["P2_R"] = p2_reactor -- Add to network for getCardAt
+            local success, msg = service:attemptActivationGlobal(1, 2, 1, 1) -- Target the reactor's position
+            assert.is_false(success)
+            assert.matches("Cannot activate the Reactor", msg)
+        end)
+
+        it("should fail if path is unaffordable", function()
+            p1.resources.energy = 1 -- Path cost is 2
+            
+            -- Override pathfinder mock specifically for this test to GUARANTEE path found
+            local original_pathfinder = service.findGlobalActivationPath
+            service.findGlobalActivationPath = function(targetCard, activatorReactor, activatingPlayer)
+                local path = {
+                    { card = p2_target, owner = p2 },
+                    { card = p1_inter, owner = p1 },
+                    { card = p1_reactor, owner = p1 }
+                }
+                local pathData = { path = path, cost = #path, isConvergenceStart = true }
+                return true, pathData, nil
+            end
+            
+            local success, msg = service:attemptActivationGlobal(1, 2, 1, 1)
+            assert.is_false(success)
+            assert.matches("Not enough energy", msg)
+            assert.are.equal(1, p1.resources.energy) -- Energy not spent
+            
+            service.findGlobalActivationPath = original_pathfinder -- Restore original mock
+        end)
+
+        it("should fail if no path is found", function()
+             service.findGlobalActivationPath = function() return false, nil, "Test no path reason" end
+             local success, msg = service:attemptActivationGlobal(1, 2, 1, 1)
+             assert.is_false(success)
+             assert.matches("No valid global activation path: Test no path reason", msg)
+        end)
+
+    end) -- End describe block for GameService:attemptActivationGlobal
 
 end)

@@ -153,10 +153,25 @@ function Card:getConvergenceDescription()
 end
 
 -- Execute the activation effect
-function Card:activateEffect(gameService, activatingPlayer, targetNetworkOwnerOrNetwork)
+-- Changed 3rd arg name to originalTargetNode to reflect its purpose better
+function Card:activateEffect(gameService, activatingPlayer, originalTargetNode) 
     print(string.format("  [CARD DEBUG] >>> Entering Card:activateEffect for %s (ID: %s)", self.title, self.id))
     if self.activationEffect and self.activationEffect.activate then
-        local result = self.activationEffect.activate(gameService, activatingPlayer, targetNetworkOwnerOrNetwork)
+        -- Ensure the card has network context to find the sourceNode
+        if not self.network or not self.position or not self.network.getNodeAt then
+            print(string.format("  [CARD ERROR] !!! Card %s cannot activate effect: Missing network context (network=%s, position=%s)", self.id, tostring(self.network), tostring(self.position)))
+            return 
+        end
+        -- Retrieve the node structure for this card (the source node)
+        local sourceNode = self.network:getNodeAt(self.position)
+        if not sourceNode then
+            print(string.format("  [CARD ERROR] !!! Card %s cannot activate effect: Failed to retrieve sourceNode from network at position (%s, %s)", self.id, self.position.x, self.position.y))
+            return
+        end
+
+        -- Call the internal activate function with the correct context
+        -- activate(gameService, activatingPlayer, sourceNetwork, sourceNode, targetNode)
+        local result = self.activationEffect.activate(gameService, activatingPlayer, self.network, sourceNode, originalTargetNode) 
         print(string.format("  [CARD DEBUG] <<< Exiting Card:activateEffect for %s (ID: %s)", self.title, self.id))
         return result
     end
@@ -164,12 +179,29 @@ function Card:activateEffect(gameService, activatingPlayer, targetNetworkOwnerOr
 end
 
 -- Execute the convergence effect
-function Card:activateConvergence(gameService, activatingPlayer, targetNetworkOwner)
+-- Changed 3rd arg name to initiatingNode (node on activator's net that linked)
+function Card:activateConvergence(gameService, activatingPlayer, initiatingNode) 
     print(string.format("  [CARD DEBUG] >>> Entering Card:activateConvergence for %s (ID: %s)", self.title, self.id))
     if self.convergenceEffect and self.convergenceEffect.activate then
-        -- Note: Convergence effects use the same activate function currently
+        -- Ensure the card has network context to find the sourceNode (the node being converged upon)
+        if not self.network or not self.position or not self.network.getNodeAt then
+            print(string.format("  [CARD ERROR] !!! Card %s cannot activate convergence: Missing network context (network=%s, position=%s)", self.id, tostring(self.network), tostring(self.position)))
+            return 
+        end
+        -- Retrieve the node structure for this card (the source node)
+        local sourceNode = self.network:getNodeAt(self.position)
+        if not sourceNode then
+            print(string.format("  [CARD ERROR] !!! Card %s cannot activate convergence: Failed to retrieve sourceNode from network at position (%s, %s)", self.id, self.position.x, self.position.y))
+            return
+        end
+
+        -- Note: Convergence effects use the same activate function structure currently
         -- The distinction of who the owner/activator is happens inside the effect based on arguments
-        local result = self.convergenceEffect.activate(gameService, activatingPlayer, targetNetworkOwner)
+        -- Call the internal activate function:
+        -- activate(gameService, activatingPlayer, sourceNetwork, sourceNode, targetNode)
+        -- Here, sourceNetwork/Node refer to *this* card being converged upon.
+        -- targetNode (the 5th arg) is interpreted as the node that *initiated* the link/activation from the other network.
+        local result = self.convergenceEffect.activate(gameService, activatingPlayer, self.network, sourceNode, initiatingNode) 
         print(string.format("  [CARD DEBUG] <<< Exiting Card:activateConvergence for %s (ID: %s)", self.title, self.id))
         return result
     end
