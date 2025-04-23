@@ -128,6 +128,65 @@ local function evaluateSatisfiedInputsCondition(conditionConfig, gameService, ac
     return satisfiedCount >= requiredCount
 end
 
+-- Checks activation chain length condition
+local function evaluateActivationChainLengthCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
+    if not gameService then
+        print("Error: gameService is required to evaluate activationChainLength condition.")
+        return false -- Need gameService to check chain length
+    end
+
+    local chainInfo = nil
+    -- Use the new function to get chain details
+    if gameService.getActivationChainInfo then
+        chainInfo = gameService:getActivationChainInfo()
+    else
+        -- This indicates a missing part in the GameService implementation
+        print("Warning: gameService:getActivationChainInfo() not found. Cannot evaluate activationChainLength condition.")
+        return false -- Fail safely if the method doesn't exist
+    end
+
+    if not chainInfo then
+        print("Warning: getActivationChainInfo() returned nil.")
+        return false
+    end
+
+    local currentChainLength = chainInfo.length -- Get the length from the returned table
+    local requiredCount = conditionConfig.count or 1
+    print(string.format("Evaluated activation chain length condition: Current=%d, Required=%d", currentChainLength, requiredCount))
+    return currentChainLength >= requiredCount
+end
+
+-- NEW: Checks activated card type condition
+local function evaluateActivatedCardTypeCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
+    if not gameService or not gameService.getActivationChainInfo then
+        print("Error: gameService:getActivationChainInfo is required to evaluate activatedCardType condition.")
+        return false
+    end
+
+    local chainInfo = gameService:getActivationChainInfo()
+    if not chainInfo or not chainInfo.cards then
+        print("Warning: getActivationChainInfo() returned invalid data.")
+        return false
+    end
+
+    local requiredType = conditionConfig.cardType
+    local requiredCount = conditionConfig.count or 1
+    if not requiredType then
+         print("Warning: activatedCardType condition requires 'cardType' in config.")
+         return false
+    end
+
+    local currentCount = 0
+    for _, cardTypeInChain in ipairs(chainInfo.cards) do
+        if cardTypeInChain == requiredType then
+            currentCount = currentCount + 1
+        end
+    end
+
+    print(string.format("Evaluated activated card type condition: Found %d/%d '%s' cards in chain.", currentCount, requiredCount, requiredType))
+    return currentCount >= requiredCount
+end
+
 -- Central condition evaluator
 local function evaluateCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
     if not conditionConfig then return true end -- No condition means it passes
@@ -139,6 +198,10 @@ local function evaluateCondition(conditionConfig, gameService, activatingPlayer,
         return evaluateConvergenceLinkCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
     elseif conditionType == "satisfiedInputs" then
         return evaluateSatisfiedInputsCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
+    elseif conditionType == "activationChainLength" then
+        return evaluateActivationChainLengthCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
+    elseif conditionType == "activatedCardType" then -- New condition type
+        return evaluateActivatedCardTypeCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
     else
         print(string.format("Warning: Unknown condition type '%s' to evaluate.", conditionType))
         return false -- Fail safely for unknown condition types
@@ -158,6 +221,11 @@ local function generateConditionDescription(conditionConfig)
         return string.format("If %d+ convergence link(s) attached: ", count)
     elseif type == "satisfiedInputs" then
         return string.format("If %d+ input port(s) are connected: ", count)
+    elseif type == "activationChainLength" then
+        return string.format("If %d+ card(s) were activated in this chain: ", count)
+    elseif type == "activatedCardType" then -- New condition description
+        local cardType = conditionConfig.cardType or "Unknown"
+        return string.format("If %d+ %s card(s) were activated in this chain: ", count, cardType)
     else
         print(string.format("Warning: Unknown condition type '%s' for description.", type))
         return "If condition met: "

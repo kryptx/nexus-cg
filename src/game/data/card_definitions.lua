@@ -335,9 +335,9 @@ definitions["NODE_TECH_003"] = {
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
             { condition = { type = "satisfiedInputs", count = 2},
-            effect = "gainVPForOwner", options = { amount = 1 } }
+            effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
         }
-        -- Description: "Owner gains 1 Material. If 2+ input port(s) are connected: Owner gains 1 VP."
+        -- Description: "Owner gains 1 Material. If 2+ input port(s) are connected: Owner gains 1 Data."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
@@ -426,7 +426,7 @@ definitions["NODE_KNOW_003"] = {
     id = "NODE_KNOW_003",
     title = "Historical Archive",
     type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 2, data = 2 },
+    buildCost = { material = 2, data = 0 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
@@ -487,13 +487,14 @@ definitions["NODE_RES_003"] = {
     id = "NODE_RES_003",
     title = "Monument Construction Site",
     type = CardTypes.RESOURCE,
-    buildCost = { material = 5, data = 1 },
+    buildCost = { material = 4 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
-            { effect = "gainVPForOwner", options = { amount = 1 } },
-            { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
+            { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
+            { condition = { type = "activatedCardType", count = 2, cardType = CardTypes.CULTURE },
+              effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Owner gains 1 VP. Grants 1 Material to the owner."
+        -- Description: "Owner gains 1 Material. If 2+ Culture card(s) were activated in this chain: Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
@@ -544,6 +545,7 @@ definitions["NODE_KNOW_004"] = {
         [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
         [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
         [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
     },
     art = nil,
     flavorText = "Synthesizing intelligence, one cycle at a time.",

@@ -100,6 +100,10 @@ function GameService:new()
     instance.pausedActivationPath = nil      -- The remaining path data { {card=Card, owner=Player}, ... }
     instance.pausedActivationContext = nil   -- { activatingPlayer=Player, isConvergenceStart=bool }
 
+    -- State for tracking current activation chain
+    instance.currentActivationChainCards = {}
+    instance.currentActivationChainLinks = {}
+
     print("Game Service Initialized.")
     return instance
 end
@@ -940,6 +944,10 @@ function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayer
     print(string.format("[Service] Attempting GLOBAL activation by P%d targeting P%d's %s (%s) at (%d,%d)",
         activatingPlayerIndex, targetPlayerIndex, targetCard.title, targetCard.id, targetGridX, targetGridY))
 
+    -- Reset chain tracking at the start of a new activation attempt
+    self.currentActivationChainCards = {}
+    self.currentActivationChainLinks = {}
+
     local activatorReactor = activatingPlayer.network:findReactor()
     if not activatorReactor then
         return false, "Error: Activating player's reactor not found."
@@ -995,6 +1003,12 @@ function GameService:_processActivationPath(path, activatingPlayer, isConvergenc
         if cardToActivate.type == Card.Type.REACTOR then
             print("    Skipping Reactor activation.")
             goto continue_loop -- Skip reactor activation
+        end
+
+        -- Track card type and traversed link type
+        table.insert(self.currentActivationChainCards, cardToActivate.type)
+        if pathElement.traversedLinkType then
+             table.insert(self.currentActivationChainLinks, pathElement.traversedLinkType)
         end
 
         local activationStatus = nil
@@ -1078,6 +1092,15 @@ function GameService:resumeActivation()
     return activationStatus, message -- Return the final status of the resumed part
 end
 
+-- NEW: Get info about the current activation chain being processed
+function GameService:getActivationChainInfo()
+    return {
+        length = #self.currentActivationChainCards, -- Keep length for compatibility with old condition name
+        cards = self.currentActivationChainCards,
+        links = self.currentActivationChainLinks
+    }
+end
+
 -- Provide the answer to a pending Yes/No request
 function GameService:providePlayerYesNoAnswer(result)
     if not self.isWaitingForInput then
@@ -1139,7 +1162,8 @@ function GameService:findGlobalActivationPath(targetCard, activatorReactor, acti
         print(string.format("[Pathfinder] FAIL: Target card %s has no owner!", targetCard.id))
         return false, nil, string.format("Target card %s has no owner!", targetCard.id)
     end
-    local initialPath = { { card = targetCard, owner = startOwner } }
+    -- Path elements now include traversedLinkType
+    local initialPath = { { card = targetCard, owner = startOwner, traversedLinkType = nil } }
     table.insert(queue, { node = targetCard, owner = startOwner, path = initialPath })
     
     -- Use composite key for visited set: playerID_cardID
@@ -1201,7 +1225,8 @@ function GameService:findGlobalActivationPath(targetCard, activatorReactor, acti
                         if condition then
                             visited[neighborVisitedKey] = true -- Mark neighbor INSTANCE visited HERE
                             local newPath = shallow_copy(currentPath)
-                            table.insert(newPath, { card = neighborNode, owner = currentOwner })
+                            -- Add path element with nil link type for adjacency
+                            table.insert(newPath, { card = neighborNode, owner = currentOwner, traversedLinkType = nil })
                             print(string.format("      >> Enqueueing ADJACENT: %s (P%d)", neighborNode.id, currentOwner.id))
                             table.insert(queue, { node = neighborNode, owner = currentOwner, path = newPath })
                         end
@@ -1276,8 +1301,9 @@ function GameService:findGlobalActivationPath(targetCard, activatorReactor, acti
                 if condition then
                     visited[neighborVisitedKeyConv] = true -- Mark neighbor INSTANCE visited HERE
                     local newPath = shallow_copy(currentPath)
-                    table.insert(newPath, { card = neighborNode, owner = neighborOwner })
-                    print(string.format("      >> Enqueueing CONVERGENCE: %s (P%d) via Link %s", neighborNode.id, neighborOwner.id, link.linkId))
+                    -- Add path element WITH link type for convergence
+                    table.insert(newPath, { card = neighborNode, owner = neighborOwner, traversedLinkType = link.linkType })
+                    print(string.format("      >> Enqueueing CONVERGENCE: %s (P%d) via Link %s (%s)", neighborNode.id, neighborOwner.id, link.linkId, link.linkType))
                     table.insert(queue, { node = neighborNode, owner = neighborOwner, path = newPath })
                 end
             end
