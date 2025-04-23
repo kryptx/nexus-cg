@@ -174,8 +174,16 @@ definitions["NODE_CULT_001"] = {
     type = CardTypes.CULTURE,
     buildCost = { material = 1, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
-        actions = { { effect = "drawCardsForOwner", options = { amount = 1 } } }
-        -- Description: "Owner draws 1 card."
+        actions = {
+            { effect = "drawCardsForOwner", options = { amount = 1 } },
+            -- Secondary effect: Gain energy if adjacent to Culture
+            {
+                condition = { type = "adjacency", count = 1, nodeType = CardTypes.CULTURE },
+                effect = "addResourceToOwner",
+                options = { resource = ResourceType.ENERGY, amount = 1 }
+            }
+        }
+        -- Description: "Owner draws 1 card. If adjacent to 1+ Culture node(s): Owner gains 1 Energy."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { { effect = "drawCardsForActivator", options = { amount = 1 } } }
@@ -303,9 +311,15 @@ definitions["NODE_CULT_004"] = {
     buildCost = { material = 3, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
-            { effect = "drawCardsForOwner", options = { amount = 1 } }
+            { effect = "drawCardsForOwner", options = { amount = 1 } },
+            -- Secondary effect: Gain data if Knowledge card was activated
+            {
+                condition = { type = "activatedCardType", count = 1, cardType = CardTypes.KNOWLEDGE },
+                effect = "addResourceToOwner",
+                options = { resource = ResourceType.DATA, amount = 1 }
+            }
         }
-        -- Description: "Owner draws 1 card."
+        -- Description: "Owner draws 1 card. If 1+ Knowledge card(s) were activated in this chain: Owner gains 1 Data."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
@@ -460,9 +474,19 @@ definitions["NODE_CULT_005"] = {
     buildCost = { material = 3, data = 3 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
-            { effect = "drawCardsForOwner", options = { amount = 1 } }
+            {
+                effect = "offerPaymentOwner",
+                options = {
+                    resource = CardEffects.ResourceType.MATERIAL,
+                    amount = 1,
+                    consequence = {
+                        { effect = "drawCardsForOwner", options = { amount = 1 } },
+                        { effect = "gainVPForOwner", options = { amount = 1 } }
+                    }
+                }
+            }
         }
-        -- Description: "Owner draws 1 card."
+        -- Description: "If Owner pays 1 Material: Owner draws 1 card. Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
@@ -686,7 +710,7 @@ definitions["NODE_TECH_KNOW_001"] = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
              { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the activator. Owner gains 1 VP."
+        -- Description: "Activator gains 1 Data. Owner gains 1 VP."
     }),
     vpValue = 1,
     imagePath = "assets/images/quantum-simulation-lab.png",
@@ -708,17 +732,17 @@ definitions["NODE_CULT_TECH_001"] = {
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
-             { condition = { type = "adjacency", nodeType = CardTypes.TECHNOLOGY, count = 1 },
+             { condition = { type = "adjacency", nodeType = CardTypes.TECHNOLOGY, count = 2 },
                 effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the owner. If adjacent to 1+ Technology node(s): Owner gains 1 VP."
+        -- Description: "Owner gains 1 Data. If adjacent to 2+ Technology node(s): Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
         }
-        -- Description: "Grants 1 Material to the activator. Grants 1 Data to the owner."
+        -- Description: "Activator gains 1 Material. Owner gains 1 Data."
     }),
     vpValue = 1,
     imagePath = "assets/images/applied-aesthetics-studio.png",
@@ -773,14 +797,14 @@ definitions["NODE_CULT_RES_001"] = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } },
             { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 2 Material to the owner. Owner gains 1 VP."
+        -- Description: "Owner gains 2 Material. Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
         }
-        -- Description: "Grants 1 Material to the activator. Grants 1 Data to the owner."
+        -- Description: "Activator gains 1 Material. Owner gains 1 Data."
     }),
     vpValue = 1,
     imagePath = "assets/images/artisan-guild-workshop.png",
@@ -811,7 +835,7 @@ definitions["NODE_RES_CULT_001"] = {
              { effect = "gainVPForActivator", options = { amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
         }
-        -- Description: "Activator gains 1 VP. Grants 1 Material to the owner."
+        -- Description: "Activator gains 1 VP. Owner gains 1 Material."
     }),
     vpValue = 1,
     imagePath = "assets/images/resource-reclamation-art-project.png",
@@ -835,14 +859,14 @@ definitions["NODE_RES_TECH_001"] = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
             { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the owner. Owner gains 1 VP."
+        -- Description: "Owner gains 1 Data. Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the activator. Grants 1 Material to the owner."
+        -- Description: "Activator gains 1 Data. Owner gains 1 Material."
     }),
     vpValue = 1,
     imagePath = "assets/images/materials-science-r&d.png",
@@ -862,15 +886,15 @@ definitions["NODE_RES_KNOW_001"] = {
     type = CardTypes.RESOURCE,
     buildCost = { material = 3, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
-        actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } } }
-        -- Description: "Grants 2 Data to the owner."
+        actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } }
+        -- Description: "Owner gains 1 Data."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
              { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the activator. Owner gains 1 VP."
+        -- Description: "Activator gains 1 Data. Owner gains 1 VP."
     }),
     vpValue = 1,
     imagePath = "assets/images/geological-survey-outpost.png",
@@ -925,7 +949,7 @@ definitions["NODE_KNOW_TECH_001"] = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } },
             { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 2 Data to the owner. Owner gains 1 VP."
+        -- Description: "Owner gains 2 Data. Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
@@ -953,9 +977,10 @@ definitions["NODE_KNOW_RES_001"] = {
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } },
-            { effect = "offerPaymentOwner", options = { resource = ResourceType.DATA, amount = 1, consequence = { { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } } } } }
+            { condition = { type = "activatedCardType", count = 2, cardType = CardTypes.RESOURCE },
+              effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
         }
-        -- Description: "Owner gains 2 Material. If owner pays 1 data: Owner gains 1 Material."
+        -- Description: "Owner gains 2 Material. If 2+ Resource card(s) were activated in this chain: Owner gains 1 Material."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
@@ -1017,10 +1042,10 @@ definitions["NODE_TECH_005"] = {
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
-             { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
+             { effect = "addResourceToActivator", options = { resource = ResourceType.ENERGY, amount = 1 } },
              { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the activator. Owner gains 1 VP."
+        -- Description: "Grants 1 Energy to the activator. Owner gains 1 VP."
     }),
     vpValue = 2,
     imagePath = "assets/images/fusion-reactor-prototype.png",
@@ -1040,23 +1065,31 @@ definitions["NODE_KNOW_006"] = {
     type = CardTypes.KNOWLEDGE,
     buildCost = { material = 2, data = 3 },
     activationEffect = CardEffects.createActivationEffect({
-        actions = { { effect = "drawCardsForOwner", options = { amount = 1 } } }
-        -- Description: "Owner draws 1 card."
+        actions = {
+            { effect = "drawCardsForOwner", options = { amount = 1 } },
+            -- Secondary effect: Gain data if chain is long
+            {
+                condition = { type = "activatedCardType", count = 2, cardType = CardTypes.KNOWLEDGE },
+                effect = "addResourceToOwner",
+                options = { resource = CardEffects.ResourceType.DATA, amount = 2 }
+            }
+        }
+        -- Description: "Owner draws 1 card. If 2+ Knowledge card(s) were activated in this chain: Owner gains 2 Data."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
             {
                 effect = "offerPaymentActivator",
                 options = {
-                    resource = ResourceType.DATA,
+                    resource = ResourceType.MATERIAL,
                     amount = 1,
                     consequence = {
-                        { effect = "forceDiscardCardsActivator", options = { amount = 1 } }
+                        { effect = "stealResource", options = { resource = ResourceType.DATA, amount = 1 } }
                     }
                 }
             }
         }
-        -- Description: "May pay 1 Data to: Activator discards 1 card(s)."
+        -- Description: "If activator pays 1 Material: Activator steals 1 Data from the owner."
     }),
     vpValue = 1,
     imagePath = "assets/images/information-brokerage.png",
@@ -1080,14 +1113,14 @@ definitions["NODE_TECH_006"] = {
             { condition = { type = "satisfiedInputs", count = 3 },
               effect = "gainVPForOwner", options = { amount = 2 } }
         }
-        -- Description: "Grants 1 Data to the owner. If 3+ input port(s) are connected: Owner gains 2 VP."
+        -- Description: "Owner gains 1 Data. If 3+ input port(s) are connected: Owner gains 2 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
-             { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
+             { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 2 } },
              { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the activator. Owner gains 1 VP."
+        -- Description: "Activator gains 2 Data. Owner gains 1 VP."
     }),
     vpValue = 1,
     imagePath = "assets/images/network-hub.png",
@@ -1120,14 +1153,14 @@ definitions["NODE_TECH_007"] = {
                 }
             }
         }
-        -- Description: "May pay 1 Energy to: Destroy a random convergence link on this node."
+        -- Description: "If activator pays 1 Energy: Destroy a random convergence link on this node."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
              { effect = "stealResource", options = { resource = ResourceType.ENERGY, amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the activator. Activator steals 1 Energy from the owner."
+        -- Description: "Activator gains 1 Data. Activator steals 1 Energy from the owner."
     }),
     vpValue = 0,
     imagePath = "assets/images/sabotage-drone-bay.png",
