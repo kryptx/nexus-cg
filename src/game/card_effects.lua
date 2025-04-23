@@ -42,17 +42,19 @@ end
 -- Generates descriptions for non-resource effects (or resource effects not covered above)
 local function generateOtherDescription(actionEffect, options)
     if actionEffect == "drawCardsForActivator" then
-        return string.format("Activator draws %d card(s).", options.amount or 1)
+        return string.format("Activator draws %d card%s.", options.amount or 1, options.amount == 1 and "" or "s")
     elseif actionEffect == "drawCardsForOwner" then
-        return string.format("Owner draws %d card(s).", options.amount or 1)
+        return string.format("Owner draws %d card%s.", options.amount or 1, options.amount == 1 and "" or "s")
+    elseif actionEffect == "drawCardsForAllPlayers" then
+        return string.format("All players draw %d card%s.", options.amount or 1, options.amount == 1 and "" or "s")
     elseif actionEffect == "gainVPForActivator" then
         return string.format("Activator gains %d VP.", options.amount or 1)
     elseif actionEffect == "gainVPForOwner" then
         return string.format("Owner gains %d VP.", options.amount or 1)
     elseif actionEffect == "forceDiscardCardsOwner" then
-        return string.format("Owner discards %d card(s).", options.amount or 1)
+        return string.format("Owner discards %d card%s.", options.amount or 1, options.amount == 1 and "" or "s")
     elseif actionEffect == "forceDiscardCardsActivator" then
-        return string.format("Activator discards %d card(s).", options.amount or 1)
+        return string.format("Activator discards %d card%s.", options.amount or 1, options.amount == 1 and "" or "s")
     elseif actionEffect == "destroyRandomLinkOnNode" then
         return "Destroy a random convergence link on this node."
     -- === Refined Resource Descriptions handled here now ===
@@ -68,11 +70,12 @@ local function generateOtherDescription(actionEffect, options)
          local nodeType = options.nodeType or "Any"
          return string.format("Activator gains %d %s per %s node in the owner's network.", options.amount or 1, resourceName, nodeType)
     -- =====================================================
-    elseif actionEffect == "offerPayment" then
+    elseif actionEffect == "offerPaymentActivator" or actionEffect == "offerPaymentOwner" then -- Update description generation
+        local payer = (actionEffect == "offerPaymentOwner") and "Owner" or "Activator"
         local costStr = string.format("%d %s", options.amount or 1, options.resource:sub(1, 1):upper() .. options.resource:sub(2))
         -- Recursively generate description for consequence actions
         local consequenceDesc = CardEffects.generateEffectDescription({ actions = options.consequence or {} }) 
-        return string.format("May pay %s to: %s", costStr, consequenceDesc)
+        return string.format("If %s pays %s: %s", payer, costStr, consequenceDesc)
     end
     return "Unknown other effect."
 end
@@ -161,6 +164,52 @@ local function generateConditionDescription(conditionConfig)
     end
 end
 
+-- === NEW HELPER for Offer Payment Logic ===
+-- playerToAsk: The player object who needs to make the choice (activatingPlayer or owner)
+-- costResource, costAmount, consequenceActions: From the effect definition
+-- gameService, activatingPlayer, sourceNetwork, sourceNode: Original execution context for callback
+local function _handleOfferPayment(playerToAsk, costResource, costAmount, consequenceActions, gameService, activatingPlayer, sourceNetwork, sourceNode)
+    -- Check if the player who needs to pay *can* pay first
+    if playerToAsk and playerToAsk.resources[costResource] and playerToAsk.resources[costResource] >= costAmount then
+        local questionString = string.format("Pay %d %s?", costAmount, costResource)
+
+        -- Create the callback function containing the logic to run *after* player chooses
+        local afterChoiceCallback = function(wantsToPay)
+            if wantsToPay then
+                -- Use the existing spendResource which includes the check and deduction
+                -- Make sure to call it on the player who was asked (playerToAsk)
+                local spentSuccessfully = playerToAsk:spendResource(costResource, costAmount)
+                if spentSuccessfully then
+                    -- Execute consequence actions - RECURSIVE CALL to a temporary activate function
+                    -- Pass the *original* activatingPlayer and sourceNetwork/sourceNode context.
+                    print(string.format("[Callback] Player %d paid %d %s. Executing consequences...", playerToAsk.id, costAmount, costResource))
+                    local tempEffect = CardEffects.createActivationEffect({ actions = consequenceActions })
+                    -- Pass the original context (gameService, activatingPlayer, sourceNetwork, sourceNode)
+                    -- to the recursively activated effect.
+                    tempEffect.activate(gameService, activatingPlayer, sourceNetwork, sourceNode)
+                else
+                    print(string.format("Warning: Failed to spend resource in _handleOfferPayment callback for player %d even after initial check.", playerToAsk.id))
+                end
+            else
+                print(string.format("[Callback] Player %d chose not to pay %d %s.", playerToAsk.id, costAmount, costResource))
+                -- If player declined, do nothing further for this consequence chain.
+            end
+        end
+
+        -- Request the input from the player via GameService
+        gameService:requestPlayerYesNo(playerToAsk, questionString, afterChoiceCallback)
+        print(string.format("[Effect] Requested payment (%d %s) from player %d. Waiting for response...", costAmount, costResource, playerToAsk.id))
+        -- Signal that we are now waiting for input
+        return "waiting"
+
+    else
+        -- Player cannot afford the cost, skip the offer.
+        print(string.format("[Effect] Skipping payment offer for player %d (cannot afford %d %s).", playerToAsk and playerToAsk.id or -1, costAmount, costResource))
+        -- Return nil (or nothing) as we are not waiting
+        return nil
+    end
+end
+
 -- === PUBLIC FUNCTIONS ===
 
 -- Public function to generate a combined description for an effect block (list of actions)
@@ -199,32 +248,33 @@ end
 
 -- Creates an activation effect object with description and activate function
 -- config = { actions = { {condition={...}, effect="...", options={...}}, ... } }
+-- Returns: The status of the activation (e.g., "waiting" or nil)
 function CardEffects.createActivationEffect(config)
     local actions = config.actions or {}
 
     -- 1. Generate the activate function
     -- Evaluates conditions per action inside the loop
-    local activateFunction = function(gameService, activatingPlayer, sourceNetwork, sourceNode, targetNode) 
+    -- Returns "waiting" if any action initiates a wait, otherwise nil
+    local activateFunction = function(gameService, activatingPlayer, sourceNetwork, sourceNode, targetNode)
         if not gameService then
             print("ERROR: Card effect executed without gameService!")
-            return
+            return nil
         end
         if not sourceNetwork or not sourceNode then
              print("ERROR: Card effect executed without sourceNetwork or sourceNode!")
-             return
+             return nil
         end
 
-        for i, action in ipairs(actions) do 
+        local overallStatus = nil -- Track if any action caused a wait
+
+        for i, action in ipairs(actions) do
             local conditionConfig = action.condition
             local effectType = action.effect
             local options = action.options or {}
-            -- Owner is determined by the network of the node whose effect is executing
-            local owner = sourceNetwork.owner 
+            local owner = sourceNetwork.owner
 
-            -- Check condition for this specific action, passing sourceNetwork/sourceNode
             if evaluateCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode) then
-                -- Condition passed (or no condition), execute the action
-                
+                local actionStatus = nil -- Status for this specific action
                 -- Resource Effects
                 if effectType == "addResourceToOwner" then
                     local resource = options.resource; local amount = options.amount or 1
@@ -280,38 +330,35 @@ function CardEffects.createActivationEffect(config)
                         local count = owner.network:countNodesByType(nodeType); local totalAmount = count * amountPerNode
                         if totalAmount > 0 then activatingPlayer:addResource(resource, totalAmount) end
                     else print("Warning: Could not execute gainResourcePerNodeActivator.") end
-                elseif effectType == "offerPayment" then
+
+                -- Offer Payment Handlers
+                elseif effectType == "offerPaymentActivator" then
                     local costResource = options.resource
                     local costAmount = options.amount or 1
                     local consequenceActions = options.consequence or {}
-
-                    if activatingPlayer and activatingPlayer.hasResource and activatingPlayer:hasResource(costResource, costAmount) then
-                        local wantsToPay = gameService:askPlayerYesNo(activatingPlayer, string.format("Pay %d %s?", costAmount, costResource))
-                        if wantsToPay then
-                            if activatingPlayer.removeResource then 
-                                activatingPlayer:removeResource(costResource, costAmount)
-                                -- Execute consequence actions - RECURSIVE CALL to a temporary activate function
-                                -- This recursively handles conditions on consequence actions correctly.
-                                -- Pass the *current* sourceNetwork/sourceNode for context.
-                                local tempEffect = CardEffects.createActivationEffect({ actions = consequenceActions })
-                                tempEffect.activate(gameService, activatingPlayer, sourceNetwork, sourceNode) -- Pass current sourceNode
-                            else print("Warning: Player missing removeResource method for offerPayment.") end
-                        end
-                    end
+                    actionStatus = _handleOfferPayment(activatingPlayer, costResource, costAmount, consequenceActions, gameService, activatingPlayer, sourceNetwork, sourceNode)
+                elseif effectType == "offerPaymentOwner" then
+                    local costResource = options.resource
+                    local costAmount = options.amount or 1
+                    local consequenceActions = options.consequence or {}
+                    actionStatus = _handleOfferPayment(owner, costResource, costAmount, consequenceActions, gameService, activatingPlayer, sourceNetwork, sourceNode)
                 else
                     print(string.format("Warning: Unknown effect type '%s' encountered.", effectType))
                 end
-            else
-                 -- Condition failed for this action, skip it. Optionally print a message.
-                 -- print(string.format("Condition failed for action %d (effect: %s)", i, effectType))
-            end -- End condition check
-        end -- End loop actions
-    end -- End activateFunction
-    
-    -- 2. Generate the full description using the public helper
+
+                -- If this action caused a wait, update overall status and stop processing further actions in this effect block
+                if actionStatus == "waiting" then
+                    overallStatus = "waiting"
+                    break -- Stop processing actions for this node
+                end
+            end
+        end
+
+        return overallStatus -- Return the overall status for this node activation
+    end
+
     local fullDescription = CardEffects.generateEffectDescription(config)
-    
-    -- 3. Return the effect object (no condition at this level anymore)
+
     return {
         description = fullDescription,
         activate = activateFunction

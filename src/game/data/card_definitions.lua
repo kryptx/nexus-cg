@@ -672,12 +672,12 @@ definitions["NODE_TECH_KNOW_001"] = {
     id = "NODE_TECH_KNOW_001",
     title = "Quantum Simulation Lab",
     type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 3, data = 3 },
+    buildCost = { material = 6, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
-            { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } },
+            { effect = "offerPaymentOwner", options = { resource = ResourceType.DATA, amount = 2, consequence = { { effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 2 } } } } }
         }
-        -- Description: "Grants 2 Data to the owner."
+        -- Description: "If owner pays 2 data: Owner gains 2 energy."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
@@ -920,17 +920,16 @@ definitions["NODE_KNOW_TECH_001"] = {
     buildCost = { material = 2, data = 5 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
-            { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
+            { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } },
             { effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the owner. Owner gains 1 VP."
+        -- Description: "Grants 2 Data to the owner. Owner gains 1 VP."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
-             { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
-             { effect = "gainVPForOwner", options = { amount = 1 } }
+             { effect = "drawCardsForAllPlayers", options = { amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the activator. Owner gains 1 VP."
+        -- Description: "All players draw 1 card."
     }),
     vpValue = 2,
     imagePath = "assets/images/advanced-algorithm-design.png",
@@ -951,17 +950,17 @@ definitions["NODE_KNOW_RES_001"] = {
     buildCost = { material = 3, data = 5 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
-            { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
-            { effect = "gainVPForOwner", options = { amount = 1 } }
+            { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } },
+            { effect = "offerPaymentOwner", options = { resource = ResourceType.DATA, amount = 1, consequence = { { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } } } } }
         }
-        -- Description: "Grants 1 Material to the owner. Owner gains 1 VP."
+        -- Description: "Owner gains 2 Material. If owner pays 1 data: Owner gains 1 Material."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
         }
-        -- Description: "Grants 1 Material to the activator. Grants 1 Data to the owner."
+        -- Description: "Activator gains 1 Material. Owner gains 1 Data."
     }),
     vpValue = 1,
     imagePath = "assets/images/resource-optimization-ai.png",
@@ -981,7 +980,7 @@ definitions["NODE_RES_004"] = {
     id = "NODE_RES_004",
     title = "Solar Collector Array",
     type = CardTypes.RESOURCE,
-    buildCost = { material = 2, data = 1 },
+    buildCost = { material = 5, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 1 } } }
         -- Description: "Grants 1 Energy to the owner."
@@ -1045,7 +1044,7 @@ definitions["NODE_KNOW_006"] = {
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
             {
-                effect = "offerPayment",
+                effect = "offerPaymentActivator",
                 options = {
                     resource = ResourceType.DATA,
                     amount = 1,
@@ -1109,7 +1108,7 @@ definitions["NODE_TECH_007"] = {
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             {
-                effect = "offerPayment", -- Offer choice to potentially harm self/others
+                effect = "offerPaymentActivator", -- Offer choice to potentially harm self/others
                 options = {
                     resource = ResourceType.ENERGY,
                     amount = 1,

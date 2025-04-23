@@ -19,6 +19,22 @@ local function shuffle(tbl)
     end
 end
 
+-- Helper function for BFS path tracking (shallow copy)
+local function shallow_copy(original)
+    if type(original) ~= 'table' then return original end -- Handle non-tables
+    local copy = {}
+    for k, v in ipairs(original) do
+        copy[k] = v
+    end
+    -- Also copy non-integer keys if any (though path is likely array)
+    for k, v in pairs(original) do
+        if type(k) ~= 'number' or k < 1 or k > #original then
+            copy[k] = v
+        end
+    end
+    return copy
+end
+
 -- Define Turn Phases
 local TurnPhase = {
     ENERGY_GAIN = "Energy Gain", -- Phase for start-of-turn energy gain
@@ -74,6 +90,16 @@ function GameService:new()
     }
     instance.nextLinkId = 1 -- Counter for unique link IDs
     
+    -- State for handling asynchronous player input
+    instance.isWaitingForInput = false
+    instance.pendingQuestion = nil
+    instance.pendingPlayer = nil -- Which player needs to answer
+    instance.pendingInputCallback = nil -- Function to call with the result
+
+    -- State for paused activation path
+    instance.pausedActivationPath = nil      -- The remaining path data { {card=Card, owner=Player}, ... }
+    instance.pausedActivationContext = nil   -- { activatingPlayer=Player, isConvergenceStart=bool }
+
     print("Game Service Initialized.")
     return instance
 end
@@ -418,7 +444,7 @@ function GameService:attemptActivation(state, targetGridX, targetGridY)
 
             -- Activate target card
             if targetCard then
-                targetCard:activateEffect(self, currentPlayer, currentPlayer.network)
+                targetCard:activateEffect(self, currentPlayer, currentPlayer.network, targetCard)
                 table.insert(activationMessages, string.format("  - %s activated!", targetCard.title))
                 print(string.format("    Effect for %s executed.", targetCard.title))
             end
@@ -428,7 +454,7 @@ function GameService:attemptActivation(state, targetGridX, targetGridY)
                  local cardId = path[i]
                  local cardToActivate = currentPlayer.network:getCardById(cardId)
                  if cardToActivate then
-                     cardToActivate:activateEffect(self, currentPlayer, currentPlayer.network)
+                     cardToActivate:activateEffect(self, currentPlayer, currentPlayer.network, cardToActivate)
                      table.insert(activationMessages, string.format("  - %s activated!", cardToActivate.title))
                      print(string.format("    Effect for %s executed.", cardToActivate.title))
                  end
@@ -882,9 +908,16 @@ end
 -- ==============================
 
 -- Attempt Activation targeting any node in any player's network
+-- Returns: success (boolean), message (string)
 function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayerIndex, targetGridX, targetGridY)
     if self.currentPhase ~= TurnPhase.ACTIVATE then
         return false, "Activation not allowed in " .. self.currentPhase .. " phase."
+    end
+    if self.isWaitingForInput then
+        return false, "Cannot activate: Waiting for player input."
+    end
+    if self.pausedActivationPath then
+        return false, "Cannot start new activation: Previous activation is paused."
     end
 
     local activatingPlayer = self.players[activatingPlayerIndex]
@@ -904,7 +937,7 @@ function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayer
         return false, "Cannot activate the Reactor itself."
     end
 
-    print(string.format("[Service] Attempting GLOBAL activation by P%d targeting P%d's %s (%s) at (%d,%d)", 
+    print(string.format("[Service] Attempting GLOBAL activation by P%d targeting P%d's %s (%s) at (%d,%d)",
         activatingPlayerIndex, targetPlayerIndex, targetCard.title, targetCard.id, targetGridX, targetGridY))
 
     local activatorReactor = activatingPlayer.network:findReactor()
@@ -916,11 +949,11 @@ function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayer
 
     if isValid and pathData then
         local path = pathData.path
-        local energyCost = pathData.cost - 1
+        local energyCost = pathData.cost - 1 -- Cost is nodes before reactor
         local isConvergenceStart = pathData.isConvergenceStart
         local pathLength = #path -- Full path length including reactor
 
-        print(string.format("  Global path found! Length (incl. reactor): %d, Nodes in Path (Cost): %d Energy. Convergence Start: %s", 
+        print(string.format("  Global path found! Length (incl. reactor): %d, Nodes in Path (Cost): %d Energy. Convergence Start: %s",
             pathLength, energyCost, tostring(isConvergenceStart)))
 
         if activatingPlayer.resources.energy >= energyCost then
@@ -931,46 +964,10 @@ function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayer
             local activationMessages = {}
             table.insert(activationMessages, string.format("Activated global path (Cost %d E):", energyCost))
 
-            -- Activate target node
-            local targetNodeData = path[1]
-            local theTargetCard = targetNodeData.card
-            local theTargetOwner = targetNodeData.owner
+            -- Process the path, potentially pausing
+            local activationStatus, message = self:_processActivationPath(path, activatingPlayer, isConvergenceStart, activationMessages)
 
-            if isConvergenceStart then
-                 print(string.format("    Activating target %s via CONVERGENCE effect...", targetNodeData.card.title))
-                 theTargetCard:activateConvergence(self, activatingPlayer, theTargetOwner.network)
-            else
-                 print(string.format("    Activating target %s via standard effect...", targetNodeData.card.title))
-                 theTargetCard:activateEffect(self, activatingPlayer, theTargetOwner.network)
-            end
-            table.insert(activationMessages, string.format("  - %s activated!", targetNodeData.card.title))
-
-            -- Activate subsequent nodes in the path (checking owner for correct effect)
-            for i = 2, pathLength do
-                local pathElement = path[i]
-                local cardToActivate = pathElement.card
-                local cardOwner = pathElement.owner -- Need owner to check and for network context
-
-                if cardOwner == activatingPlayer then
-                    -- Node belongs to the activator: Use standard effect
-                    print(string.format("    Activating subsequent node %s (Owned by P%d) via standard effect...", 
-                                        cardToActivate.title, cardOwner.id))
-                    -- Pass activatingPlayer and the actual owner's network
-                    cardToActivate:activateEffect(self, activatingPlayer, cardOwner.network, cardToActivate) 
-                else
-                    -- Node belongs to another player: Use convergence effect
-                    print(string.format("    Activating subsequent node %s (Owned by P%d) via CONVERGENCE effect...", 
-                                        cardToActivate.title, cardOwner.id))
-                    -- Pass activatingPlayer and the actual owner's network
-                    cardToActivate:activateConvergence(self, activatingPlayer, cardOwner.network, cardToActivate) 
-                end
-                
-                table.insert(activationMessages, string.format("  - %s activated!", cardToActivate.title))
-                
-                -- No break needed here, activation proceeds along the paid path
-            end
-            
-            return true, table.concat(activationMessages, "\n")
+            return activationStatus, message -- Return status directly from helper
         else
             print("  Activation failed: Cannot afford energy cost.")
             return false, string.format("Not enough energy. Cost: %d E (Have: %d E)", energyCost, activatingPlayer.resources.energy)
@@ -981,13 +978,138 @@ function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayer
     end
 end
 
--- Helper function for BFS path tracking (shallow copy)
-local function shallow_copy(original)
-    local copy = {}
-    for k, v in ipairs(original) do
-        copy[k] = v
+-- NEW: Helper to process a path (or resume a paused one)
+-- path: The path elements { {card=Card, owner=Player}, ... } to process (full or remaining)
+-- activatingPlayer: The player who initiated the activation
+-- isConvergenceStart: Boolean indicating if the *original* target was via convergence
+-- activationMessages: Table to append messages to (passed by reference essentially)
+-- Returns: success (boolean), message (string)
+function GameService:_processActivationPath(path, activatingPlayer, isConvergenceStart, activationMessages)
+    print(string.format("[Path Processor] Processing %d nodes...", #path))
+
+    for i = 1, #path do
+        local pathElement = path[i]
+        local cardToActivate = pathElement.card
+        local cardOwner = pathElement.owner -- Need owner for context
+
+        if cardToActivate.type == Card.Type.REACTOR then
+            print("    Skipping Reactor activation.")
+            goto continue_loop -- Skip reactor activation
+        end
+
+        local activationStatus = nil
+        local effectType = "standard"
+
+        if i == 1 and isConvergenceStart then -- First node and it was a convergence target
+            print(string.format("    Activating target %s via CONVERGENCE effect...", cardToActivate.title))
+            effectType = "convergence"
+            activationStatus = cardToActivate:activateConvergence(self, activatingPlayer, cardOwner.network, cardToActivate)
+        elseif cardOwner ~= activatingPlayer then -- Subsequent node owned by opponent
+            print(string.format("    Activating subsequent node %s (Owned by P%d) via CONVERGENCE effect...", cardToActivate.title, cardOwner.id))
+            effectType = "convergence"
+            activationStatus = cardToActivate:activateConvergence(self, activatingPlayer, cardOwner.network, cardToActivate)
+        else -- Node owned by activator (target or subsequent)
+            print(string.format("    Activating node %s (Owned by P%d) via standard effect...", cardToActivate.title, cardOwner.id))
+            effectType = "standard"
+            activationStatus = cardToActivate:activateEffect(self, activatingPlayer, cardOwner.network, cardToActivate)
+        end
+
+        table.insert(activationMessages, string.format("  - %s activated (%s)!", cardToActivate.title, effectType))
+
+        -- Check if the activation caused a wait
+        if activationStatus == "waiting" then
+            print("    !! Activation paused by node: " .. cardToActivate.title)
+            -- Store the remaining path and context
+            local remainingPath = {}
+            for j = i + 1, #path do -- Store nodes *after* the current one
+                table.insert(remainingPath, path[j])
+            end
+
+            if #remainingPath > 0 then
+                self.pausedActivationPath = remainingPath
+                self.pausedActivationContext = { activatingPlayer = activatingPlayer, isConvergenceStart = isConvergenceStart } -- Store original context
+                print(string.format("    Stored %d remaining nodes for paused activation.", #remainingPath))
+            else
+                 print("    Wait triggered on the last node. No path remaining to pause.")
+                 self.pausedActivationPath = nil -- Ensure it's cleared
+                 self.pausedActivationContext = nil
+            end
+
+            return true, table.concat(activationMessages, "\n") .. "\nActivation paused, waiting for input..."
+        end
+
+        ::continue_loop::
     end
-    return copy
+
+    -- If loop completes without pausing
+    print("[Path Processor] Path completed successfully.")
+    self.pausedActivationPath = nil -- Clear any old paused state just in case
+    self.pausedActivationContext = nil
+    return true, table.concat(activationMessages, "\n")
+end
+
+-- NEW: Resume a paused activation sequence
+function GameService:resumeActivation()
+    if not self.pausedActivationPath or not self.pausedActivationContext then
+        print("Warning: resumeActivation called but no paused activation found.")
+        return false, "No paused activation found."
+    end
+
+    print("[GameService] Resuming paused activation...")
+    local path = self.pausedActivationPath
+    local context = self.pausedActivationContext
+    local activatingPlayer = context.activatingPlayer
+    local isConvergenceStart = context.isConvergenceStart -- Use original flag
+
+    -- Clear the paused state *before* processing to prevent infinite loops if resume also pauses
+    self.pausedActivationPath = nil
+    self.pausedActivationContext = nil
+
+    -- Create a new message table for the resumed part
+    local resumeMessages = {"[Resumed Activation]"}
+
+    -- Process the remaining path
+    local activationStatus, message = self:_processActivationPath(path, activatingPlayer, isConvergenceStart, resumeMessages)
+
+    -- TODO: How to report the status of the resumed activation back to the UI?
+    -- For now, just print it. Might need another mechanism.
+    print(message)
+
+    return activationStatus, message -- Return the final status of the resumed part
+end
+
+-- Provide the answer to a pending Yes/No request
+function GameService:providePlayerYesNoAnswer(result)
+    if not self.isWaitingForInput then
+        print("Warning: providePlayerYesNoAnswer called when not waiting for input.")
+        return
+    end
+    if type(result) ~= "boolean" then
+        print("Error: Invalid result type provided to providePlayerYesNoAnswer. Expected boolean.")
+        return
+    end
+
+    print(string.format("[GameService] Received answer '%s' for player %d.", tostring(result), self.pendingPlayer.id))
+
+    local callback = self.pendingInputCallback
+    -- Clear waiting state *before* calling callback
+    self.isWaitingForInput = false
+    self.pendingPlayer = nil
+    self.pendingQuestion = nil
+    self.pendingInputCallback = nil
+
+    -- Execute the stored callback with the result
+    if callback then
+        callback(result)
+        print("[GameService] Executed pending input callback.")
+    else
+        print("Warning: No pending callback found to execute.")
+    end
+
+    -- After callback finishes, check if we need to resume an activation
+    if self.pausedActivationPath then
+        self:resumeActivation()
+    end
 end
 
 -- Find Activation Path (Global BFS)
@@ -1170,6 +1292,11 @@ end
 -- Calculate and add start-of-turn energy gain based on GDD 4.8
 function GameService:performEnergyGain(player)
     if not player then return end
+    -- If waiting for input, do nothing (prevents potential issues during paused state)
+    if self.isWaitingForInput then
+        print("[Energy Gain] Skipped for Player " .. player.id .. " - Waiting for input.")
+        return
+    end
 
     local energyGain = 1 -- Base gain for Reactor
     local numOpponents = #self.players - 1
@@ -1177,7 +1304,7 @@ function GameService:performEnergyGain(player)
 
     print(string.format("[Energy Gain] Calculating for Player %d (%s). Base gain: %d", player.id, player.name, energyGain))
 
-    local linkedOpponentIndices = {} 
+    local linkedOpponentIndices = {}
     local numLinksToOpponents = 0
     local numUniqueOpponentsLinked = 0
 
@@ -1225,6 +1352,26 @@ function GameService:performEnergyGain(player)
     end
 end
 
--- Return both GameService and TurnPhase
+-- NEW: Request Yes/No input from a player
+function GameService:requestPlayerYesNo(player, question, callback)
+    if self.isWaitingForInput then
+        print("Warning: GameService already waiting for input. Ignoring new request.")
+        return -- Avoid overwriting a pending request
+    end
+    if not player or not question or not callback then
+        print("Error: Invalid arguments for requestPlayerYesNo.")
+        return
+    end
+
+    print(string.format("[GameService] Requesting Yes/No input from Player %d: '%s'", player.id, question))
+    self.isWaitingForInput = true
+    self.pendingPlayer = player
+    self.pendingQuestion = question
+    self.pendingInputCallback = callback
+
+    -- NOTE: The game state (e.g., PlayState) needs to observe 'isWaitingForInput'
+    -- and 'pendingQuestion'/'pendingPlayer' to display the prompt.
+end
+
 return { GameService = GameService, TurnPhase = TurnPhase } 
 

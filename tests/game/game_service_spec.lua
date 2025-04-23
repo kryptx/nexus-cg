@@ -949,8 +949,8 @@ describe("GameService Module", function()
             assert.is_true(success)
             -- Path cost is #path - 1 = 3 - 1 = 2
             assert.are.equal(initialEnergy - 2, p1.resources.energy, "Should spend 2 energy")
-            assert.matches("P2 Target activated!", msg)
-            assert.matches("P1 Intermediate activated!", msg)
+            assert.matches("P2 Target activated", msg)
+            assert.matches("P1 Intermediate activated", msg)
             
             -- Verify the intermediate node's effect was called
             assert.spy(p1_inter.activationEffect.activate).was.called(1)

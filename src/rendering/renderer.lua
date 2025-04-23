@@ -1084,4 +1084,82 @@ function Renderer:drawUI(player, hoveredLinkType, currentPhase, convergenceSelec
     love.graphics.setLineWidth(originalLineWidth)
 end
 
+-- NEW: Draw Yes/No Prompt Box
+-- Draws a modal box with the question and returns bounds for Yes/No buttons
+-- Returns: yesBounds {x, y, w, h}, noBounds {x, y, w, h}
+function Renderer:drawYesNoPrompt(question)
+    local screenW = love.graphics.getWidth()
+    local screenH = love.graphics.getHeight()
+
+    -- Box Appearance
+    local boxWidth = screenW * 0.5  -- 50% of screen width
+    local boxHeight = screenH * 0.3 -- 30% of screen height
+    local boxX = (screenW - boxWidth) / 2
+    local boxY = (screenH - boxHeight) / 2
+    local padding = 20
+    local cornerRadius = 5
+
+    -- Button Appearance
+    local buttonWidth = 100
+    local buttonHeight = 40
+    local buttonGap = 30
+    local buttonsTotalWidth = (buttonWidth * 2) + buttonGap
+    local buttonStartY = boxY + boxHeight - padding - buttonHeight
+    local buttonStartX = boxX + (boxWidth - buttonsTotalWidth) / 2
+    local yesButtonX = buttonStartX
+    local noButtonX = buttonStartX + buttonWidth + buttonGap
+
+    -- Text Appearance
+    local questionFont = self.fonts.uiStandard or love.graphics.getFont()
+    local buttonFont = self.fonts.uiStandard or love.graphics.getFont()
+    local questionMaxWidth = boxWidth - (2 * padding)
+    local questionTextY = boxY + padding
+
+    -- 1. Draw Background Overlay (dim the background)
+    local originalColor = {love.graphics.getColor()}
+    love.graphics.setColor(0, 0, 0, 0.7) -- Dark semi-transparent overlay
+    love.graphics.rectangle("fill", 0, 0, screenW, screenH)
+
+    -- 2. Draw Prompt Box Background
+    love.graphics.setColor(StyleGuide.PROMPT_BOX_BACKGROUND_COLOR or {0.2, 0.2, 0.25, 1}) -- Use style or fallback
+    love.graphics.rectangle("fill", boxX, boxY, boxWidth, boxHeight, cornerRadius, cornerRadius)
+
+    -- 3. Draw Prompt Box Border
+    local originalLineWidth = love.graphics.getLineWidth()
+    love.graphics.setLineWidth(2)
+    love.graphics.setColor(StyleGuide.PROMPT_BOX_BORDER_COLOR or {0.9, 0.9, 0.9, 1}) -- Use style or fallback
+    love.graphics.rectangle("line", boxX, boxY, boxWidth, boxHeight, cornerRadius, cornerRadius)
+    love.graphics.setLineWidth(originalLineWidth)
+
+    -- 4. Draw Question Text
+    love.graphics.setFont(questionFont)
+    love.graphics.setColor(StyleGuide.PROMPT_BOX_TEXT_COLOR or {1, 1, 1, 1}) -- Use style or fallback
+    love.graphics.printf(question or "Confirm?", boxX + padding, questionTextY, questionMaxWidth, "center")
+
+    -- 5. Draw Buttons (Simple Rectangles for now, could use Button class later)
+    -- Yes Button
+    local yesBounds = { x = yesButtonX, y = buttonStartY, w = buttonWidth, h = buttonHeight }
+    love.graphics.setColor(0.3, 0.7, 0.3, 1) -- Greenish
+    love.graphics.rectangle("fill", yesBounds.x, yesBounds.y, yesBounds.w, yesBounds.h, cornerRadius, cornerRadius)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.rectangle("line", yesBounds.x, yesBounds.y, yesBounds.w, yesBounds.h, cornerRadius, cornerRadius)
+    love.graphics.setFont(buttonFont)
+    love.graphics.printf("Yes", yesBounds.x, yesBounds.y + (buttonHeight - buttonFont:getHeight()) / 2, buttonWidth, "center")
+
+    -- No Button
+    local noBounds = { x = noButtonX, y = buttonStartY, w = buttonWidth, h = buttonHeight }
+    love.graphics.setColor(0.7, 0.3, 0.3, 1) -- Reddish
+    love.graphics.rectangle("fill", noBounds.x, noBounds.y, noBounds.w, noBounds.h, cornerRadius, cornerRadius)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.rectangle("line", noBounds.x, noBounds.y, noBounds.w, noBounds.h, cornerRadius, cornerRadius)
+    love.graphics.setFont(buttonFont)
+    love.graphics.printf("No", noBounds.x, noBounds.y + (buttonHeight - buttonFont:getHeight()) / 2, buttonWidth, "center")
+
+    -- Restore original color
+    love.graphics.setColor(originalColor)
+
+    -- Return the calculated bounds for click detection
+    return yesBounds, noBounds
+end
+
 return Renderer

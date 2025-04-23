@@ -125,6 +125,12 @@ function PlayState:init(gameService)
     self.hoverGridX = nil
     self.hoverGridY = nil
 
+    -- State for Yes/No Prompt
+    self.isDisplayingPrompt = false -- NEW: Flag if prompt is active
+    self.promptQuestion = nil       -- NEW: Text of the question
+    self.promptYesBounds = nil      -- NEW: Bounding box for Yes button (set by renderer)
+    self.promptNoBounds = nil       -- NEW: Bounding box for No button (set by renderer)
+
     -- Initialize Game Service (either use injected or create new)
     self.gameService = gameService or GameService:new()
 
@@ -301,6 +307,13 @@ function PlayState:update(stateManager, dt)
     local mx, my = love.mouse.getPosition()
     local mouseDown = love.mouse.isDown(1)
 
+    -- If displaying prompt, only update essential UI or nothing game-related
+    if self.isDisplayingPrompt then
+        -- Optionally update prompt buttons if they have hover states
+        -- For now, no updates needed while prompt is up, handled in draw/mousepressed
+        return
+    end
+
     if self.isPaused then
         -- Update only pause menu buttons when paused
         for _, button in ipairs(self.pauseMenuButtons) do
@@ -319,7 +332,7 @@ function PlayState:update(stateManager, dt)
         end
     end
 
-    -- Keyboard Panning Logic (only if not paused)
+    -- Keyboard Panning Logic (only if not paused and not displaying prompt)
     local effectivePanSpeed = KEYBOARD_PAN_SPEED / self.cameraZoom
     if love.keyboard.isDown('w') or love.keyboard.isDown('up') then
         self.cameraY = self.cameraY - effectivePanSpeed * dt
@@ -401,13 +414,15 @@ function PlayState:draw(stateManager)
     love.graphics.pop()
 
     -- Draw grid hover highlight (only for current player's grid space)
-    local selectedCard = self.selectedHandIndex and currentPlayer.hand[self.selectedHandIndex] or nil
-    -- Only draw highlight if a card is selected AND we are hovering over the grid
-    if selectedCard and self.hoverGridX ~= nil and self.hoverGridY ~= nil and self.currentPhase == TurnPhase.BUILD then
-        -- Check placement validity using the game service (ensure this function exists!)
-        -- We use the hoverGridX/Y calculated relative to the current player's origin
-        local isValid = self.gameService:isPlacementValid(self.gameService.currentPlayerIndex, selectedCard, self.hoverGridX, self.hoverGridY)
-        self.renderer:drawHoverHighlight(self.hoverGridX, self.hoverGridY, self.cameraX, self.cameraY, self.cameraZoom, selectedCard, isValid, currentOrigin.x, currentOrigin.y)
+    if not self.isDisplayingPrompt then
+        local selectedCard = self.selectedHandIndex and currentPlayer.hand[self.selectedHandIndex] or nil
+        -- Only draw highlight if a card is selected AND we are hovering over the grid
+        if selectedCard and self.hoverGridX ~= nil and self.hoverGridY ~= nil and self.currentPhase == TurnPhase.BUILD then
+            -- Check placement validity using the game service (ensure this function exists!)
+            -- We use the hoverGridX/Y calculated relative to the current player's origin
+            local isValid = self.gameService:isPlacementValid(self.gameService.currentPlayerIndex, selectedCard, self.hoverGridX, self.hoverGridY)
+            self.renderer:drawHoverHighlight(self.hoverGridX, self.hoverGridY, self.cameraX, self.cameraY, self.cameraZoom, selectedCard, isValid, currentOrigin.x, currentOrigin.y)
+        end
     end
 
     -- Ensure default line width for screen-space UI (Hand)
@@ -416,7 +431,7 @@ function PlayState:draw(stateManager)
     self.handCardBounds = self.renderer:drawHand(currentPlayer, self.selectedHandIndex)
     
     -- Draw hovered hand card preview near the mouse
-    if self.hoveredHandIndex then
+    if not self.isDisplayingPrompt and self.hoveredHandIndex then
         local hoveredCard = currentPlayer.hand[self.hoveredHandIndex]
         if hoveredCard then
             local mouseX, mouseY = love.mouse.getPosition()
@@ -464,7 +479,7 @@ function PlayState:draw(stateManager)
     love.graphics.print("MMB Drag / WASD: Pan | Wheel: Zoom | C: Test Converge | P: Next Phase", screenW / 2 - 200, screenH - 20)
 
     -- [[[ Draw Help Box (if enabled) ]]]
-    if self.showHelpBox and self.currentPhase then
+    if self.showHelpBox and self.currentPhase and not self.isDisplayingPrompt then
         local helpText = getPhaseDescription(self.currentPhase)
         local helpPadding = 10
         local helpBoxMaxWidth = 250 -- Max width before text wraps
@@ -498,6 +513,28 @@ function PlayState:draw(stateManager)
         love.graphics.setColor(originalColor) -- Restore original color
     end
     -- [[[ End Draw Help Box ]]]
+
+    -- NEW: Check if we need to display the prompt
+    if self.gameService.isWaitingForInput then
+        self.isDisplayingPrompt = true -- Sync state
+        self.promptQuestion = self.gameService.pendingQuestion
+        if self.renderer.drawYesNoPrompt then
+            -- Draw the prompt and store the button bounds it returns
+            self.promptYesBounds, self.promptNoBounds = self.renderer:drawYesNoPrompt(self.promptQuestion)
+        else
+            -- Fallback if renderer function doesn't exist yet
+            love.graphics.setColor(1,0,0,1)
+            love.graphics.print("ERROR: Renderer:drawYesNoPrompt not implemented!", screenW/2 - 150, screenH/2)
+        end
+    else
+        -- Clear prompt state if GameService is no longer waiting
+        if self.isDisplayingPrompt then
+            self.isDisplayingPrompt = false
+            self.promptQuestion = nil
+            self.promptYesBounds = nil
+            self.promptNoBounds = nil
+        end
+    end
 
     -- Restore original font before drawing pause menu (if needed)
     love.graphics.setFont(originalFont)
@@ -536,6 +573,26 @@ local function isPointInRect(px, py, rect)
 end
 
 function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
+    -- NEW: Check if prompt is active FIRST
+    if self.isDisplayingPrompt then
+        if button == 1 then -- Only left click for prompt buttons
+            if self.promptYesBounds and isPointInRect(x, y, self.promptYesBounds) then
+                print("[PlayState] Clicked YES on prompt.")
+                self.gameService:providePlayerYesNoAnswer(true)
+                -- State is cleared in draw based on gameService.isWaitingForInput
+                return -- Handled the click
+            elseif self.promptNoBounds and isPointInRect(x, y, self.promptNoBounds) then
+                print("[PlayState] Clicked NO on prompt.")
+                self.gameService:providePlayerYesNoAnswer(false)
+                -- State is cleared in draw based on gameService.isWaitingForInput
+                return -- Handled the click
+            end
+            -- If clicked elsewhere while prompt is up, do nothing
+            print("[PlayState] Clicked outside prompt buttons while prompt active.")
+            return
+        end
+    end
+
     if self.isPaused then
         if button == 1 then -- Only handle left clicks for buttons
             for _, pbutton in ipairs(self.pauseMenuButtons) do
@@ -556,6 +613,13 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
         if element.handleMousePress and element:handleMousePress(x, y) then
             return -- UI element handled the click
         end
+    end
+
+    -- Check if the click should be ignored because we are waiting for input but didn't click the prompt
+    -- This check might be redundant now due to the check at the start of the function, but safe to keep.
+    if self.gameService.isWaitingForInput then
+        print("[PlayState] Ignoring game click while waiting for prompt input.")
+        return
     end
 
     local currentPlayerIndex = self.gameService.currentPlayerIndex
@@ -846,6 +910,11 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
 end
 
 function PlayState:mousereleased(stateManager, x, y, button, istouch)
+    -- Ignore if prompt is active, except for stopping panning
+    if self.isDisplayingPrompt and button ~= 3 then
+        return
+    end
+
     if self.isPaused then
         -- Potentially handle pause button release if needed by Button class,
         -- but likely handled on press. Stop panning regardless.
@@ -863,6 +932,12 @@ function PlayState:mousereleased(stateManager, x, y, button, istouch)
 end
 
 function PlayState:mousemoved(stateManager, x, y, dx, dy, istouch)
+    -- Ignore if prompt is active, except for panning
+    if self.isDisplayingPrompt and not self.isPanning then
+        -- TODO: Could update hover state for Yes/No buttons here if desired
+        return
+    end
+
     if self.isPaused then
         -- Update pause button hover state if implemented in Button class
         -- For now, just prevent panning/game hover updates.
@@ -922,9 +997,8 @@ function PlayState:mousemoved(stateManager, x, y, dx, dy, istouch)
 end
 
 function PlayState:wheelmoved(stateManager, x, y)
-    if self.isPaused then
-        return
-    end
+    if self.isDisplayingPrompt then return end -- Ignore zoom if prompt is up
+    if self.isPaused then return end
 
     -- Zoom in/out based on scroll direction (y > 0 is scroll up/zoom in)
     local zoomFactor = 1.1
@@ -953,12 +1027,21 @@ end
 
 function PlayState:keypressed(stateManager, key)
     if key == "escape" then
+        -- If prompt is active, escape should perhaps cancel it?
+        if self.isDisplayingPrompt then
+            print("[PlayState] Escape pressed during prompt - Cancelling input.")
+            self.gameService:providePlayerYesNoAnswer(false) -- Assume cancel = No
+            -- State is cleared in draw based on gameService.isWaitingForInput
+            return
+        end
         self.isPaused = not self.isPaused -- Toggle pause state
     elseif key == "p" then -- Debug: Advance Phase
-        if not self.isPaused then
+        if not self.isPaused and not self.isDisplayingPrompt then
             self:advancePhase()
         end
     end
+    -- Ignore other keypresses if paused or prompt is active?
+    if self.isPaused or self.isDisplayingPrompt then return end
 end
 
 function PlayState:resetConvergenceSelection()
