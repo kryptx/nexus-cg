@@ -19,13 +19,13 @@ local function generateResourceDescription(actionEffect, resource, amount)
     local resourceName = resource:sub(1, 1):upper() .. resource:sub(2) -- Capitalize first letter
     
     if actionEffect == "addResourceToOwner" then
-        return string.format("Grants %d %s to the owner.", amount, resourceName)
+        return string.format("Owner gains %d %s.", amount, resourceName)
     elseif actionEffect == "addResourceToActivator" then
-        return string.format("Grants %d %s to the activator.", amount, resourceName)
+        return string.format("Activator gains %d %s.", amount, resourceName)
     elseif actionEffect == "addResourceToBoth" then
-        return string.format("Grants %d %s to both the owner and activator.", amount, resourceName)
+        return string.format("Owner and activator gain %d %s.", amount, resourceName)
     elseif actionEffect == "addResourceToAllPlayers" then
-        return string.format("Grants %d %s to all players.", amount, resourceName)
+        return string.format("All players gain %d %s.", amount, resourceName)
     elseif actionEffect == "gainResourcePerNodeOwner" then
          local nodeType = "Any" -- Placeholder, actual type depends on options
          return string.format("Owner gains %d %s per %s node...", amount, resourceName, nodeType)

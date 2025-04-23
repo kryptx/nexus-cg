@@ -431,16 +431,6 @@ function PlayState:draw(stateManager)
             local previewX = mouseX - previewCardW / 2 -- Center using scaled width
             local previewY = mouseY - previewCardH - gap -- Position above using scaled height
 
-            -- Clamp position to stay within screen bounds using scaled dimensions
-            if previewX + previewCardW > screenW then
-                previewX = screenW - previewCardW
-            end
-            if previewY + previewCardH > screenH then
-                previewY = screenH - previewCardH
-            end
-            previewX = math.max(0, previewX)
-            previewY = math.max(0, previewY)
-
             self.renderer:drawHoveredHandCard(hoveredCard, previewX, previewY, previewScale) -- Pass scale
         end
     end

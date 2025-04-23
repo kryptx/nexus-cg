@@ -492,7 +492,16 @@ function Renderer:_drawCardInternal(card, x, y, context)
     local alphaOverride = context.alpha or 1.0
     local useInvalidBorder = context.borderType == "invalid"
 
-    -- Base background
+    -- Draw Outer Border FIRST
+    local originalLineWidth = love.graphics.getLineWidth()
+    love.graphics.setLineWidth(self.PORT_RADIUS * 2)
+    love.graphics.setColor(0.15, 0.15, 0.15, 1.0 * alphaOverride) -- Always black
+    local cornerRadius = 2 -- Adjust as needed
+    love.graphics.rectangle("line", x, y, CARD_WIDTH, CARD_HEIGHT, cornerRadius, cornerRadius)
+    love.graphics.setLineWidth(originalLineWidth) -- Restore line width before drawing content
+    love.graphics.setColor(originalColor) -- Restore original color
+
+    -- Base background (drawn over the border outline)
     local baseR, baseG, baseB = 0.8, 0.8, 0.8
     if card.type == Card.Type.REACTOR then baseR, baseG, baseB = 1, 1, 0.5 end
     love.graphics.setColor(baseR, baseG, baseB, 1.0 * alphaOverride)
@@ -654,14 +663,6 @@ function Renderer:_drawCardInternal(card, x, y, context)
     self:_drawTextScaled(activationText, x + margin + 2, effectsTextYBase, effectsLimit, "left", effectStyleName, effectBaseFontSize, targetScale_effect, alphaOverride)
     self:_drawTextScaled(convergenceText, x + margin + 2, effectsTextYBase + effectLineHeight * 3, effectsLimit, "left", effectStyleName, effectBaseFontSize, targetScale_effect, alphaOverride)
 
-    -- Draw Outer Border
-    if useInvalidBorder then
-        love.graphics.setColor(1, 0, 0, 1.0 * alphaOverride)
-    else
-        love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride)
-    end
-    love.graphics.rectangle("line", x, y, CARD_WIDTH, CARD_HEIGHT)
-
     love.graphics.setColor(originalColor)
     -- Draw Connection Ports
     self:drawCardPorts(card, x, y, alphaOverride, context.activeLinks)
@@ -761,9 +762,36 @@ function Renderer:drawHoveredHandCard(card, sx, sy, scale)
     local originalColor = {love.graphics.getColor()}
     local originalLineWidth = love.graphics.getLineWidth()
 
+    -- Calculate adjusted position to keep preview fully on screen
+    local screenWidth = love.graphics.getWidth()
+    local screenHeight = love.graphics.getHeight()
+    -- Border extends half its line width outwards. Line width is PORT_RADIUS * 2.
+    local borderWidthOut = self.PORT_RADIUS * scale
+    local cardDrawWidth = CARD_WIDTH * scale
+    local cardDrawHeight = CARD_HEIGHT * scale
+
+    local drawX = sx
+    local drawY = sy
+
+    -- Adjust X to stay within screen bounds
+    if drawX - borderWidthOut < 0 then
+        drawX = borderWidthOut -- Align left edge
+    elseif drawX + cardDrawWidth + borderWidthOut > screenWidth then
+        drawX = screenWidth - cardDrawWidth - borderWidthOut -- Align right edge
+    end
+
+    -- Adjust Y to stay within screen bounds
+    if drawY - borderWidthOut < 0 then
+        drawY = borderWidthOut -- Align top edge
+    elseif drawY + cardDrawHeight + borderWidthOut > screenHeight then
+        drawY = screenHeight - cardDrawHeight - borderWidthOut -- Align bottom edge
+    end
+
     love.graphics.push()
-    love.graphics.translate(sx, sy)
+    -- Use adjusted coordinates for translation
+    love.graphics.translate(drawX, drawY)
     love.graphics.scale(scale, scale)
+    -- Use original line width divided by scale for consistent border thickness
     love.graphics.setLineWidth(originalLineWidth / scale)
 
     local context = {
@@ -811,54 +839,91 @@ function Renderer:drawHand(player, selectedIndex)
     love.graphics.setColor(labelStyle.color)
     love.graphics.print(string.format("%s Hand (%d):", player.name, #player.hand), HAND_START_X, handStartY - 20)
 
-    local cardTitleStyle = self.styleGuide.UI_HAND_LABEL
-    love.graphics.setFont(self.fonts[cardTitleStyle.fontName])
+    -- Define context for hand cards (using PREVIEW styles, scaled externally)
+    local handCardContext = {
+        stylePrefix = "PREVIEW",
+        baseFontSizes = {
+            title = self.uiBaseStandardSize,
+            cost = self.uiBaseSmallSize,
+            effect = self.uiBaseMiniSize,
+            artLabel = self.uiBaseStandardSize
+        },
+        targetScales = { -- Target scales are 1.0 as overall scaling is done via love.graphics.scale
+            title = 1.0,
+            cost = 1.0,
+            effect = 1.0, -- Adjusted for potentially smaller size
+            artLabel = 1.0
+        },
+        alpha = 1.0,
+        borderType = "normal"
+        -- activeLinks is not relevant for hand cards
+    }
 
+    -- Draw non-selected cards first
     for i, card in ipairs(player.hand) do
         if i ~= selectedIndex then
             local sx = HAND_START_X + (i-1) * (HAND_CARD_WIDTH + HAND_SPACING)
             local sy = handStartY
             table.insert(handBounds, { index = i, x = sx, y = sy, w = HAND_CARD_WIDTH, h = HAND_CARD_HEIGHT })
-            love.graphics.setColor(0.8, 0.8, 1, 1)
-            love.graphics.rectangle("fill", sx, sy, HAND_CARD_WIDTH, HAND_CARD_HEIGHT)
-            love.graphics.setColor(0, 0, 0, 1)
-            love.graphics.rectangle("line", sx, sy, HAND_CARD_WIDTH, HAND_CARD_HEIGHT)
-            love.graphics.setColor(cardTitleStyle.color)
-            love.graphics.printf(card.title, sx + 3, sy + 3, HAND_CARD_WIDTH - 6, "left")
+
+            -- Draw the actual card scaled down
+            love.graphics.push()
+            love.graphics.translate(sx, sy)
+            love.graphics.scale(HAND_CARD_SCALE, HAND_CARD_SCALE)
+            love.graphics.setLineWidth(originalLineWidth / HAND_CARD_SCALE) -- Adjust line width for scale
+
+            self:_drawCardInternal(card, 0, 0, handCardContext)
+
+            love.graphics.pop()
+            -- Restore line width for next iteration or selected card
+            love.graphics.setLineWidth(originalLineWidth)
         end
     end
 
+    -- Draw selected card last (raised and highlighted)
     if selectedIndex then
         local card = player.hand[selectedIndex]
         if card then
             local i = selectedIndex
             local sx = HAND_START_X + (i-1) * (HAND_CARD_WIDTH + HAND_SPACING)
-            local sy = handStartY - SELECTED_CARD_RAISE
+            local sy = handStartY - SELECTED_CARD_RAISE -- Raised position
             local boundsFound = false
             for k, b in ipairs(handBounds) do
                 if b.index == i then
+                    -- Update existing bounds y to original position for click detection
                     b.y = handStartY
                     boundsFound = true
                     break
                 end
             end
             if not boundsFound then
+                -- Insert bounds at original y if it wasn't drawn in the first loop (shouldn't happen)
                 table.insert(handBounds, { index = i, x = sx, y = handStartY, w = HAND_CARD_WIDTH, h = HAND_CARD_HEIGHT })
             end
 
-            love.graphics.setColor(1, 1, 0.8, 1)
-            love.graphics.rectangle("fill", sx, sy, HAND_CARD_WIDTH, HAND_CARD_HEIGHT)
-            love.graphics.setColor(0, 0, 0, 1)
-            love.graphics.setLineWidth(3)
-            love.graphics.rectangle("line", sx, sy, HAND_CARD_WIDTH, HAND_CARD_HEIGHT)
-            love.graphics.setColor(cardTitleStyle.color)
-            love.graphics.printf(card.title, sx + 3, sy + 3, HAND_CARD_WIDTH - 6, "left")
+            -- Draw the selected card scaled down but raised
+            love.graphics.push()
+            love.graphics.translate(sx, sy)
+            love.graphics.scale(HAND_CARD_SCALE, HAND_CARD_SCALE)
+            love.graphics.setLineWidth(originalLineWidth / HAND_CARD_SCALE) -- Adjust line width for scale
+
+            self:_drawCardInternal(card, 0, 0, handCardContext)
+
+            -- Draw highlight border *after* internal card drawing, within the scaled context
+            love.graphics.setLineWidth(3 / HAND_CARD_SCALE) -- Make highlight border thick
+            love.graphics.setColor(0, 0, 0, 1) -- Black border highlight
+            local cornerRadius = 2 / HAND_CARD_SCALE -- Use scaled corner radius consistent with _drawCardInternal border
+            love.graphics.rectangle("line", 0, 0, CARD_WIDTH, CARD_HEIGHT, cornerRadius, cornerRadius)
+
+            love.graphics.pop()
+            -- Restore line width after drawing selected card
+            love.graphics.setLineWidth(originalLineWidth)
         end
     end
 
     love.graphics.setFont(originalFont)
     love.graphics.setColor(originalColor)
-    love.graphics.setLineWidth(originalLineWidth)
+    -- No need to restore line width here, done inside/after loops
 
     return handBounds
 end
