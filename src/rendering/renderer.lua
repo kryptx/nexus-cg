@@ -637,19 +637,9 @@ function Renderer:_drawCardInternal(card, x, y, context)
     end
 
     -- 3. Draw Effects Box Area
-    love.graphics.setColor(0.9, 0.9, 0.9, 1.0 * alphaOverride)
-    -- Use areaW for effects box width
-    love.graphics.rectangle("fill", x + margin, effectsY, areaW, effectsH)
-    love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride)
-    -- Use areaW for effects box width
-    love.graphics.rectangle("line", x + margin, effectsY, areaW, effectsH)
     local effectBaseFontSize = context.baseFontSizes.effect
-    local activationText = "Activation: " .. (card:getActivationDescription() or "No effect")
-    local convergenceText = "Convergence: " .. (card:getConvergenceDescription() or "No effect")
-    local effectsLimit = (CARD_WIDTH - (2 * margin) - 4)
-    local effectsTextYBase = effectsY + 2
-    local effectStyleName = context.stylePrefix .. "_EFFECT"
     local targetScale_effect = context.targetScales.effect
+    local effectStyleName = context.stylePrefix .. "_EFFECT"
     local effectFont = self.fonts[self.styleGuide[effectStyleName].fontName] or love.graphics.getFont()
     local fontMultiplier = 1
     if string.find(self.styleGuide[effectStyleName].fontName, "world") then
@@ -658,10 +648,44 @@ function Renderer:_drawCardInternal(card, x, y, context)
         fontMultiplier = self.uiFontMultiplier
     end
     local effectLineHeight = effectFont:getHeight() / fontMultiplier * targetScale_effect
+    local effectPadding = 2
+    local totalEffectAreaH = CARD_HEIGHT - headerH - imageH - (2 * margin)
+    local convergenceBoxH = totalEffectAreaH * 0.5 -- Convergence gets 50% of the space
+    local activationBoxH = totalEffectAreaH - convergenceBoxH -- Activation gets the rest
+    local convergenceBoxY = effectsY + activationBoxH
 
-    love.graphics.setColor(originalColor)
-    self:_drawTextScaled(activationText, x + margin + 2, effectsTextYBase, effectsLimit, "left", effectStyleName, effectBaseFontSize, targetScale_effect, alphaOverride)
-    self:_drawTextScaled(convergenceText, x + margin + 2, effectsTextYBase + effectLineHeight * 3, effectsLimit, "left", effectStyleName, effectBaseFontSize, targetScale_effect, alphaOverride)
+    -- Activation Box (Light Background)
+    love.graphics.setColor(0.9, 0.9, 0.9, 1.0 * alphaOverride)
+    love.graphics.rectangle("fill", x + margin, effectsY, areaW, activationBoxH)
+    love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride)
+    love.graphics.rectangle("line", x + margin, effectsY, areaW, activationBoxH)
+
+    -- Convergence Box (Dark Background)
+    love.graphics.setColor(0.2, 0.2, 0.2, 1.0 * alphaOverride) -- Dark gray
+    love.graphics.rectangle("fill", x + margin, convergenceBoxY, areaW, convergenceBoxH)
+    love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride) -- Black border
+    love.graphics.rectangle("line", x + margin, convergenceBoxY, areaW, convergenceBoxH)
+
+    -- Fetch Effect Texts (without labels)
+    local activationText = card:getActivationDescription() or "No effect"
+    local convergenceText = card:getConvergenceDescription() or "No effect"
+    local effectsLimit = areaW - (2 * effectPadding)
+
+    -- Draw Activation Text (Light background -> use default text color)
+    love.graphics.setColor(originalColor) -- Use style's default color
+    local activationTextY = effectsY + effectPadding
+    self:_drawTextScaled(activationText, x + margin + effectPadding, activationTextY, effectsLimit, "left", effectStyleName, effectBaseFontSize, targetScale_effect, alphaOverride)
+
+    -- Draw Convergence Text (Dark background -> use light text color)
+    local convergenceTextColor = {1, 1, 1, 1} -- White text
+    love.graphics.setColor(convergenceTextColor[1], convergenceTextColor[2], convergenceTextColor[3], (convergenceTextColor[4] or 1) * alphaOverride)
+    local convergenceTextY = convergenceBoxY + effectPadding
+    -- Override text color in _drawTextScaled call for convergence
+    -- Store original style color, apply override, then restore
+    local originalStyleColor = self.styleGuide[effectStyleName].color
+    self.styleGuide[effectStyleName].color = convergenceTextColor
+    self:_drawTextScaled(convergenceText, x + margin + effectPadding, convergenceTextY, effectsLimit, "left", effectStyleName, effectBaseFontSize, targetScale_effect, alphaOverride)
+    self.styleGuide[effectStyleName].color = originalStyleColor -- Restore original style color
 
     love.graphics.setColor(originalColor)
     -- Draw Connection Ports
