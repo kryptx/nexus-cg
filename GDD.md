@@ -32,7 +32,7 @@ The core theme revolves around shaping an evolving ecosystem where individual pl
 ### 4.1 Starting Conditions
 
 *   **Player Setup:** Each player receives:
-    *   A player board (Functionality TBD: resource tracking, VP tracking, etc.).
+    *   A player board: used for tracking Victory Points, turn phases, link markers, and storing resources.
     *   One "Reactor" card placed in their starting play area. This serves as the **base**. The Reactor has **all 8 connection ports** according to the standard convention (See 4.3) and allows adjacent placement without requiring an initial Output->Input link.
     *   **One Genesis Card:** Create a separate pool of "Genesis Cards" (See 5.1.A). Each player draws one Genesis Card at random from this pool and adds it to their hand. Shuffle any remaining Genesis Cards into the main Node deck before proceeding.
     *   A starting hand of **2** additional cards dealt from the node deck. This forms a starting hand of **3** cards. (deal these *after* the Genesis Card).
@@ -42,7 +42,6 @@ The core theme revolves around shaping an evolving ecosystem where individual pl
     *   The main deck (Node cards) is shuffled and placed centrally.
     *   The Paradigm Shift deck is shuffled (including Genesis Paradigms). One Genesis Paradigm is revealed. (See 4.7).
     *   Resource tokens (Energy, Data, Material) and Victory Point tokens are placed in a general supply.
-    *   Optional: Central "Convergence Map" board placed centrally.
 
 ### 4.2 Core Loop
 
@@ -173,7 +172,7 @@ A player's turn consists of the following phases, performed in order:
     *   **Endgame Objectives:** VP awarded from completing specific public or private objective cards (Mechanism TBD).
     *   **Paradigm Effects:** Some Paradigm cards might provide end-game scoring bonuses.
     *   **(Optional) Resource Conversion:** Convert remaining resources (Energy, Data, Material) into VP at a specified ratio (e.g., 5:1) (TBD).
-*   **Winner:** The player with the highest total Victory Point score wins. Ties are broken by [Tiebreaker Rule TBD - e.g., most remaining resources, most cards in network].
+*   **Winner:** The player with the highest total Victory Point score wins. Ties are broken by most nodes, then most energy, then most data, then most materials.
 
 ## 5. Game Assets
 
@@ -231,9 +230,8 @@ These cards modify global rules.
 *   **Convergence Link Sets:** 4 sets per player (Tech, Cult, Res, Know), each containing 2 identical markers (total 8 markers per player). Markers should ideally indicate type and perhaps fit visually onto half-edge ports.
 *   **Resource Tokens:** Energy, Data, Material.
 *   **Victory Point Tokens:** Various denominations.
-*   **Player Boards (Optional):** For resource/VP tracking, storing unused Link markers.
+*   **Player Boards:** For tracking Victory Points, turn phases, link markers, and storing resources.
 *   **First Player Marker.**
-*   **(Optional) Central Convergence Map.**
 
 ## 6. Art Style & Visuals
 

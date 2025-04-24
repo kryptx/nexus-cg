@@ -6,18 +6,12 @@ local Rules = require('src.game.rules') -- Rules system for validating game acti
 local Vector = require('src.utils.vector') -- Vector utilities for spatial operations
 local AudioManager = require('src.audio.audio_manager') -- Audio manager for sound effects
 local CardDefinitions = require('src.game.data.card_definitions') -- Card definitions
-local ParadigmDefinitions = require('src.game.data.paradigm_definitions') -- Paradigm definitions
+local ParadigmService = require('src.game.paradigm_service') -- Extracted paradigm management service
+local DeckService = require('src.game.deck_service') -- Extracted deck management service
+local ActivationService = require('src.game.activation_service') -- Extracted activation logic service
 
 local GameService = {}
 GameService.__index = GameService
-
--- Helper function to shuffle a table in place (Fisher-Yates)
-local function shuffle(tbl)
-    for i = #tbl, 2, -1 do
-        local j = love.math.random(i)
-        tbl[i], tbl[j] = tbl[j], tbl[i]
-    end
-end
 
 -- Helper function for BFS path tracking (shallow copy)
 local function shallow_copy(original)
@@ -77,16 +71,15 @@ function GameService:new()
     instance.players = {} -- Will be populated during game initialization
     instance.currentPlayerIndex = 1
     instance.currentPhase = TurnPhase.BUILD -- Start in Build phase
-    instance.deck = {} -- Main card deck
-    instance.paradigmDeck = {} -- Standard paradigm shift cards, shuffled
-    instance.genesisParadigms = {} -- Available genesis paradigms
-    instance.currentParadigm = nil -- Active paradigm object
+    instance.paradigmService = ParadigmService:new() -- Manage paradigm decks and shifts
+    instance.deckService = DeckService:new(instance.audioManager) -- Manage main deck, draws, and dealing
+    instance.activationService = ActivationService:new(instance) -- Manage card activation logic
     instance.gameOver = false -- Game end flag
     instance.activeConvergenceLinks = {} -- Stores details of established links
     instance.paradigmShiftTriggers = { -- Tracks which paradigm shift milestones have occurred
         firstConvergence = false,
-        universalConvergence = false, -- Will need logic to check this
-        individualCompletion = false -- Will need logic to check this
+        universalConvergence = false,
+        individualCompletion = false
     }
     instance.nextLinkId = 1 -- Counter for unique link IDs
     
@@ -95,14 +88,6 @@ function GameService:new()
     instance.pendingQuestion = nil
     instance.pendingPlayer = nil -- Which player needs to answer
     instance.pendingInputCallback = nil -- Function to call with the result
-
-    -- State for paused activation path
-    instance.pausedActivationPath = nil      -- The remaining path data { {card=Card, owner=Player}, ... }
-    instance.pausedActivationContext = nil   -- { activatingPlayer=Player, isConvergenceStart=bool }
-
-    -- State for tracking current activation chain
-    instance.currentActivationChainCards = {}
-    instance.currentActivationChainLinks = {}
 
     print("Game Service Initialized.")
     return instance
@@ -177,131 +162,38 @@ end
 
 -- Initialize main card deck
 function GameService:initializeMainDeck()
-    print("Initializing main deck...")
-    self.deck = {}
-    local genesisCardsPool = {} -- Temporary pool for Genesis cards
-    
-    local cardDefinitions = require('src.game.data.card_definitions')
-    
-    -- Separate Genesis cards and add regular cards to the deck
-    for cardId, cardData in pairs(cardDefinitions) do
-        if cardData.type ~= Card.Type.REACTOR then  -- Skip reactor cards
-            if cardData.isGenesis then
-                local card = Card:new(cardData)
-                table.insert(genesisCardsPool, card)
-                print(string.format("  Added Genesis card %s to pool.", card.id))
-            else
-                for i = 1, 3 do 
-                    local card = Card:new(cardData)
-                    table.insert(self.deck, card)
-                end
-            end
-        end
-    end
-    
-    -- Store the Genesis pool for dealing
-    self.genesisCardsPool = genesisCardsPool 
-    print(string.format("Separated %d Genesis cards.", #self.genesisCardsPool))
-    
-    -- Shuffle the main deck (excluding Genesis cards for now)
-    shuffle(self.deck)
-    print(string.format("Main deck initialized with %d regular cards (before adding remaining Genesis).", #self.deck))
+    -- Delegate deck setup to DeckService
+    return self.deckService:initializeMainDeck()
 end
 
 -- Initialize paradigm decks
 function GameService:initializeParadigmDecks()
-    print("Initializing paradigm decks...")
-    self.paradigmDeck = ParadigmDefinitions:getByType("Standard")
-    self.genesisParadigms = ParadigmDefinitions:getByType("Genesis")
-
-    -- Shuffle the standard paradigm deck
-    shuffle(self.paradigmDeck)
-    
-    print(string.format("Initialized %d Standard Paradigms (shuffled) and %d Genesis Paradigms.", #self.paradigmDeck, #self.genesisParadigms))
+    -- Delegate paradigm deck initialization to ParadigmService
+    return self.paradigmService:initializeParadigmDecks()
 end
 
 -- Deal initial hands to all players
 function GameService:dealInitialHands()
-    local NUM_STARTING_CARDS = 6 -- Number of cards to draw after Genesis card
-    
-    print("Shuffling Genesis card pool...")
-    shuffle(self.genesisCardsPool)
-    
-    print("Dealing 1 Genesis card to each player...")
-    for _, player in ipairs(self.players) do
-        if #self.genesisCardsPool > 0 then
-            local genesisCard = table.remove(self.genesisCardsPool, 1)
-            player:addCardToHand(genesisCard)
-            print(string.format("  Dealt Genesis card '%s' to %s.", genesisCard.title, player.name))
-        else
-            print(string.format("    Warning: Not enough Genesis cards to deal to %s!", player.name))
-        end
-    end
-    
-    print(string.format("Shuffling %d remaining Genesis card(s) into main deck...", #self.genesisCardsPool))
-    for _, remainingGenesisCard in ipairs(self.genesisCardsPool) do
-        table.insert(self.deck, remainingGenesisCard)
-    end
-    shuffle(self.deck) -- Shuffle again after adding remaining Genesis cards
-    self.genesisCardsPool = nil -- Clear the temporary pool
-    print(string.format("Main deck now contains %d cards (including remaining Genesis).", #self.deck))
-    
-    print(string.format("Dealing %d starting cards to each player...", NUM_STARTING_CARDS))
-    for _, player in ipairs(self.players) do
-        print(string.format("  Dealing cards to %s...", player.name))
-        for i = 1, NUM_STARTING_CARDS do
-            local card = self:drawCard()
-            if card then
-                player:addCardToHand(card)
-            else
-                print(string.format("    Warning: Deck empty while dealing cards to %s (drew %d).", player.name, i-1))
-                break -- No more cards
-            end
-        end
-    end
-    print("Finished dealing initial hands.")
+    -- Delegate initial hand dealing to DeckService
+    return self.deckService:dealInitialHands(self.players)
 end
 
 -- Draw a card from the main deck
 function GameService:drawCard()
-    print(string.format("[DEBUG] Attempting to draw card. Current deck size: %d", #self.deck))
-    if #self.deck == 0 then
-        print("[DEBUG] Cannot draw: Deck is empty")
-        return nil -- Deck is empty
-    end
-    
-    local card = table.remove(self.deck, 1) -- Draw from top
-    print(string.format("[DEBUG] Drew card: %s (ID: %s). Remaining deck size: %d", card.title, card.id, #self.deck))
-    
-    self.audioManager:playSound("card_draw")
-    
-    return card
+    -- Delegate card draw to DeckService
+    return self.deckService:drawCard()
 end
 
 -- Draw and set the initial paradigm
 function GameService:drawInitialParadigm()
-    print("Setting initial paradigm...")
-    if #self.genesisParadigms == 0 then
-        print("Warning: No Genesis Paradigms defined. Using nil paradigm.")
-        self.currentParadigm = nil
-        return
-    end
-
-    local randomIndex = love.math.random(#self.genesisParadigms)
-    self.currentParadigm = self.genesisParadigms[randomIndex]
-
-    print(string.format("Initial Paradigm set to: '%s' (ID: %s)", self.currentParadigm.title, self.currentParadigm.id))
-
-    if self.currentParadigm.effect then
-        print(string.format("  (Effect function exists for %s)", self.currentParadigm.id))
-    end
+    -- Delegate initial paradigm drawing to ParadigmService
+    return self.paradigmService:drawInitialParadigm()
 end
 
 -- Check if the deck is empty (for game end condition)
 function GameService:isDeckEmpty()
-    local isEmpty = #self.deck == 0
-    print(string.format("[DEBUG] Checking if deck is empty. Deck size: %d, isEmpty: %s", #self.deck, tostring(isEmpty)))
-    return isEmpty
+    -- Delegate emptiness check to DeckService
+    return self.deckService:isEmpty()
 end
 
 -- Get all players
@@ -316,7 +208,7 @@ end
 
 -- Get the currently active paradigm
 function GameService:getCurrentParadigm()
-    return self.currentParadigm
+    return self.paradigmService:getCurrentParadigm()
 end
 
 -- Get the current turn phase
@@ -399,78 +291,6 @@ function GameService:attemptPlacement(state, cardIndex, gridX, gridY)
     else
         print("  Invalid placement: " .. reason)
         return false, "Invalid placement: " .. reason
-    end
-end
-
--- Attempt Activation
-function GameService:attemptActivation(state, targetGridX, targetGridY)
-    if self.currentPhase ~= TurnPhase.ACTIVATE then
-        return false, "Activation not allowed in " .. self.currentPhase .. " phase."
-    end
-
-    local currentPlayer = self.players[self.currentPlayerIndex]
-    local targetCard = currentPlayer.network:getCardAt(targetGridX, targetGridY)
-
-    if not targetCard then
-        return false, "No card at activation target."
-    end
-
-    if targetCard.type == Card.Type.REACTOR then
-        print("[Service] Activation failed: Cannot activate the Reactor itself.")
-        return false, "Cannot activate the Reactor itself."
-    end
-
-    print(string.format("[Service] Attempting activation targeting %s (%s) at (%d,%d)", 
-        targetCard.title, targetCard.id, targetGridX, targetGridY))
-
-    local reactor = currentPlayer.network:findReactor()
-    if not reactor then
-        return false, "Error: Reactor not found in network."
-    end
-    
-    -- Use rules system to validate activation path
-    local isValid, path, reason = self.rules:isActivationPathValid(
-        currentPlayer.network, reactor.id, targetCard.id)
-        
-    if isValid and path then
-        local pathLength = #path
-        local energyCost = pathLength 
-        print(string.format("  Activation path found! Length (Nodes): %d, Cost: %d Energy.", pathLength, energyCost))
-
-        if currentPlayer.resources.energy >= energyCost then
-            print("  Activation affordable.")
-            currentPlayer:spendResource('energy', energyCost)
-            self.audioManager:playSound("activation")
-
-            -- Execute effects along path (target first, then towards reactor)
-            local activationMessages = {}
-             table.insert(activationMessages, string.format("Activated path (Cost %d E):", energyCost))
-
-            -- Activate target card
-            if targetCard then
-                targetCard:activateEffect(self, currentPlayer, currentPlayer.network, targetCard)
-                table.insert(activationMessages, string.format("  - %s activated!", targetCard.title))
-                print(string.format("    Effect for %s executed.", targetCard.title))
-            end
-            
-            -- Activate remaining cards in path
-            for i = 2, pathLength do 
-                 local cardId = path[i]
-                 local cardToActivate = currentPlayer.network:getCardById(cardId)
-                 if cardToActivate then
-                     cardToActivate:activateEffect(self, currentPlayer, currentPlayer.network, cardToActivate)
-                     table.insert(activationMessages, string.format("  - %s activated!", cardToActivate.title))
-                     print(string.format("    Effect for %s executed.", cardToActivate.title))
-                 end
-             end
-             return true, table.concat(activationMessages, "\n") -- Multi-line status
-        else
-            print("  Activation failed: Cannot afford energy cost.")
-            return false, string.format("Not enough energy for activation. Cost: %d E (Have: %d E)", energyCost, currentPlayer.resources.energy)
-        end
-    else
-        print("  Activation failed: No path found.")
-        return false, string.format("No valid activation path: %s", reason or "Unknown reason")
     end
 end
 
@@ -689,7 +509,8 @@ function GameService:checkAndTriggerParadigmShifts(newLinkData)
     end
 
     if paradigmChanged then
-        print(string.format("  New Paradigm Active: '%s'", self.currentParadigm and self.currentParadigm.title or "None"))
+        local cp = self.paradigmService:getCurrentParadigm()
+        print(string.format("  New Paradigm Active: '%s'", cp and cp.title or "None"))
     end
 
     return paradigmChanged
@@ -698,21 +519,8 @@ end
 -- Helper to draw the next standard paradigm and make it active
 -- Returns true if a new paradigm was successfully drawn and applied, false otherwise
 function GameService:drawNextStandardParadigm()
-    if #self.paradigmDeck == 0 then
-        print("[Paradigm] No more Standard Paradigms left to draw.")
-        return false
-    end
-
-    local oldParadigm = self.currentParadigm
-    self.currentParadigm = table.remove(self.paradigmDeck, 1)
-
-    print(string.format("[Paradigm] Shifted from '%s' to '%s' (%s).",
-        oldParadigm and oldParadigm.title or "None",
-        self.currentParadigm.title,
-        self.currentParadigm.id
-    ))
-
-    return true
+    -- Delegate standard paradigm drawing to ParadigmService
+    return self.paradigmService:drawNextStandardParadigm()
 end
 
 -- Advance to the next logical phase in the turn
@@ -907,414 +715,6 @@ function GameService:calculateFinalScores()
     return scores
 end
 
--- ==============================
--- GLOBAL ACTIVATION (Updated)
--- ==============================
-
--- Attempt Activation targeting any node in any player's network
--- Returns: success (boolean), message (string)
-function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayerIndex, targetGridX, targetGridY)
-    if self.currentPhase ~= TurnPhase.ACTIVATE then
-        return false, "Activation not allowed in " .. self.currentPhase .. " phase."
-    end
-    if self.isWaitingForInput then
-        return false, "Cannot activate: Waiting for player input."
-    end
-    if self.pausedActivationPath then
-        return false, "Cannot start new activation: Previous activation is paused."
-    end
-
-    local activatingPlayer = self.players[activatingPlayerIndex]
-    local targetPlayer = self.players[targetPlayerIndex]
-
-    if not activatingPlayer or not targetPlayer then
-        return false, "Invalid player index provided."
-    end
-
-    local targetCard = targetPlayer.network:getCardAt(targetGridX, targetGridY)
-
-    if not targetCard then
-        return false, "No card at target location."
-    end
-
-    if targetCard.type == Card.Type.REACTOR then
-        return false, "Cannot activate the Reactor itself."
-    end
-
-    print(string.format("[Service] Attempting GLOBAL activation by P%d targeting P%d's %s (%s) at (%d,%d)",
-        activatingPlayerIndex, targetPlayerIndex, targetCard.title, targetCard.id, targetGridX, targetGridY))
-
-    -- Reset chain tracking at the start of a new activation attempt
-    self.currentActivationChainCards = {}
-    self.currentActivationChainLinks = {}
-
-    local activatorReactor = activatingPlayer.network:findReactor()
-    if not activatorReactor then
-        return false, "Error: Activating player's reactor not found."
-    end
-
-    local isValid, pathData, reason = self:findGlobalActivationPath(targetCard, activatorReactor, activatingPlayer)
-
-    if isValid and pathData then
-        local path = pathData.path
-        local energyCost = pathData.cost - 1 -- Cost is nodes before reactor
-        local isConvergenceStart = pathData.isConvergenceStart
-        local pathLength = #path -- Full path length including reactor
-
-        print(string.format("  Global path found! Length (incl. reactor): %d, Nodes in Path (Cost): %d Energy. Convergence Start: %s",
-            pathLength, energyCost, tostring(isConvergenceStart)))
-
-        if activatingPlayer.resources.energy >= energyCost then
-            print("  Activation affordable.")
-            activatingPlayer:spendResource('energy', energyCost)
-            self.audioManager:playSound("activation")
-
-            local activationMessages = {}
-            table.insert(activationMessages, string.format("Activated global path (Cost %d E):", energyCost))
-
-            -- Process the path, potentially pausing
-            local activationStatus, message = self:_processActivationPath(path, activatingPlayer, isConvergenceStart, activationMessages)
-
-            return activationStatus, message -- Return status directly from helper
-        else
-            print("  Activation failed: Cannot afford energy cost.")
-            return false, string.format("Not enough energy. Cost: %d E (Have: %d E)", energyCost, activatingPlayer.resources.energy)
-        end
-    else
-        print("  Activation failed: No global path found.")
-        return false, string.format("No valid global activation path: %s", reason or "Unknown reason")
-    end
-end
-
--- NEW: Helper to process a path (or resume a paused one)
--- path: The path elements { {card=Card, owner=Player}, ... } to process (full or remaining)
--- activatingPlayer: The player who initiated the activation
--- isConvergenceStart: Boolean indicating if the *original* target was via convergence
--- activationMessages: Table to append messages to (passed by reference essentially)
--- Returns: success (boolean), message (string)
-function GameService:_processActivationPath(path, activatingPlayer, isConvergenceStart, activationMessages)
-    print(string.format("[Path Processor] Processing %d nodes...", #path))
-
-    for i = 1, #path do
-        local pathElement = path[i]
-        local cardToActivate = pathElement.card
-        local cardOwner = pathElement.owner -- Need owner for context
-
-        if cardToActivate.type == Card.Type.REACTOR then
-            print("    Skipping Reactor activation.")
-            goto continue_loop -- Skip reactor activation
-        end
-
-        -- Track card type and traversed link type
-        table.insert(self.currentActivationChainCards, cardToActivate.type)
-        if pathElement.traversedLinkType then
-             table.insert(self.currentActivationChainLinks, pathElement.traversedLinkType)
-        end
-
-        local activationStatus = nil
-        local effectType = "standard"
-
-        if i == 1 and isConvergenceStart then -- First node and it was a convergence target
-            print(string.format("    Activating target %s via CONVERGENCE effect...", cardToActivate.title))
-            effectType = "convergence"
-            activationStatus = cardToActivate:activateConvergence(self, activatingPlayer, cardOwner.network, cardToActivate)
-        elseif cardOwner ~= activatingPlayer then -- Subsequent node owned by opponent
-            print(string.format("    Activating subsequent node %s (Owned by P%d) via CONVERGENCE effect...", cardToActivate.title, cardOwner.id))
-            effectType = "convergence"
-            activationStatus = cardToActivate:activateConvergence(self, activatingPlayer, cardOwner.network, cardToActivate)
-        else -- Node owned by activator (target or subsequent)
-            print(string.format("    Activating node %s (Owned by P%d) via standard effect...", cardToActivate.title, cardOwner.id))
-            effectType = "standard"
-            activationStatus = cardToActivate:activateEffect(self, activatingPlayer, cardOwner.network, cardToActivate)
-        end
-
-        table.insert(activationMessages, string.format("  - %s activated (%s)!", cardToActivate.title, effectType))
-
-        -- Check if the activation caused a wait
-        if activationStatus == "waiting" then
-            print("    !! Activation paused by node: " .. cardToActivate.title)
-            -- Store the remaining path and context
-            local remainingPath = {}
-            for j = i + 1, #path do -- Store nodes *after* the current one
-                table.insert(remainingPath, path[j])
-            end
-
-            if #remainingPath > 0 then
-                self.pausedActivationPath = remainingPath
-                self.pausedActivationContext = { activatingPlayer = activatingPlayer, isConvergenceStart = isConvergenceStart } -- Store original context
-                print(string.format("    Stored %d remaining nodes for paused activation.", #remainingPath))
-            else
-                 print("    Wait triggered on the last node. No path remaining to pause.")
-                 self.pausedActivationPath = nil -- Ensure it's cleared
-                 self.pausedActivationContext = nil
-            end
-
-            return true, table.concat(activationMessages, "\n") .. "\nActivation paused, waiting for input..."
-        end
-
-        ::continue_loop::
-    end
-
-    -- If loop completes without pausing
-    print("[Path Processor] Path completed successfully.")
-    self.pausedActivationPath = nil -- Clear any old paused state just in case
-    self.pausedActivationContext = nil
-    return true, table.concat(activationMessages, "\n")
-end
-
--- NEW: Resume a paused activation sequence
-function GameService:resumeActivation()
-    if not self.pausedActivationPath or not self.pausedActivationContext then
-        print("Warning: resumeActivation called but no paused activation found.")
-        return false, "No paused activation found."
-    end
-
-    print("[GameService] Resuming paused activation...")
-    local path = self.pausedActivationPath
-    local context = self.pausedActivationContext
-    local activatingPlayer = context.activatingPlayer
-    local isConvergenceStart = context.isConvergenceStart -- Use original flag
-
-    -- Clear the paused state *before* processing to prevent infinite loops if resume also pauses
-    self.pausedActivationPath = nil
-    self.pausedActivationContext = nil
-
-    -- Create a new message table for the resumed part
-    local resumeMessages = {"[Resumed Activation]"}
-
-    -- Process the remaining path
-    local activationStatus, message = self:_processActivationPath(path, activatingPlayer, isConvergenceStart, resumeMessages)
-
-    -- TODO: How to report the status of the resumed activation back to the UI?
-    -- For now, just print it. Might need another mechanism.
-    print(message)
-
-    return activationStatus, message -- Return the final status of the resumed part
-end
-
--- NEW: Get info about the current activation chain being processed
-function GameService:getActivationChainInfo()
-    return {
-        length = #self.currentActivationChainCards, -- Keep length for compatibility with old condition name
-        cards = self.currentActivationChainCards,
-        links = self.currentActivationChainLinks
-    }
-end
-
--- Provide the answer to a pending Yes/No request
-function GameService:providePlayerYesNoAnswer(result)
-    if not self.isWaitingForInput then
-        print("Warning: providePlayerYesNoAnswer called when not waiting for input.")
-        return
-    end
-    if type(result) ~= "boolean" then
-        print("Error: Invalid result type provided to providePlayerYesNoAnswer. Expected boolean.")
-        return
-    end
-
-    print(string.format("[GameService] Received answer '%s' for player %d.", tostring(result), self.pendingPlayer.id))
-
-    local callback = self.pendingInputCallback
-    -- Clear waiting state *before* calling callback
-    self.isWaitingForInput = false
-    self.pendingPlayer = nil
-    self.pendingQuestion = nil
-    self.pendingInputCallback = nil
-
-    -- Execute the stored callback with the result
-    if callback then
-        callback(result)
-        print("[GameService] Executed pending input callback.")
-    else
-        print("Warning: No pending callback found to execute.")
-    end
-
-    -- After callback finishes, check if we need to resume an activation
-    if self.pausedActivationPath then
-        self:resumeActivation()
-    end
-end
-
--- Find Activation Path (Global BFS)
--- Searches across networks using adjacency and convergence links.
--- Returns: boolean (isValid), pathData { path={ {card=Card, owner=Player}, ... }, cost=int, isConvergenceStart=bool }, reason (string)
-function GameService:findGlobalActivationPath(targetCard, activatorReactor, activatingPlayer)
-    print(string.format("[Pathfinder] START: Target=%s (%s, P%d), Reactor=%s (%s, P%d), Activator=P%d", 
-        targetCard and targetCard.title or "NIL",
-        targetCard and targetCard.id or "NIL",
-        targetCard and targetCard.owner and targetCard.owner.id or -1,
-        activatorReactor and activatorReactor.title or "NIL",
-        activatorReactor and activatorReactor.id or "NIL",
-        activatorReactor and activatorReactor.owner and activatorReactor.owner.id or -1,
-        activatingPlayer and activatingPlayer.id or -1
-    ))
-
-    if not targetCard or not activatorReactor or not activatingPlayer then
-        print("[Pathfinder] FAIL: Invalid arguments.")
-        return false, nil, "Invalid arguments to findGlobalActivationPath"
-    end
-
-    local queue = {}
-    local visited = {} -- Track visited card INSTANCES to prevent cycles
-
-    local startOwner = targetCard.owner
-    if not startOwner then
-        print(string.format("[Pathfinder] FAIL: Target card %s has no owner!", targetCard.id))
-        return false, nil, string.format("Target card %s has no owner!", targetCard.id)
-    end
-    -- Path elements now include traversedLinkType
-    local initialPath = { { card = targetCard, owner = startOwner, traversedLinkType = nil } }
-    table.insert(queue, { node = targetCard, owner = startOwner, path = initialPath })
-    
-    -- Use composite key for visited set: playerID_cardID
-    local startVisitedKey = startOwner.id .. "_" .. targetCard.id
-    visited[startVisitedKey] = true 
-    print(string.format("[Pathfinder] Initial Queue: Target %s (P%d). Visited Key: %s", targetCard.id, startOwner.id, startVisitedKey))
-
-    while #queue > 0 do
-        local currentState = table.remove(queue, 1)
-        local currentNode = currentState.node
-        local currentOwner = currentState.owner
-        local currentPath = currentState.path
-        local currentVisitedKey = currentOwner.id .. "_" .. currentNode.id
-        print(string.format("[Pathfinder] Dequeue: Current=%s (P%d), PathLen=%d, VisitedKey=%s", currentNode.id, currentOwner.id, #currentPath, currentVisitedKey))
-
-        if currentNode == activatorReactor then
-            local isConvergenceStart = false
-            if #currentPath > 1 then
-                isConvergenceStart = currentPath[1].owner ~= currentPath[2].owner
-            end
-
-            local activationPath = shallow_copy(currentPath)
-
-            local pathData = {
-                path = activationPath,
-                cost = #activationPath, 
-                isConvergenceStart = isConvergenceStart
-            }
-            print(string.format("[Pathfinder] SUCCESS: Reached Reactor %s. Path Cost=%d, ConvStart=%s", activatorReactor.id, pathData.cost, tostring(isConvergenceStart)))
-            return true, pathData, nil
-        end
-
-        -- Explore Neighbors (Adjacency within the same network)
-        print(string.format("  [Pathfinder Adjacency] Exploring neighbors of %s (P%d)...", currentNode.id, currentOwner.id))
-        for portIndex = 1, 8 do
-            local portProps = currentNode:getPortProperties(portIndex)
-            -- Check if it's an available OUTPUT port on the current node
-            if portProps and portProps.is_output and currentNode:isPortAvailable(portIndex) then
-                local adjacentPos = currentNode.network:getAdjacentCoordForPort(currentNode.position.x, currentNode.position.y, portIndex)
-                if adjacentPos then
-                    local neighborNode = currentOwner.network:getCardAt(adjacentPos.x, adjacentPos.y)
-                    -- Check if neighbor exists AND its INSTANCE has not been visited
-                    local neighborVisitedKey = neighborNode and (currentOwner.id .. "_" .. neighborNode.id) or nil
-                    if neighborNode and not visited[neighborVisitedKey] then 
-                        -- Find the corresponding INPUT port on the neighbor
-                        local neighborPortIndex = currentNode.network:getOpposingPortIndex(portIndex)
-                        local neighborProps = neighborNode:getPortProperties(neighborPortIndex)
-                        
-                        local currentPortAvail = currentNode:isPortAvailable(portIndex) 
-                        local neighborPortAvail = neighborNode:isPortAvailable(neighborPortIndex)
-                        local typesMatch = neighborProps and portProps.type == neighborProps.type
-                        print(string.format("    - Adj Check: %s(P%d)[Port %d Out %s, Avail:%s] -> %s(P%d)[Port %d In %s, Avail:%s] | Types Match: %s | VisitedKey: %s",
-                            currentNode.id, currentOwner.id, portIndex, portProps.type, tostring(currentPortAvail),
-                            neighborNode.id, currentOwner.id, neighborPortIndex, neighborProps and neighborProps.type or "NIL", tostring(neighborPortAvail),
-                            tostring(typesMatch), neighborVisitedKey))
-
-                        -- Check if neighbor port is an available INPUT of the same TYPE
-                        local condition = neighborProps and not neighborProps.is_output and neighborNode:isPortAvailable(neighborPortIndex) and neighborProps.type == portProps.type
-                        if condition then
-                            visited[neighborVisitedKey] = true -- Mark neighbor INSTANCE visited HERE
-                            local newPath = shallow_copy(currentPath)
-                            -- Add path element with nil link type for adjacency
-                            table.insert(newPath, { card = neighborNode, owner = currentOwner, traversedLinkType = nil })
-                            print(string.format("      >> Enqueueing ADJACENT: %s (P%d)", neighborNode.id, currentOwner.id))
-                            table.insert(queue, { node = neighborNode, owner = currentOwner, path = newPath })
-                        end
-                    end
-                end
-            end
-        end
-
-        -- Explore Neighbors (Convergence Links)
-        print(string.format("  [Pathfinder Convergence] Exploring links for %s (P%d)...", currentNode.id, currentOwner.id))
-        for _, link in ipairs(self.activeConvergenceLinks) do
-            local neighborNode, neighborOwner
-            local neighborNodeId, neighborPlayerIndex, neighborPortIndex, currentPortIndex
-
-            -- Determine potential neighbor based on the link and current node
-            if link.initiatingNodeId == currentNode.id and link.initiatingPlayerIndex == currentOwner.id then
-                neighborNodeId = link.targetNodeId
-                neighborPlayerIndex = link.targetPlayerIndex
-                neighborPortIndex = link.targetPortIndex 
-                currentPortIndex = link.initiatingPortIndex 
-            elseif link.targetNodeId == currentNode.id and link.targetPlayerIndex == currentOwner.id then
-                neighborNodeId = link.initiatingNodeId
-                neighborPlayerIndex = link.initiatingPlayerIndex
-                neighborPortIndex = link.initiatingPortIndex 
-                currentPortIndex = link.targetPortIndex 
-            else
-                neighborNodeId = nil 
-            end
-
-            if neighborNodeId and neighborPlayerIndex then
-                neighborOwner = self.players[neighborPlayerIndex]
-                neighborNode = neighborOwner and neighborOwner.network:getCardById(neighborNodeId) or nil
-            else
-                 neighborNode = nil
-            end
-
-            -- Check if neighbor exists AND its INSTANCE has not been visited
-            local neighborVisitedKeyConv = neighborNode and (neighborOwner.id .. "_" .. neighborNode.id) or nil
-            if neighborNode and not visited[neighborVisitedKeyConv] then
-                local outputNode, inputNode, outputPortIdx, inputPortIdx
-                -- Determine which is the output node based on link direction
-                if link.initiatingNodeId == currentNode.id then 
-                    outputNode, inputNode = currentNode, neighborNode
-                    outputPortIdx, inputPortIdx = currentPortIndex, neighborPortIndex 
-                else 
-                    outputNode, inputNode = neighborNode, currentNode
-                    outputPortIdx, inputPortIdx = neighborPortIndex, currentPortIndex 
-                end
-
-                local outputPortProps = outputNode:getPortProperties(outputPortIdx)
-                local inputPortProps = inputNode:getPortProperties(inputPortIdx)
-                
-                -- Check traversability based on link ID (allows traversing the link even if occupied by *this* link)
-                local isOutputPortTraversable = outputNode:isPortDefined(outputPortIdx) and 
-                                                 (outputNode:getOccupyingLinkId(outputPortIdx) == nil or outputNode:getOccupyingLinkId(outputPortIdx) == link.linkId)
-                                                 
-                local isInputPortTraversable = inputNode:isPortDefined(inputPortIdx) and 
-                                                (inputNode:getOccupyingLinkId(inputPortIdx) == nil or inputNode:getOccupyingLinkId(inputPortIdx) == link.linkId)
-
-                local typesMatchConv = outputPortProps and inputPortProps and outputPortProps.type == inputPortProps.type
-                print(string.format("    - Conv Check (Link %s): %s(P%d)[Port %d Out %s, Trav:%s] -> %s(P%d)[Port %d In %s, Trav:%s] | Types Match: %s | VisitedKey: %s",
-                    link.linkId,
-                    outputNode.id, outputNode.owner.id, outputPortIdx, outputPortProps and outputPortProps.type or "NIL", tostring(isOutputPortTraversable),
-                    inputNode.id, inputNode.owner.id, inputPortIdx, inputPortProps and inputPortProps.type or "NIL", tostring(isInputPortTraversable),
-                    tostring(typesMatchConv), neighborVisitedKeyConv))
-                
-                local condition = outputPortProps and outputPortProps.is_output and
-                                inputPortProps and not inputPortProps.is_output and
-                                isOutputPortTraversable and isInputPortTraversable and 
-                                outputPortProps.type == inputPortProps.type
-                
-                if condition then
-                    visited[neighborVisitedKeyConv] = true -- Mark neighbor INSTANCE visited HERE
-                    local newPath = shallow_copy(currentPath)
-                    -- Add path element WITH link type for convergence
-                    table.insert(newPath, { card = neighborNode, owner = neighborOwner, traversedLinkType = link.linkType })
-                    print(string.format("      >> Enqueueing CONVERGENCE: %s (P%d) via Link %s (%s)", neighborNode.id, neighborOwner.id, link.linkId, link.linkType))
-                    table.insert(queue, { node = neighborNode, owner = neighborOwner, path = newPath })
-                end
-            end
-        end
-
-    end
-
-    print("[Pathfinder] FAIL: Queue empty, Reactor not found.")
-    return false, nil, "No valid activation path exists to the activator's reactor."
-end
-
 -- Calculate and add start-of-turn energy gain based on GDD 4.8
 function GameService:performEnergyGain(player)
     if not player then return end
@@ -1397,6 +797,11 @@ function GameService:requestPlayerYesNo(player, question, callback)
 
     -- NOTE: The game state (e.g., PlayState) needs to observe 'isWaitingForInput'
     -- and 'pendingQuestion'/'pendingPlayer' to display the prompt.
+end
+
+-- NEW: Delegate global activation to ActivationService
+function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayerIndex, targetGridX, targetGridY)
+    return self.activationService:attemptActivationGlobal(activatingPlayerIndex, targetPlayerIndex, targetGridX, targetGridY)
 end
 
 return { GameService = GameService, TurnPhase = TurnPhase } 

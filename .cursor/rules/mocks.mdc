@@ -1,0 +1,8 @@
+---
+description: How to use a luassert spy
+globs: 
+alwaysApply: false
+---
+With luassert, you can only use `spy.on` or `spy.new`. If you want to control the return value of the spy, you must use `spy.new` and provide a function that wraps your desired method.
+
+`spy.spy_on` is not a function, and luassert spies **do not** implement any `returns` method!

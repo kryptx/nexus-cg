@@ -1,0 +1,6 @@
+---
+description: How to run tests
+globs: 
+alwaysApply: false
+---
+`busted tests`
