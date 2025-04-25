@@ -165,8 +165,9 @@ function PlayState:init(animationController, gameService) -- Accept animationCon
         Button:new(0, 0, "Quit Game", function() love.event.quit() end, 0, 0, uiFonts, uiStyleGuide)
     }
 
-    -- Initial layout calculation using current window size
+    -- Calculate initial layout using current window size
     self:_recalculateLayout(love.graphics.getWidth(), love.graphics.getHeight())
+    print("Initial layout calculated using window size: " .. love.graphics.getWidth() .. "x" .. love.graphics.getHeight())
 end
 
 function PlayState:enter()
@@ -190,6 +191,9 @@ function PlayState:enter()
         }
         print(string.format("Player %d origin set to: (%d, %d)", i, self.playerOrigins[i].x, self.playerOrigins[i].y))
     end
+    
+    -- Force layout recalculation based on current window size
+    self:_recalculateLayout(love.graphics.getWidth(), love.graphics.getHeight())
     
     self:updateStatusMessage() -- Update status initially
     
@@ -501,7 +505,7 @@ function PlayState:draw(stateManager)
     -- Draw turn indicator & Other Debug Info
     love.graphics.setColor(1,1,1,1)
     love.graphics.print(string.format("Current Turn: Player %d (%s)", self.gameService.currentPlayerIndex, currentPlayer.name), 10, 10)
-    love.graphics.print("MMB Drag / WASD: Pan | Wheel: Zoom | C: Test Converge | P: Next Phase", screenW / 2 - 200, screenH - 20)
+    love.graphics.print("MMB Drag / WASD: Pan | Wheel: Zoom | P: Next Phase", screenW / 2 - 200, screenH - 20)
 
     -- [[[ Draw Help Box (if enabled) ]]]
     if self.showHelpBox and self.currentPhase and not self.isDisplayingPrompt then
