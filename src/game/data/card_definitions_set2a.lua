@@ -244,7 +244,7 @@ definitions["SET2_010"] = {
         }
         -- Description: "If activator pays 1 Data: Activator gains 1 Material. Owner gains 1 Data."
     }),
-    vpValue = 0, imagePath = "assets/images/smuggler's-den.png", flavorText = "Goods acquired through... unofficial channels.",
+    vpValue = 0, imagePath = "assets/images/smugglers-den.png", flavorText = "Goods acquired through... unofficial channels.",
     definedPorts = { [CardPorts.BOTTOM_LEFT] = true, [CardPorts.RIGHT_BOTTOM] = true },
 }
 definitions["SET2_011"] = {
