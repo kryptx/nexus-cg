@@ -7,6 +7,9 @@ local CardPorts = require('src.game.card').Ports -- Use new Port constants
 local CardEffects = require('src.game.card_effects')
 local ResourceType = CardEffects.ResourceType
 
+local definitions_set2a = require('src.game.data.card_definitions_set2a')
+local definitions_set2b = require('src.game.data.card_definitions_set2b')
+
 local definitions = {}
 
 -- === Reactor Card ===
@@ -1172,5 +1175,13 @@ definitions["NODE_TECH_007"] = {
     art = nil,
     flavorText = "Disruption delivered remotely.",
 }
+
+for k, v in pairs(definitions_set2a) do
+    definitions[k] = v
+end
+
+for k, v in pairs(definitions_set2b) do
+    definitions[k] = v
+end
 
 return definitions 

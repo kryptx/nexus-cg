@@ -36,7 +36,7 @@ function DeckService:initializeMainDeck()
                 table.insert(pool, Card:new(cardData))
                 print(string.format("  Collected Genesis card %s", cardData.id or cardId))
             else
-                for i = 1, 3 do
+                for i = 1, 2 do
                     table.insert(self.deck, Card:new(cardData))
                 end
             end
