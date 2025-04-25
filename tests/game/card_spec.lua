@@ -109,6 +109,20 @@ describe("Card Module", function()
             it("should return false for an invalid/non-existent port index", function()
                  assert.is_false(card:isPortAvailable(99))
             end)
+
+            it("should return false for a defined open port that is physically blocked by an adjacent node", function()
+                local Network = require 'src.game.network'
+                local Player = require 'src.game.player'
+                local player = Player:new({id=1,name="Test Player"})
+                local network = Network:new(player)
+                local cardA = Card:new({id="A", type=Card.Type.TECHNOLOGY, definedPorts={[Card.Ports.RIGHT_TOP]=true}})
+                local cardB = Card:new({id="B", type=Card.Type.TECHNOLOGY})
+                cardA.owner = player
+                cardB.owner = player
+                network:placeCard(cardA, 0, 0)
+                network:placeCard(cardB, 1, 0)
+                assert.is_false(cardA:isPortAvailable(Card.Ports.RIGHT_TOP))
+            end)
         end)
         
         -- Test occupation marking
@@ -136,6 +150,24 @@ describe("Card Module", function()
                  assert.is_false(card:isPortOccupied(Card.Ports.TOP_LEFT))
                  card:markPortUnoccupied(Card.Ports.TOP_LEFT)
                  assert.is_false(card:isPortOccupied(Card.Ports.TOP_LEFT))
+            end)
+
+            it("should consider a port occupied if another card is adjacent in that direction", function()
+                local Network = require 'src.game.network'
+                local Player = require 'src.game.player'
+                -- Setup network and cards
+                local player = Player:new({id=1,name="Test Player"})
+                local network = Network:new(player)
+                local cardA = Card:new({id="A", type=Card.Type.TECHNOLOGY, definedPorts = {[Card.Ports.RIGHT_TOP]=true}})
+                local cardB = Card:new({id="B", type=Card.Type.TECHNOLOGY})
+                cardA.owner = player
+                cardB.owner = player
+                network:placeCard(cardA, 0, 0)
+                network:placeCard(cardB, 1, 0)
+                -- RIGHT_TOP faces (1,0)
+                assert.is_true(cardA:isPortOccupied(Card.Ports.RIGHT_TOP))
+                -- A port facing an empty cell should not be occupied
+                assert.is_false(cardA:isPortOccupied(Card.Ports.TOP_LEFT))
             end)
         end)
     end)
