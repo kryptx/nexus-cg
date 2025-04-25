@@ -796,7 +796,7 @@ function Renderer:_drawCardInternal(card, x, y, context)
         ["Materials"] = "@",  ["materials"] = "@",
         ["Material"] = "@",   ["material"] = "@",
         ["Data"] = "#",       ["data"] = "#",
-        ["Energy"] = "&",     ["energy"] = "&"
+        ["Energy"] = "\\",     ["energy"] = "\\"
     }
 
     -- NEW: Apply the substitutions
