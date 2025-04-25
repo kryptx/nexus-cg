@@ -10,9 +10,14 @@ package.path = package.path .. ';../?.lua'
 local StateManager = require 'src.core.state_manager'
 local MenuState = require 'src.game.states.menu_state' -- Assuming this exists
 local PlayState = require 'src.game.states.play_state'
+local AnimationController = require('src.controllers.AnimationController') -- Require AnimationController
+local ServiceModule = require('src.game.game_service') -- Require GameService module
+local GameService = ServiceModule.GameService
 
 -- Global variable to hold the state manager
 local stateManager = nil -- Back to local
+local animationController = nil -- Add animation controller instance
+local gameService = nil -- Add game service instance
 
 function love.load()
     print("love.load() - Initializing Game Manager")
@@ -21,11 +26,13 @@ function love.load()
     love.graphics.setDefaultFilter("nearest", "nearest", 1)
 
     stateManager = StateManager:new() -- Assign to local
+    animationController = AnimationController:new() -- Create instance
+    gameService = GameService:new() -- Create GameService instance
 
     -- Register game states
     -- We need to create instances of the state tables
     local menuStateInstance = setmetatable({}, { __index = MenuState })
-    local playStateInstance = PlayState:new() -- Use the constructor we added
+    local playStateInstance = PlayState:new(animationController, gameService) -- Pass BOTH instances
 
     stateManager:registerState('menu', menuStateInstance)
     stateManager:registerState('play', playStateInstance)
@@ -40,6 +47,10 @@ end
 function love.update(dt)
     if stateManager then
         stateManager:update(dt)
+    end
+    -- Update animations globally
+    if animationController then
+        animationController:update(dt)
     end
 end
 

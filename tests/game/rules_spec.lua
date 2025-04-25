@@ -43,6 +43,7 @@ function Network:addCard(card, x, y)
     self.grid[y][x] = card
     self.cards[card.id] = card
     card.position = {x = x, y = y}
+    card.network = self
 end
 
 function Network:getSize()
@@ -72,30 +73,12 @@ describe("Rules Module", function()
     local reactorCard
     local techCard1, techCard2
     
-    -- Helper function to add required methods to mock cards
-    local function makeMockCard(data)
-        local card = data
-        -- Add isPortDefined based on definedPorts
-        card.isPortDefined = function(self, portIndex)
-            return self.definedPorts and self.definedPorts[portIndex] == true
-        end
-        -- Add isPortOccupied (assume false for these tests)
-        card.isPortOccupied = function(self, portIndex) return false end
-        -- Add isPortAvailable combining the two
-        card.isPortAvailable = function(self, portIndex)
-            return self:isPortDefined(portIndex) and not self:isPortOccupied(portIndex)
-        end
-        -- Use the real Card's getPortProperties for accuracy
-        card.getPortProperties = Card.getPortProperties -- Assign the actual function
-        return card
-    end
-
     before_each(function()
         rules = Rules:new()
         network = Network:new()
         
-        -- Create test cards using the helper
-        reactorCard = makeMockCard({
+        -- Use Card:new directly instead of makeMockCard
+        reactorCard = Card:new({
             id = "REACTOR_TEST",
             type = Card.Type.REACTOR,
             definedPorts = {
@@ -106,18 +89,16 @@ describe("Rules Module", function()
             }
         })
         
-        -- Tech card with Culture Input (Bottom Left) - Should connect ABOVE Reactor
-        techCard1 = makeMockCard({
+        techCard1 = Card:new({
             id = "CONNECT_VALID",
-            type = Card.Type.TECHNOLOGY, -- Type doesn't matter for connection check itself
+            type = Card.Type.TECHNOLOGY, 
             definedPorts = {
                 [Card.Ports.BOTTOM_LEFT] = true,   -- Culture Input (Connects to Reactor's Port 1 - Culture Output)
                 [Card.Ports.RIGHT_BOTTOM] = true,  -- Resource Output (Irrelevant here),
             }
         })
         
-        -- Card WITHOUT the required Input port
-        techCard2 = makeMockCard({
+        techCard2 = Card:new({
             id = "CONNECT_INVALID",
             type = Card.Type.KNOWLEDGE,
             definedPorts = {
@@ -128,10 +109,11 @@ describe("Rules Module", function()
     end)
     
     describe("isPlacementValid()", function()
-        it("should allow placing the first card (reactor) in an empty network", function()
-            local valid, _ = rules:isPlacementValid(reactorCard, network, 0, 0)
-            assert.is_true(valid)
-        end)
+        -- REMOVED: Invalid test - Reactor placement is handled by Network:initializeWithReactor, not Rules:isPlacementValid
+        -- it("should allow placing the first card (reactor) in an empty network", function()
+        --     local valid, _ = rules:isPlacementValid(reactorCard, network, 0, 0)
+        --     assert.is_true(valid)
+        -- end)
         
         it("should reject placement on an occupied position", function()
             network:addCard(reactorCard, 0, 0)
@@ -184,8 +166,8 @@ describe("Rules Module", function()
         local bpuCard -- Basic Processing Unit mock
 
         before_each(function() 
-            -- Add reactor to network using the helper
-            reactorCard = makeMockCard({ -- Re-create reactor in this scope
+            -- Add reactor to network 
+            reactorCard = Card:new({ -- Re-create reactor in this scope using Card:new
                 id = "REACTOR_TEST",
                 type = Card.Type.REACTOR,
                 definedPorts = {
@@ -197,8 +179,8 @@ describe("Rules Module", function()
             })
             network:addCard(reactorCard, 0, 0)
 
-            -- Define BPU mock (Tech Input top-right) using the helper
-            bpuCard = makeMockCard({
+            -- Define BPU (Tech Input top-right) using Card:new
+            bpuCard = Card:new({
                 id = "BPU_TEST",
                 type = Card.Type.TECHNOLOGY,
                 -- position will be set by addCard

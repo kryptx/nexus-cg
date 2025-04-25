@@ -9,6 +9,9 @@ local StyleGuide = {
     CARD_EFFECT =     { fontName = 'worldSmall',         color = {0.1, 0.1, 0.1, 1} }, -- Dark Gray, Uses standard worldSmall
     CARD_ART_LABEL =  { fontName = 'worldStandard',      color = {0, 0, 0, 1} },       -- Black (For the 'ART' placeholder)
 
+    -- NEW: Style for Convergence text using the white BMFont
+    CARD_EFFECT_CONVERGENCE = { fontName = 'worldConvergence', color = {1, 1, 1, 1} }, -- White
+
     UI_LABEL =        { fontName = 'uiStandard',    color = {1, 1, 1, 1} },       -- White
     UI_HAND_LABEL =   { fontName = 'uiStandard',    color = {1, 1, 1, 1} },       -- White
     UI_STATUS_MSG =   { fontName = 'uiStandard',    color = {1, 1, 1, 1} },       -- White (Was yellow)

@@ -46,7 +46,13 @@ local mockRenderer = { -- Base methods for the mock
         material = "DUMMY_MATERIAL_ICON",
         data = "DUMMY_DATA_ICON"
         -- Add others if needed by tests
-    }
+    },
+    -- NEW: Add missing mock method
+    gridToWorldCoords = function() return 0, 0 end,
+    -- Constants needed by PlayState
+    CARD_WIDTH = 100,
+    CARD_HEIGHT = 140, -- Add missing constant
+    HAND_CARD_SCALE = 0.6 -- Add missing constant
 }
 mockRenderer.new = function() -- Constructor returns a new instance based on the base
     local instance = {
@@ -95,6 +101,16 @@ local mockButton = {
                 return false
             end
             return px >= self.x and px < self.x + self.width and py >= self.y and py < self.y + self.height
+        end
+        -- Add missing setPosition method to mock
+        instance.setPosition = function(self, newX, newY)
+            self.x = newX
+            self.y = newY
+        end
+        -- Add missing setSize method to mock
+        instance.setSize = function(self, newW, newH)
+            self.width = newW
+            self.height = newH
         end
         return instance
     end
@@ -146,7 +162,9 @@ local mockGameService = { -- Base methods for the mock
         ACTIVATE = "Activate",
         CONVERGE = "Converge",
         CLEANUP = "Cleanup"
-    }
+    },
+    -- NEW: Add missing mock method
+    isPlacementValid = function() return true end -- Default to true for tests needing it
 }
 mockGameService.new = function() -- Constructor returns a new instance based on the base
     local instance = {
@@ -155,6 +173,18 @@ mockGameService.new = function() -- Constructor returns a new instance based on 
         players = {}
     }
     setmetatable(instance, { __index = mockGameService })
+    return instance
+end
+
+-- NEW: Mock AnimationController
+local mockAnimationController = {
+    addAnimation = function() end, -- Simple mock addAnimation
+    getActiveAnimations = function() return {} end, -- Return empty table
+    getAnimatingCardIds = function() return {} end -- Return empty table (set)
+}
+mockAnimationController.new = function()
+    local instance = {}
+    setmetatable(instance, { __index = mockAnimationController })
     return instance
 end
 
@@ -231,6 +261,7 @@ package.loaded['src.game.data.card_definitions'] = mockCardDefinitions
 package.loaded['src.rendering.renderer'] = mockRenderer
 package.loaded['src.ui.button'] = mockButton
 package.loaded['src.game.game_service'] = mockGameService
+package.loaded['src.controllers.AnimationController'] = mockAnimationController -- Mock AnimationController
 
 -- Now require the module under test
 local PlayState = require 'src.game.states.play_state'
@@ -238,6 +269,7 @@ local PlayState = require 'src.game.states.play_state'
 describe("PlayState Module", function()
     local state
     local mockGameServiceInstance
+    local mockAnimationControllerInstance -- Declare mock controller instance
 
     before_each(function()
         -- Reset capture tables for ALL tests
@@ -247,9 +279,11 @@ describe("PlayState Module", function()
 
         -- Create a new mockGameService instance first
         mockGameServiceInstance = mockGameService.new()
+        -- Create a mock AnimationController instance
+        mockAnimationControllerInstance = mockAnimationController.new()
 
-        -- Create a new PlayState instance using its constructor, providing the mock
-        state = PlayState:new(mockGameServiceInstance)
+        -- Create a new PlayState instance using its constructor, providing BOTH mocks
+        state = PlayState:new(mockAnimationControllerInstance, mockGameServiceInstance)
 
         -- Clear players array as :enter() will set it up fully
         state.players = {}

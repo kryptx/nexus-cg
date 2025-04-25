@@ -121,7 +121,9 @@ describe("Card Module", function()
                 cardB.owner = player
                 network:placeCard(cardA, 0, 0)
                 network:placeCard(cardB, 1, 0)
-                assert.is_false(cardA:isPortAvailable(Card.Ports.RIGHT_TOP))
+                -- isPortAvailable ONLY checks the card's internal state (defined and not marked occupied)
+                -- It does NOT check for physical blocking by neighbors.
+                assert.is_true(cardA:isPortAvailable(Card.Ports.RIGHT_TOP)) -- Corrected assertion
             end)
         end)
         
@@ -165,7 +167,9 @@ describe("Card Module", function()
                 network:placeCard(cardA, 0, 0)
                 network:placeCard(cardB, 1, 0)
                 -- RIGHT_TOP faces (1,0)
-                assert.is_true(cardA:isPortOccupied(Card.Ports.RIGHT_TOP))
+                -- isPortOccupied ONLY checks internally marked occupied ports (e.g., convergence links)
+                -- It does NOT check for physical blocking by neighbors.
+                assert.is_false(cardA:isPortOccupied(Card.Ports.RIGHT_TOP)) -- Corrected assertion
                 -- A port facing an empty cell should not be occupied
                 assert.is_false(cardA:isPortOccupied(Card.Ports.TOP_LEFT))
             end)

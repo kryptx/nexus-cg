@@ -81,16 +81,17 @@ local function getPortInfo(renderer, portIndex)
     return nil
 end
 
-function PlayState:new(gameService)
+function PlayState:new(animationController, gameService) -- Accept animationController and gameService
     local instance = setmetatable({}, { __index = PlayState })
-    instance:init(gameService)
+    instance:init(animationController, gameService) -- Pass it to init
     return instance
 end
 
-function PlayState:init(gameService)
+function PlayState:init(animationController, gameService) -- Accept animationController and gameService
     -- Initialize state variables
     self.players = {}
     self.renderer = Renderer:new() -- Create renderer instance
+    self.animationController = animationController -- Store the controller
     self.selectedHandIndex = nil -- Track selected card in hand
     self.hoveredHandIndex = nil -- Add this
     self.handCardBounds = {} -- Store bounding boxes returned by renderer
@@ -132,8 +133,8 @@ function PlayState:init(gameService)
     self.promptYesBounds = nil      -- NEW: Bounding box for Yes button (set by renderer)
     self.promptNoBounds = nil       -- NEW: Bounding box for No button (set by renderer)
 
-    -- Initialize Game Service (either use injected or create new)
-    self.gameService = gameService or GameService:new()
+    -- Initialize Game Service (using injected or create new)
+    self.gameService = gameService or GameService:new() -- Use the injected gameService if provided
 
     -- Create UI elements (initial placeholder creation, positions set in _recalculateLayout)
     local uiFonts = self.renderer.fonts -- Get the fonts table
@@ -336,11 +337,27 @@ function PlayState:draw(stateManager)
     local screenW = love.graphics.getWidth()
     local screenH = love.graphics.getHeight()
 
-    -- Draw ALL player networks using their origins
+    -- Get cards currently being animated
+    local animatingCardIds = {}
+    if self.animationController then
+        animatingCardIds = self.animationController:getAnimatingCardIds()
+    end
+
+    -- Draw ALL player networks using their origins - pass animatingCardIds to skip cards being animated
     local activeLinks = self.gameService.activeConvergenceLinks -- Get active links
     for i, player in ipairs(self.players) do
         local origin = self.playerOrigins[i] or {x=0, y=0} -- Fallback origin
-        self.renderer:drawNetwork(player.network, self.cameraX, self.cameraY, self.cameraZoom, origin.x, origin.y, activeLinks)
+        self.renderer:drawNetwork(player.network, self.cameraX, self.cameraY, self.cameraZoom, origin.x, origin.y, activeLinks, animatingCardIds)
+    end
+
+    -- Draw any active card animations (after networks, before UI)
+    if self.animationController then
+        local activeAnimations = self.animationController:getActiveAnimations()
+        for id, animation in pairs(activeAnimations) do
+            if animation.type == 'cardPlay' then
+                self.renderer:drawCardAnimation(animation, self.cameraX, self.cameraY, self.cameraZoom)
+            end
+        end
     end
 
     -- Draw highlight box around the active player's grid area
@@ -422,7 +439,8 @@ function PlayState:draw(stateManager)
     -- Ensure default line width for screen-space UI (Hand)
     love.graphics.setLineWidth(1)
     -- Now draw the actual hand (will draw over the grid highlight and preview)
-    self.handCardBounds = self.renderer:drawHand(currentPlayer, self.selectedHandIndex)
+    -- Pass animatingCardIds to skip cards being animated
+    self.handCardBounds = self.renderer:drawHand(currentPlayer, self.selectedHandIndex, animatingCardIds)
     
     -- Draw hovered hand card preview near the mouse
     if not self.isDisplayingPrompt and self.hoveredHandIndex then
@@ -666,11 +684,48 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                 -- Convert to grid coordinates relative to the CURRENT player's origin
                 local gridX, gridY = self.renderer:worldToGridCoords(worldX, worldY, currentOrigin.x, currentOrigin.y)
 
-                local success, message = self.gameService:attemptPlacement(self, self.selectedHandIndex, gridX, gridY)
-                if success then
-                    self:resetSelectionAndStatus()
+                -- Check if placement is valid BEFORE starting animation
+                local selectedCard = currentPlayer.hand[self.selectedHandIndex]
+                local isValid = self.gameService:isPlacementValid(currentPlayerIndex, selectedCard, gridX, gridY)
+                if isValid then
+                    -- Get start position (center of the hand card)
+                    local handBounds = self.handCardBounds[self.selectedHandIndex]
+                    local startScreenX = handBounds.x + handBounds.w / 2
+                    local startScreenY = handBounds.y + handBounds.h / 2
+                    local startWorldX, startWorldY = self.renderer:screenToWorldCoords(startScreenX, startScreenY, self.cameraX, self.cameraY, self.cameraZoom)
+                    -- Get end position (center of the grid cell)
+                    local endWorldXBase, endWorldYBase = self.renderer:gridToWorldCoords(gridX, gridY, currentOrigin.x, currentOrigin.y)
+                    local endWorldX = endWorldXBase + self.renderer.CARD_WIDTH / 2
+                    local endWorldY = endWorldYBase + self.renderer.CARD_HEIGHT / 2
+                    -- Start Animation!
+                    self.animationController:addAnimation({
+                        type = 'cardPlay',
+                        duration = 0.5, -- Slightly longer to appreciate the effects
+                        card = selectedCard,
+                        startWorldPos = { x = startWorldX, y = startWorldY },
+                        endWorldPos = { x = endWorldX, y = endWorldY },
+                        startScale = self.renderer.HAND_CARD_SCALE or 0.6,
+                        endScale = 1.0,
+                        startRotation = math.pi * 0.1, -- Slight tilt at start
+                        endRotation = 0, -- End with no rotation
+                        easingType = "outBack", -- Use the outBack easing for a slight overshoot
+                        startAlpha = 0.9,
+                        endAlpha = 1.0
+                    })
+                    -- Clear selection immediately so the card disappears from hand
+                    local cardToRemove = self.selectedHandIndex -- Store index before clearing
+                    self:resetSelectionAndStatus() -- Clear selection
+                    -- Actually play the card in the game state (happens after animation)
+                    -- The animation system doesn't handle game logic
+                    local success, message = self.gameService:attemptPlacement(self, cardToRemove, gridX, gridY)
+                    self:updateStatusMessage(message)
+                    -- Note: success check is somewhat redundant as we checked isValid, but good practice
+                else
+                    -- Placement not valid, update status from gameService
+                    local _, message = self.gameService:attemptPlacement(self, self.selectedHandIndex, gridX, gridY)
+                    self:updateStatusMessage(message)
+                    -- Don't reset selection, allow player to try again
                 end
-                self:updateStatusMessage(message)
             elseif self.convergenceSelectionState == "selecting_own_output" then
                 -- Handle clicking on network to select output port
                 local worldX, worldY = self.renderer:screenToWorldCoords(x, y, self.cameraX, self.cameraY, self.cameraZoom)
