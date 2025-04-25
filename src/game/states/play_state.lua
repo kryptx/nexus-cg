@@ -134,60 +134,37 @@ function PlayState:init(gameService)
     -- Initialize Game Service (either use injected or create new)
     self.gameService = gameService or GameService:new()
 
-    -- Create UI buttons (pass self for context in callbacks)
-    local screenW = love.graphics.getWidth()
-    local screenH = love.graphics.getHeight()
-    local buttonY = screenH - 50
-    local endTurnWidth = 80 -- Width for End Turn/Next Phase
-    local discardWidth = 140 -- Increased width for discard buttons
-    local buttonHeight = 40 -- Explicit height
+    -- Create UI elements (initial placeholder creation, positions set in _recalculateLayout)
     local uiFonts = self.renderer.fonts -- Get the fonts table
     local uiStyleGuide = self.renderer.styleGuide -- Get the style guide
 
-    -- End Turn / Next Phase buttons
-    local currentX = screenW - endTurnWidth - BUTTON_GAP
-    self.buttonEndTurn = Button:new(currentX, buttonY, "End Turn", function() self:endTurn() end, endTurnWidth, buttonHeight, uiFonts, uiStyleGuide)
+    -- End Turn / Next Phase buttons (Placeholder creation)
+    self.buttonEndTurn = Button:new(0, 0, "End Turn", function() self:endTurn() end, 0, 0, uiFonts, uiStyleGuide)
+    self.buttonAdvancePhase = Button:new(0, 0, "Next Phase", function() self:advancePhase() end, 0, 0, uiFonts, uiStyleGuide)
 
-    currentX = currentX - endTurnWidth - BUTTON_GAP
-    self.buttonAdvancePhase = Button:new(currentX, buttonY, "Next Phase", function() self:advancePhase() end, endTurnWidth, buttonHeight, uiFonts, uiStyleGuide)
-
-    -- Create discard buttons with text and inline icons
-    currentX = 10
+    -- Create discard buttons (Placeholder creation)
     local discardText = "Discard for 1 "
-    -- Use nil for the 'icon' parameter (5th to last), pass icon to 'inlineIcon' (last)
-    self.buttonDiscardMaterial = Button:new(currentX, buttonY, discardText, function() self:discardSelected('material') end, discardWidth, buttonHeight, uiFonts, uiStyleGuide, nil, self.renderer.icons.material)
-    self.buttonDiscardMaterial:setEnabled(false)
+    self.buttonDiscardMaterial = Button:new(0, 0, discardText, function() self:discardSelected('material') end, 0, 0, uiFonts, uiStyleGuide, nil, self.renderer.icons.material)
+    self.buttonDiscardData = Button:new(0, 0, discardText, function() self:discardSelected('data') end, 0, 0, uiFonts, uiStyleGuide, nil, self.renderer.icons.data)
 
-    currentX = currentX + discardWidth + BUTTON_GAP
-    self.buttonDiscardData = Button:new(currentX, buttonY, discardText, function() self:discardSelected('data') end, discardWidth, buttonHeight, uiFonts, uiStyleGuide, nil, self.renderer.icons.data)
-    self.buttonDiscardData:setEnabled(false)
-
-    -- Calculate position for Help Toggle button (e.g., near top right)
-    local toggleHelpWidth = 100
-    local toggleHelpHeight = 30
-    local toggleHelpX = screenW - toggleHelpWidth - BUTTON_GAP
-    local toggleHelpY = 10 -- Place it near the top status message
-
-    self.buttonToggleHelp = Button:new(toggleHelpX, toggleHelpY, "Toggle Help", function()
+    -- Help Toggle button (Placeholder creation)
+    self.buttonToggleHelp = Button:new(0, 0, "Toggle Help", function()
         self.showHelpBox = not self.showHelpBox
         print("Help Box Toggled: ", self.showHelpBox)
-    end, toggleHelpWidth, toggleHelpHeight, uiFonts, uiStyleGuide)
+    end, 0, 0, uiFonts, uiStyleGuide)
 
     -- Update uiElements list
     self.uiElements = { self.buttonEndTurn, self.buttonAdvancePhase, self.buttonDiscardMaterial, self.buttonDiscardData, self.buttonToggleHelp }
 
-    local pauseButtonW = 150
-    local pauseButtonH = 40
-    local pauseButtonGap = 15
-    local pauseTotalHeight = (pauseButtonH * 3) + (pauseButtonGap * 2)
-    local pauseStartY = (screenH - pauseTotalHeight) / 2
-    local pauseButtonX = (screenW - pauseButtonW) / 2
-
+    -- Pause Menu Buttons (Placeholder creation)
     self.pauseMenuButtons = {
-        Button:new(pauseButtonX, pauseStartY, "Resume Game", function() self.isPaused = false end, pauseButtonW, pauseButtonH, uiFonts, uiStyleGuide),
-        Button:new(pauseButtonX, pauseStartY + pauseButtonH + pauseButtonGap, "Main Menu", function() print("TODO: Transition to Main Menu state") end, pauseButtonW, pauseButtonH, uiFonts, uiStyleGuide),
-        Button:new(pauseButtonX, pauseStartY + 2 * (pauseButtonH + pauseButtonGap), "Quit Game", function() love.event.quit() end, pauseButtonW, pauseButtonH, uiFonts, uiStyleGuide)
+        Button:new(0, 0, "Resume Game", function() self.isPaused = false end, 0, 0, uiFonts, uiStyleGuide),
+        Button:new(0, 0, "Main Menu", function() print("TODO: Transition to Main Menu state") end, 0, 0, uiFonts, uiStyleGuide),
+        Button:new(0, 0, "Quit Game", function() love.event.quit() end, 0, 0, uiFonts, uiStyleGuide)
     }
+
+    -- Initial layout calculation using current window size
+    self:_recalculateLayout(love.graphics.getWidth(), love.graphics.getHeight())
 end
 
 function PlayState:enter()
@@ -1054,6 +1031,84 @@ function PlayState:resetConvergenceSelection()
     self.targetConvergenceNodePos = nil
     self.targetConvergencePortIndex = nil
     -- We might need to re-evaluate button states here too, but handled in abort logic for now
+end
+
+-- Helper to update UI element positions based on screen size
+function PlayState:_recalculateLayout(w, h)
+    print(string.format("Recalculating layout for %d x %d", w, h))
+
+    -- Define button sizes and positions dynamically
+    local buttonY = h - 50 -- Position relative to bottom
+    local endTurnWidth = 80
+    local discardWidth = 140
+    local buttonHeight = 40
+    local toggleHelpWidth = 100
+    local toggleHelpHeight = 30
+    local pauseButtonW = 150
+    local pauseButtonH = 40
+    local pauseButtonGap = 15
+
+    -- Main Game Buttons
+    local currentX = w - endTurnWidth - BUTTON_GAP
+    if self.buttonEndTurn then
+        self.buttonEndTurn:setPosition(currentX, buttonY)
+        self.buttonEndTurn:setSize(endTurnWidth, buttonHeight)
+    end
+
+    currentX = currentX - endTurnWidth - BUTTON_GAP
+    if self.buttonAdvancePhase then
+        self.buttonAdvancePhase:setPosition(currentX, buttonY)
+        self.buttonAdvancePhase:setSize(endTurnWidth, buttonHeight)
+    end
+
+    currentX = 10 -- Reset for left-aligned buttons
+    if self.buttonDiscardMaterial then
+        self.buttonDiscardMaterial:setPosition(currentX, buttonY)
+        self.buttonDiscardMaterial:setSize(discardWidth, buttonHeight)
+        self.buttonDiscardMaterial:setEnabled(self.selectedHandIndex and self.currentPhase == TurnPhase.BUILD) -- Update enabled state
+    end
+
+    currentX = currentX + discardWidth + BUTTON_GAP
+    if self.buttonDiscardData then
+        self.buttonDiscardData:setPosition(currentX, buttonY)
+        self.buttonDiscardData:setSize(discardWidth, buttonHeight)
+        self.buttonDiscardData:setEnabled(self.selectedHandIndex and self.currentPhase == TurnPhase.BUILD) -- Update enabled state
+    end
+
+    -- Help Toggle Button (Top Right)
+    local toggleHelpX = w - toggleHelpWidth - BUTTON_GAP
+    local toggleHelpY = 10
+    if self.buttonToggleHelp then
+        self.buttonToggleHelp:setPosition(toggleHelpX, toggleHelpY)
+        self.buttonToggleHelp:setSize(toggleHelpWidth, toggleHelpHeight)
+    end
+
+    -- Pause Menu Buttons (Centered)
+    local pauseTotalHeight = (pauseButtonH * 3) + (pauseButtonGap * 2)
+    local pauseStartY = (h - pauseTotalHeight) / 2
+    local pauseButtonX = (w - pauseButtonW) / 2
+    if self.pauseMenuButtons and #self.pauseMenuButtons == 3 then
+        self.pauseMenuButtons[1]:setPosition(pauseButtonX, pauseStartY)
+        self.pauseMenuButtons[1]:setSize(pauseButtonW, pauseButtonH)
+        self.pauseMenuButtons[2]:setPosition(pauseButtonX, pauseStartY + pauseButtonH + pauseButtonGap)
+        self.pauseMenuButtons[2]:setSize(pauseButtonW, pauseButtonH)
+        self.pauseMenuButtons[3]:setPosition(pauseButtonX, pauseStartY + 2 * (pauseButtonH + pauseButtonGap))
+        self.pauseMenuButtons[3]:setSize(pauseButtonW, pauseButtonH)
+    end
+
+    -- TODO: Recalculate Help Box position/size if needed (depends on ToggleHelp button)
+    -- TODO: Update status message position (e.g., top center)
+    -- TODO: Update debug text position (e.g., bottom center)
+end
+
+-- LÖVE callback for window resize
+function PlayState:resize(stateManager, w, h)
+    -- Recalculate UI element positions
+    self:_recalculateLayout(w, h)
+
+    -- Optional: Adjust camera or other view elements if necessary
+    -- For example, if the camera view should maintain aspect ratio or re-center
+    -- print(string.format("PlayState received resize: %d x %d", w, h))
 end
 
 return PlayState 

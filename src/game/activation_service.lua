@@ -108,11 +108,27 @@ function ActivationService:findGlobalActivationPath(targetCard, activatorReactor
                             table.insert(newPath, { card = neighborNode, owner = currentOwner, traversedLinkType = nil })
                             print(string.format("      >> Enqueueing ADJACENT: %s (P%d)", neighborNode.id, currentOwner.id))
                             table.insert(queue, { node = neighborNode, owner = currentOwner, path = newPath })
+                        else
+                           print(string.format("      >> FAILED ADJACENCY CHECK #3: Neighbor %s (P%d) Port %d. Props=%s, IsOutput=%s, Available=%s, TypeMatch=%s",
+                                neighborNode.id, currentOwner.id, neighborPortIndex,
+                                tostring(neighborProps),
+                                neighborProps and tostring(neighborProps.is_output),
+                                neighborNode:isPortAvailable(neighborPortIndex),
+                                neighborProps and portProps and tostring(neighborProps.type == portProps.type)))
                         end
+                    else
+                        print(string.format("      >> FAILED ADJACENCY CHECK #2: Neighbor @(%s,%s) node=%s, visited=%s",
+                            tostring(adjacentPos and adjacentPos.x), tostring(adjacentPos and adjacentPos.y),
+                            tostring(neighborNode and neighborNode.id),
+                            neighborVisitedKey and tostring(visited[neighborVisitedKey])))
                     end
+                else
+                    print(string.format("      >> FAILED ADJACENCY CHECK #1b: adjacentPos is nil for Port %d", portIndex))
                 end
+            else
+               if portProps then print(string.format("      >> SKIPPING Port %d: IsOutput=%s, Available=%s", portIndex, tostring(portProps.is_output), currentNode:isPortAvailable(portIndex))) end
             end
-        end
+        end -- end for portIndex
 
         -- Explore Neighbors (Convergence Links)
         print(string.format("  [Pathfinder Convergence] Exploring links for %s (P%d)...", currentNode.id, currentOwner.id))

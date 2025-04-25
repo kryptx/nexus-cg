@@ -239,17 +239,15 @@ end
 
 -- Checks if a specific port is currently marked as occupied by any link
 function Card:isPortOccupied(portIndex)
-    -- Occupied if explicitly marked by a link
-    if self.occupiedPorts[portIndex] ~= nil then
+    -- Check occupiedPorts first (for convergence links)
+    if self.occupiedPorts[portIndex] then
         return true
     end
-    -- Also consider physically blocked if another card is adjacent in that direction
-    if self.network and self.position then
-        local adjCoord = self.network:getAdjacentCoordForPort(self.position.x, self.position.y, portIndex)
-        if adjCoord then
-            local adjCard = self.network:getCardAt(adjCoord.x, adjCoord.y)
-            if adjCard then
-                return true
+    -- Check connections (for adjacency links established during placement)
+    if self.connections then
+        for _, conn in ipairs(self.connections) do
+            if conn.selfPort == portIndex then
+                return true -- Occupied by an adjacent card connection
             end
         end
     end

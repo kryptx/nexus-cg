@@ -168,4 +168,16 @@ function Button:setEnabled(enabled)
     end
 end
 
+-- New method to set the position
+function Button:setPosition(x, y)
+    self.x = x
+    self.y = y
+end
+
+-- New method to set the size
+function Button:setSize(width, height)
+    self.width = width
+    self.height = height
+end
+
 return Button

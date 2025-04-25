@@ -126,6 +126,9 @@ function Renderer:new()
     instance.worldFontMultiplier = worldFontMultiplier
     instance.uiFontMultiplier = uiFontMultiplier
 
+    -- NEW: Scale factor for pre-rendering card canvases
+    instance.canvasRenderScaleFactor = 4
+
     -- Load Resource Icons
     instance.icons.energy = instance:_loadImage("assets/images/energy.png")
     instance.icons.data = instance:_loadImage("assets/images/data.png")
@@ -457,11 +460,42 @@ function Renderer:_drawSinglePortShape(portIndex, portX, portY, radius, alpha)
     love.graphics.setColor(baseColor[1], baseColor[2], baseColor[3], (baseColor[4] or 1) * alpha)
 
     local vertices
-    if isOutput then -- Draw rectangle
-        if orientation == "top" then vertices = { portX-r, portY-r, portX+r, portY-r, portX+r, portY, portX-r, portY }
-        elseif orientation == "bottom" then vertices = { portX-r, portY, portX+r, portY, portX+r, portY+r, portX-r, portY+r }
-        elseif orientation == "left" then vertices = { portX-r, portY-r, portX, portY-r, portX, portY+r, portX-r, portY+r }
-        elseif orientation == "right" then vertices = { portX, portY-r, portX+r, portY-r, portX+r, portY+r, portX, portY+r }
+    if isOutput then -- Draw trapezoid (wider outer edge)
+        local outer_half_width = r * 1.5 -- Outer edge will be 3r wide/tall
+        local inner_half_width = r       -- Inner edge remains 2r wide/tall
+
+        if orientation == "top" then
+            -- Outer edge points (y = portY)
+            local x1_out = portX - inner_half_width
+            local x2_out = portX + inner_half_width
+            -- Inner edge points (y = portY)
+            local x1_in = portX - outer_half_width
+            local x2_in = portX + outer_half_width
+            vertices = { x1_out, portY-r, x2_out, portY-r, x2_in, portY, x1_in, portY }
+        elseif orientation == "bottom" then
+             -- Outer edge points (y = portY+r)
+            local x1_out = portX - inner_half_width
+            local x2_out = portX + inner_half_width
+            -- Inner edge points (y = portY)
+            local x1_in = portX - outer_half_width
+            local x2_in = portX + outer_half_width
+            vertices = { x1_in, portY, x2_in, portY, x2_out, portY+r, x1_out, portY+r }
+        elseif orientation == "left" then
+            -- Outer edge points (x = portX-r)
+            local y1_out = portY - inner_half_width
+            local y2_out = portY + inner_half_width
+            -- Inner edge points (x = portX)
+            local y1_in = portY - outer_half_width
+            local y2_in = portY + outer_half_width
+            vertices = { portX-r, y1_out, portX, y1_in, portX, y2_in, portX-r, y2_out }
+        elseif orientation == "right" then
+             -- Outer edge points (x = portX+r)
+            local y1_out = portY - inner_half_width
+            local y2_out = portY + inner_half_width
+            -- Inner edge points (x = portX)
+            local y1_in = portY - outer_half_width
+            local y2_in = portY + outer_half_width
+            vertices = { portX, y1_in, portX+r, y1_out, portX+r, y2_out, portX, y2_in }
         end
     else -- Draw triangle (input)
         if orientation == "top" then vertices = { portX-r, portY-r, portX+r, portY-r, portX, portY+r } -- Points down
@@ -471,6 +505,7 @@ function Renderer:_drawSinglePortShape(portIndex, portX, portY, radius, alpha)
         end
     end
 
+    love.graphics.setLineWidth(0.5)
     if vertices then
         love.graphics.polygon("fill", vertices)
         local borderColor = PORT_BORDER_COLOR
@@ -705,7 +740,7 @@ function Renderer:_drawSingleCardInWorld(card, wx, wy, activeLinks, alphaOverrid
 
     -- Draw the pre-rendered card base from cache
     local canvas = self:_generateCardCanvas(card)
-    local sf = self.worldFontMultiplier or 1
+    local sf = self.canvasRenderScaleFactor or 1 -- Use new scale factor
     local invSf = 1 / sf
     local borderPadding = self.PORT_RADIUS -- Original units
     local drawX = wx - borderPadding * invSf
@@ -813,7 +848,7 @@ function Renderer:drawHoveredHandCard(card, sx, sy, scale)
     end
 
     -- Draw the cached card canvas scaled down
-    local sf = self.worldFontMultiplier or 1
+    local sf = self.canvasRenderScaleFactor or 1 -- Use new scale factor
     local invSf = 1 / sf
     local drawScale = scale * invSf
     local canvas = self:_generateCardCanvas(card)
@@ -867,8 +902,8 @@ function Renderer:drawHand(player, selectedIndex)
         -- activeLinks is not relevant for hand cards
     }
 
-    -- Adjust for cached canvas resolution (baked at worldFontMultiplier)
-    local sf = self.worldFontMultiplier or 1
+    -- Adjust for cached canvas resolution (baked at canvasRenderScaleFactor)
+    local sf = self.canvasRenderScaleFactor or 1 -- Use new scale factor
     local invSf = 1 / sf
 
     -- Draw non-selected cards by blitting cached canvas
@@ -1092,8 +1127,8 @@ end
 -- Draws a modal box with the question and returns bounds for Yes/No buttons
 -- Returns: yesBounds {x, y, w, h}, noBounds {x, y, w, h}
 function Renderer:drawYesNoPrompt(question)
-    local screenW = love.graphics.getWidth()
-    local screenH = love.graphics.getHeight()
+    local screenW = love.graphics.getWidth()  -- Get current width
+    local screenH = love.graphics.getHeight() -- Get current height
 
     -- Box Appearance
     local boxWidth = screenW * 0.5  -- 50% of screen width
@@ -1168,8 +1203,8 @@ end
 
 function Renderer:_generateCardCanvas(card)
     if self.cardCache[card.id] then return self.cardCache[card.id] end
-    -- Render at higher resolution (worldFontMultiplier scale)
-    local sf = self.worldFontMultiplier or 1
+    -- Render at higher resolution (canvasRenderScaleFactor)
+    local sf = self.canvasRenderScaleFactor or 1 -- Use new scale factor
     -- Calculate canvas size including padding for half the border width
     local borderPadding = self.PORT_RADIUS -- Padding needed in sf=1 units
     local canvasPadding = borderPadding * sf
@@ -1185,7 +1220,7 @@ function Renderer:_generateCardCanvas(card)
     -- Translate to account for padding before scaling
     love.graphics.translate(canvasPadding, canvasPadding)
     -- Scale drawing so 1:1 coordinates map to sf× size on canvas
-    love.graphics.scale(self.worldFontMultiplier or 1, self.worldFontMultiplier or 1)
+    love.graphics.scale(sf, sf) -- Use new scale factor
     local context = {
         stylePrefix = "CARD",
         baseFontSizes = {

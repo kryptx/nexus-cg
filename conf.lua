@@ -3,6 +3,9 @@ function love.conf(t)
     t.window.width = 1280                    -- Set the window width
     t.window.height = 720                   -- Set the window height
     t.window.vsync = 1                      -- Enable vertical sync (0 = off, 1 = on)
+    t.window.resizable = true               -- Allow window resizing
+    t.window.minwidth = 800                 -- Set minimum window width
+    t.window.minheight = 600                -- Set minimum window height
 
     -- Enable standard modules
     t.modules.audio = true

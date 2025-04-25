@@ -27,26 +27,22 @@ end
 -- Validates if a card can be placed at a given position in a network
 -- Returns: boolean, reason (if false)
 function Rules:isPlacementValid(card, network, x, y)
-    -- Check if the position is already occupied
+    -- Basic Checks
+    if not card then return false, "Invalid card provided" end
+    if not network then return false, "Invalid network provided" end
     if network:getCardAt(x, y) then
-        return false, "Position already occupied"
+        return false, "Target location is already occupied"
     end
     
-    -- Check uniqueness rule: Network cannot have duplicates of the same card
-    if network:hasCardWithId(card.id) then
-        return false, "Card already exists in network (Uniqueness Rule)"
+    -- Reactor is always valid at (0,0) during initialization only (handled elsewhere)
+    -- For regular placement, cannot place Reactor
+    if card.type == Card.Type.REACTOR then 
+        return false, "Cannot place Reactor card manually"
     end
-    
-    -- If this is the first card (reactor) or network is empty, allow placement
-    if network:isEmpty() then
-        -- NOTE: This path is unlikely now that network initializes with reactor.
-        --       Placement adjacent to reactor is handled by the general adjacency/connection check.
-        return true
-    end
-    
-    -- Check if there's at least one adjacent card
+
+    -- Check Adjacency and Connections
     local adjacentFound = false
-    local validConnectionFound = false
+    local validConnectionToExistingCard = false
     local adjacentPositions = {
         {x=x, y=y-1, dirFromNew="up"},    -- Above
         {x=x, y=y+1, dirFromNew="down"},  -- Below
@@ -57,67 +53,56 @@ function Rules:isPlacementValid(card, network, x, y)
     for _, posData in ipairs(adjacentPositions) do
         local adjCard = network:getCardAt(posData.x, posData.y)
         if adjCard then
-            adjacentFound = true
+            adjacentFound = true -- Found at least one adjacent card
             
-            -- Check if there's a valid connection (Input->Output as per GDD 4.3)
-            -- Calculate dx, dy from the new card (x,y) to the adjacent card (posData.x, posData.y)
+            -- Determine facing ports
             local dx = posData.x - x
             local dy = posData.y - y
-            if self:hasValidConnection(card, adjCard, dx, dy) then
-                validConnectionFound = true
-                break -- Found one valid connection, no need to check others
+            local newCardFacingPorts = self:getFacingPorts(dx, dy)
+            local existingCardFacingPorts = self:getFacingPorts(-dx, -dy)
+
+            -- Check for GDD 4.3 Rule: 
+            -- "At least one open INPUT port on the new card must align with 
+            --  an open OUTPUT port of the same type on an existing adjacent card."
+            local connectionPossible = false
+            for _, newPortIndex in ipairs(newCardFacingPorts) do
+                if card:isPortDefined(newPortIndex) then -- Check if the new card HAS this port
+                    local newPortProps = card:getPortProperties(newPortIndex)
+                    if newPortProps and not newPortProps.is_output then -- Is it an INPUT on the new card?
+                        for _, existingPortIndex in ipairs(existingCardFacingPorts) do
+                            -- CRUCIAL: Check if existing card's OUTPUT port is DEFINED and AVAILABLE (not occupied)
+                            if adjCard:isPortDefined(existingPortIndex) and adjCard:isPortAvailable(existingPortIndex) then 
+                                local existingPortProps = adjCard:getPortProperties(existingPortIndex)
+                                -- Is it an OUTPUT on the existing card, types match, and ports align physically?
+                                if existingPortProps and existingPortProps.is_output and 
+                                   newPortProps.type == existingPortProps.type and
+                                   Card:portsAlign(newPortIndex, existingPortIndex) then 
+                                    connectionPossible = true
+                                    break -- Found a valid connection path TO this specific adjacent card
+                                end
+                            end
+                        end
+                    end
+                end
+                if connectionPossible then break end -- No need to check other ports on the new card facing this neighbor
+            end
+            
+            if connectionPossible then
+                validConnectionToExistingCard = true -- Mark that we found at least one valid link to ANY neighbor
             end
         end
     end
     
     if not adjacentFound then
-        return false, "Must be adjacent to at least one card"
+        return false, "Must be placed adjacent to an existing card"
     end
     
-    if not validConnectionFound then -- Check if a valid connection was found after checking all adjacent cards
-        return false, "No valid connection found with adjacent cards"
+    if not validConnectionToExistingCard then
+        return false, "No valid connection found (requires New:Input <- Existing:Output of same type)"
     end
 
     -- If adjacent found and at least one connection is valid
     return true
-end
-
--- Checks if two adjacent cards have a valid connection (Output -> Input match)
--- Returns: boolean
-function Rules:hasValidConnection(newCard, existingCard, dx, dy)
-    -- Determine which edges are facing each other based on relative positions
-    -- dx, dy indicate the direction from newCard to existingCard
-    
-    -- Edge ports on the newCard that face the existingCard
-    local newCardFacingPorts = self:getFacingPorts(dx, dy) -- Removed includeAllPorts, not needed
-    
-    -- Edge ports on the existingCard that face the newCard
-    local existingCardFacingPorts = self:getFacingPorts(-dx, -dy) -- Removed includeAllPorts, not needed
-    
-    -- Check for at least one valid Output -> Input connection
-    -- GDD 4.3: At least one INPUT on newCard connects to OUTPUT on existingCard
-    for _, newPortIndex in ipairs(newCardFacingPorts) do
-        if newCard:isPortAvailable(newPortIndex) then 
-            local newPortProps = newCard:getPortProperties(newPortIndex) -- Use instance method
-            
-            -- For each potential port on the existing card that faces the new card
-            for _, existingPortIndex in ipairs(existingCardFacingPorts) do
-                if existingCard:isPortAvailable(existingPortIndex) then 
-                    local existingPortProps = existingCard:getPortProperties(existingPortIndex) -- Use instance method
-                    
-                    -- Check if we have an Input (new) -> Output (existing) connection with matching type
-                    -- AND that the ports physically align (e.g., TopLeft connects to BottomLeft)
-                    if not newPortProps.is_output and existingPortProps.is_output and 
-                       newPortProps.type == existingPortProps.type and
-                       Card:portsAlign(newPortIndex, existingPortIndex) then -- Assuming Card has a helper for this
-                        return true
-                    end
-                end
-            end
-        end
-    end
-    
-    return false
 end
 
 -- Helper function to get port indices that face a particular direction
