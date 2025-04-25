@@ -144,7 +144,32 @@ function Renderer:new()
     instance.cardCache = {}
 
     -- Attempt to load BMFont (image font) for in-card text rendering
+    -- We load three different bitmap fonts:
+    -- 1. titlefont.fnt - Used specifically for card titles
+    -- 2. imagefont.fnt - Used for regular card text
+    -- 3. imagefont-white.fnt - Used for convergence text (on dark background)
     local bmFontPath = "assets/fonts/imagefont.fnt"
+    
+    -- NEW: Load special title font for card titles
+    local titleFontPath = "assets/fonts/titlefont.fnt"
+    local titleFont = nil
+    if love.filesystem.getInfo(titleFontPath) then
+        local successTitle, titleFontOrErr = pcall(love.graphics.newFont, titleFontPath)
+        if successTitle and titleFontOrErr then
+            titleFont = titleFontOrErr
+            -- Use nearest filtering for crisp pixel look
+            titleFont:setFilter('nearest', 'nearest')
+            print("Successfully loaded title BMFont: " .. titleFontPath)
+            
+            -- Assign to the worldTitleSemiBold slot specifically for card titles
+            instance.fonts.worldTitleSemiBold = titleFont
+        else
+            print(string.format("Warning: Failed to load title BMFont '%s'. Error: %s. Falling back.", titleFontPath, tostring(titleFontOrErr)))
+        end
+    else
+        print(string.format("Warning: Title BMFont file not found at '%s'. Falling back.", titleFontPath))
+    end
+    
     if love.filesystem.getInfo(bmFontPath) then
         local success, bmFontOrErr = pcall(love.graphics.newFont, bmFontPath)
         if success and bmFontOrErr then
@@ -155,7 +180,10 @@ function Renderer:new()
             -- Replace world and preview font entries with the bitmap font
             instance.fonts.worldStandard = bmFont
             instance.fonts.worldSmall = bmFont
-            instance.fonts.worldTitleSemiBold = bmFont
+            -- Only replace worldTitleSemiBold if we didn't load a specific title font
+            if not titleFont then
+                instance.fonts.worldTitleSemiBold = bmFont
+            end
             instance.fonts.previewTitleSemiBold = bmFont
             instance.fonts.previewStandard = bmFont
             instance.fonts.previewSmall = bmFont
@@ -181,6 +209,12 @@ function Renderer:new()
                 print(string.format("Warning: White BMFont file not found at '%s'. Falling back.", bmFontWhitePath))
                 instance.fonts.worldConvergence = bmFont -- Fallback to the main BMFont
             end
+            
+            -- If we loaded a title font, calculate its multiplier for proper scaling
+            if titleFont then
+                instance.titleFontMultiplier = titleFont:getHeight() / baseTitleSize
+                print("Title font multiplier: " .. instance.titleFontMultiplier)
+            end
 
         else
             print(string.format("Warning: Failed to load BMFont '%s'. Error: %s", bmFontPath, tostring(bmFontOrErr)))
@@ -191,6 +225,12 @@ function Renderer:new()
         print(string.format("Warning: BMFont file not found at '%s'. Falling back to TTF fonts.", bmFontPath))
         -- Ensure fallback for convergence font if main BMFont isn't even found
         instance.fonts.worldConvergence = instance.fonts.previewMini or defaultFont
+        
+        -- Set up title font multiplier if title font was loaded but main font wasn't
+        if titleFont then
+            instance.titleFontMultiplier = titleFont:getHeight() / baseTitleSize
+            print("Title font multiplier set on fallback: " .. instance.titleFontMultiplier)
+        end
     end
 
     -- Final check/fallback for convergence font if it wasn't set above
@@ -241,7 +281,10 @@ function Renderer:_drawTextScaled(text, x, y, limit, align, styleName, baseFontS
         return
     end
     local fontMultiplier
-    if string.find(style.fontName, "world") then
+    if style.fontName == "worldTitleSemiBold" and self.titleFontMultiplier then
+        -- Use the specific multiplier for title font
+        fontMultiplier = self.titleFontMultiplier
+    elseif string.find(style.fontName, "world") then
         fontMultiplier = self.worldFontMultiplier
     elseif string.find(style.fontName, "ui") or string.find(style.fontName, "preview") then
         fontMultiplier = self.uiFontMultiplier
@@ -646,6 +689,13 @@ function Renderer:_drawCardInternal(card, x, y, context)
     love.graphics.setColor(originalColor)
     local titleX = x + margin + iconSize + margin - 3
     local titleY = y + margin - 2
+    
+    -- Adjust title position when using the special title font
+    if self.titleFontMultiplier and self.fonts.worldTitleSemiBold then
+        -- Add a bit more vertical space for the title font
+        titleY = y + margin
+    end
+    
     local titleLimit = CARD_WIDTH - (2*margin + iconSize + costAreaW)
     local titleStyle = context.stylePrefix .. "_TITLE_NW"
     self:_drawTextScaled(card.title or "Untitled", titleX, titleY, titleLimit, "left", titleStyle, context.baseFontSizes.title, context.targetScales.title, alphaOverride)
@@ -858,6 +908,7 @@ function Renderer:drawNetwork(network, cameraX, cameraY, cameraZoom, originX, or
     originX = originX or 0
     originY = originY or 0
     animatingCardIds = animatingCardIds or {} -- Ensure it's a table
+    local gridCardIds = animatingCardIds.gridCardIds or {} -- Extract grid card IDs
 
     love.graphics.push()
     love.graphics.translate(-cameraX * cameraZoom, -cameraY * cameraZoom)
@@ -870,7 +921,7 @@ function Renderer:drawNetwork(network, cameraX, cameraY, cameraZoom, originX, or
     local drawQueue = {}
     for cardId, card in pairs(network.cards) do
         -- Check if the card is currently animating
-        if type(card) == "table" and card.position and not animatingCardIds[card.id] then
+        if type(card) == "table" and card.position and not animatingCardIds[card.instanceId] then
             local wx, wy = self:gridToWorldCoords(card.position.x, card.position.y, originX, originY)
             table.insert(drawQueue, { card = card, wx = wx, wy = wy })
         else
@@ -959,6 +1010,7 @@ end
 
 -- Draw a player's hand, visually indicating the selected card
 -- Returns a table of bounding boxes for click detection: { { index=i, x=sx, y=sy, w=w, h=h }, ... }
+-- cardsBeingAnimated is a table of cards that are in the process of being animated and should be hidden in the hand
 function Renderer:drawHand(player, selectedIndex, animatingCardIds)
     if not player or not player.hand then return {} end
     animatingCardIds = animatingCardIds or {} -- Ensure it's a table
@@ -983,8 +1035,8 @@ function Renderer:drawHand(player, selectedIndex, animatingCardIds)
     -- Draw non-selected cards by blitting cached canvas
     for i, card in ipairs(player.hand) do
         if i ~= selectedIndex then
-            -- Only draw cards that aren't animating
-            if not animatingCardIds[card.id] then
+            -- Check if this specific card instance is being animated
+            if not animatingCardIds[card.instanceId] then
                 local sx = HAND_START_X + (i-1) * (HAND_CARD_WIDTH + HAND_SPACING)
                 local sy = handStartY
                 table.insert(handBounds, { index = i, x = sx, y = sy, w = HAND_CARD_WIDTH, h = HAND_CARD_HEIGHT })
@@ -999,7 +1051,7 @@ function Renderer:drawHand(player, selectedIndex, animatingCardIds)
     -- Draw selected card last (raised and highlighted)
     if selectedIndex then
         local card = player.hand[selectedIndex]
-        if card and not animatingCardIds[card.id] then
+        if card and not animatingCardIds[card.instanceId] then
             local i = selectedIndex
             local sx = HAND_START_X + (i-1) * (HAND_CARD_WIDTH + HAND_SPACING)
             local sy = handStartY - SELECTED_CARD_RAISE -- Raised position
@@ -1352,7 +1404,14 @@ function Renderer:drawYesNoPrompt(question)
 end
 
 function Renderer:_generateCardCanvas(card)
-    if self.cardCache[card.id] then return self.cardCache[card.id] end
+    -- Create a cache key that combines the card definition ID and the instance ID
+    local cacheKey = card.id
+    
+    -- Check if we already have this card in the cache
+    if self.cardCache[cacheKey] then 
+        return self.cardCache[cacheKey]
+    end
+    
     -- Render at higher resolution (canvasRenderScaleFactor)
     local sf = self.canvasRenderScaleFactor or 1 -- Use new scale factor
     -- Calculate canvas size including padding for half the border width
@@ -1380,7 +1439,7 @@ function Renderer:_generateCardCanvas(card)
             artLabel = self.baseStandardFontSize
         },
         targetScales = {
-            title = 0.33,
+            title = 0.5,
             cost = 0.35,
             effect = 0.25,
             artLabel = 0.416666667
@@ -1392,7 +1451,7 @@ function Renderer:_generateCardCanvas(card)
     self:_drawCardInternal(card, 0, 0, context)
     love.graphics.setCanvas()
     love.graphics.pop()
-    self.cardCache[card.id] = canvas
+    self.cardCache[cacheKey] = canvas
     return canvas
 end
 

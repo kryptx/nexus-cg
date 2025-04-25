@@ -718,11 +718,16 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                         local endWorldXBase, endWorldYBase = self.renderer:gridToWorldCoords(gridX, gridY, currentOrigin.x, currentOrigin.y)
                         local endWorldX = endWorldXBase + self.renderer.CARD_WIDTH / 2
                         local endWorldY = endWorldYBase + self.renderer.CARD_HEIGHT / 2
+                        
+                        -- Store the card to be placed and its index
+                        local cardToPlaceIndex = self.selectedHandIndex
+                        local cardToPlace = selectedCard
+                        
                         -- Start Animation!
-                        self.animationController:addAnimation({
+                        local animId = self.animationController:addAnimation({
                             type = 'cardPlay',
                             duration = 0.5, -- Slightly longer to appreciate the effects
-                            card = selectedCard,
+                            card = cardToPlace, -- The actual card object, which has a unique instanceId
                             startWorldPos = { x = startWorldX, y = startWorldY },
                             endWorldPos = { x = endWorldX, y = endWorldY },
                             startScale = self.renderer.HAND_CARD_SCALE or 0.6,
@@ -731,16 +736,23 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                             endRotation = 0, -- End with no rotation
                             easingType = "outBack", -- Use the outBack easing for a slight overshoot
                             startAlpha = 0.9,
-                            endAlpha = 1.0
+                            endAlpha = 1.0,
+                            context = 'grid'
                         })
-                        -- Clear selection immediately so the card disappears from hand
-                        local cardToRemove = self.selectedHandIndex -- Store index before clearing
-                        self:resetSelectionAndStatus() -- Clear selection
-                        -- Actually play the card in the game state (happens after animation)
-                        -- The animation system doesn't handle game logic
-                        local success, message = self.gameService:attemptPlacement(self, cardToRemove, gridX, gridY)
-                        self:updateStatusMessage(message)
-                        -- Note: success check is somewhat redundant as we checked isValid, but good practice
+                        
+                        -- Register completion callback
+                        self.animationController:registerCompletionCallback(animId, function()
+                            -- Actually place the card in the game state when animation completes
+                            local success, message = self.gameService:attemptPlacement(self, cardToPlaceIndex, gridX, gridY)
+                            self:updateStatusMessage(message)
+                        end)
+                        
+                        -- Clear selection UI state
+                        self.selectedHandIndex = nil
+                        self.hoveredHandIndex = nil
+                        
+                        -- Display appropriate message during animation
+                        self:updateStatusMessage("Placing card on the network...")
                     else
                         -- Can't afford the card - do shudder animation instead
                         self:createShudderAnimation(self.selectedHandIndex, "cantAfford")
@@ -1172,7 +1184,7 @@ function PlayState:createShudderAnimation(cardIndex, errorType)
     self.animationController:addAnimation({
         type = 'handShudder', -- Rename animation type to distinguish from world shudder
         duration = 0.4,
-        card = selectedCard,
+        card = selectedCard, -- Uses the card with its own instanceId
         -- Keep the card in the same position, but in SCREEN space
         startScreenPos = { x = centerX, y = centerY },
         endScreenPos = { x = centerX, y = centerY },
@@ -1188,7 +1200,9 @@ function PlayState:createShudderAnimation(cardIndex, errorType)
         -- Use our shudder easing function
         easingType = "shudder",
         -- Metadata for the GameService error message
-        meta = { errorType = errorType or "generic" }
+        meta = { errorType = errorType or "generic" },
+        -- Explicitly mark as hand context
+        context = 'hand'
     })
 end
 

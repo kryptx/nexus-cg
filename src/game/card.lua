@@ -63,6 +63,9 @@ function Card:portsAlign(portIndex1, portIndex2)
     return alignments[portIndex1] == portIndex2
 end
 
+-- Global ID counter for unique instance IDs
+local nextInstanceId = 1
+
 -- Constructor for a new Card instance
 -- data: A table containing card definition details
 function Card:new(data)
@@ -72,6 +75,7 @@ function Card:new(data)
     instance.id = data.id or error("Card must have a unique id")
     instance.title = data.title or "Untitled Card"
     instance.type = data.type or error("Card must have a type (Card.Type)")
+    instance.instanceId = nextInstanceId
 
     -- Gameplay Properties
     -- Ensure buildCost has both material and data, defaulting to 0
@@ -132,6 +136,9 @@ function Card:new(data)
 
     -- Connection Management (moved from Reactor)
     instance.connections = {}
+
+    -- Increment the global instance ID counter
+    nextInstanceId = nextInstanceId + 1
 
     return instance
 end
@@ -235,6 +242,23 @@ function Card:markPortUnoccupied(portIndex)
     else
         print(string.format("Warning: Attempted to mark invalid port index %s as unoccupied on card %s.", tostring(portIndex), self.id or '?'))
     end
+end
+
+-- Clears a specific port (for link destruction)
+function Card:clearPort(portIndex)
+    if portIndex and portIndex >= 1 and portIndex <= 8 then
+        if self.occupiedPorts[portIndex] then
+            local linkId = self.occupiedPorts[portIndex]
+            print(string.format("Card %s: Clearing port %d (occupied by link %s).", self.id or '?', portIndex, linkId))
+            self.occupiedPorts[portIndex] = nil -- Use nil to mark as unoccupied
+            return linkId
+        else
+            print(string.format("Card %s: Port %d was not occupied, nothing to clear.", self.id or '?', portIndex))
+        end
+    else
+        print(string.format("Warning: Attempted to clear invalid port index %s on card %s.", tostring(portIndex), self.id or '?'))
+    end
+    return nil
 end
 
 -- Checks if a specific port is currently marked as occupied by any link
@@ -468,5 +492,11 @@ function Card:getInputPorts()
 end
 
 -- TODO: Add functions related to activation, linking, etc.
+
+-- Get a string representation of the card
+function Card:toString()
+    return string.format("Card[%s]: %s (%s) - ID: %s, InstanceID: %d", 
+                        self.type, self.title, self.subtype, self.id, self.instanceId)
+end
 
 return Card

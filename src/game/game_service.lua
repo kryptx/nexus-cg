@@ -828,9 +828,129 @@ function GameService:requestPlayerYesNo(player, question, callback)
     -- and 'pendingQuestion'/'pendingPlayer' to display the prompt.
 end
 
+-- NEW: Handle Yes/No answer from player input
+function GameService:providePlayerYesNoAnswer(answer)
+    if not self.isWaitingForInput then
+        print("Warning: GameService received answer but was not waiting for input.")
+        return
+    end
+    
+    print(string.format("[GameService] Received answer: %s", answer and "Yes" or "No"))
+    
+    -- Store the callback and reset state before calling
+    local callback = self.pendingInputCallback
+    local player = self.pendingPlayer
+    
+    -- Reset the prompt state
+    self.isWaitingForInput = false
+    self.pendingQuestion = nil
+    self.pendingPlayer = nil
+    self.pendingInputCallback = nil
+    
+    -- Call the callback with the answer
+    if callback and type(callback) == "function" then
+        callback(player, answer)
+    else
+        print("Warning: No valid callback found for player answer.")
+    end
+end
+
 -- NEW: Delegate global activation to ActivationService
 function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayerIndex, targetGridX, targetGridY)
     return self.activationService:attemptActivationGlobal(activatingPlayerIndex, targetPlayerIndex, targetGridX, targetGridY)
+end
+
+-- NEW: Destroy a random link connected to the given node
+function GameService:destroyRandomLinkOnNode(sourceNode)
+    if not sourceNode then
+        print("Warning: destroyRandomLinkOnNode called with nil sourceNode")
+        return false
+    end
+    
+    print(string.format("[GameService] Attempting to destroy a random link on node '%s' (%s)", sourceNode.title, sourceNode.id))
+    
+    -- 1. Find all links connected to this node
+    local connectedLinks = {}
+    for _, link in ipairs(self.activeConvergenceLinks) do
+        if (link.initiatingNodeId == sourceNode.id) or (link.targetNodeId == sourceNode.id) then
+            table.insert(connectedLinks, link)
+        end
+    end
+    
+    if #connectedLinks == 0 then
+        print("  No links found connected to this node.")
+        return false
+    end
+    
+    -- 2. Choose a random link to destroy
+    local randomIndex = math.random(1, #connectedLinks)
+    local linkToDestroy = connectedLinks[randomIndex]
+    
+    -- 3. Find the nodes connected by this link
+    local initiatingPlayer = self.players[linkToDestroy.initiatingPlayerIndex]
+    local targetPlayer = self.players[linkToDestroy.targetPlayerIndex]
+    
+    if not initiatingPlayer or not initiatingPlayer.network then
+        print("  Warning: Could not find initiating player or network")
+        return false
+    end
+    
+    if not targetPlayer or not targetPlayer.network then
+        print("  Warning: Could not find target player or network")
+        return false
+    end
+    
+    -- 4. Find the cards at the link's endpoints
+    local initiatingNode = nil
+    for _, card in pairs(initiatingPlayer.network.cards) do
+        if card.id == linkToDestroy.initiatingNodeId then
+            initiatingNode = card
+            break
+        end
+    end
+    
+    local targetNode = nil
+    for _, card in pairs(targetPlayer.network.cards) do
+        if card.id == linkToDestroy.targetNodeId then
+            targetNode = card
+            break
+        end
+    end
+    
+    if not initiatingNode then
+        print("  Warning: Could not find initiating node for link", linkToDestroy.linkId)
+        return false
+    end
+    
+    if not targetNode then
+        print("  Warning: Could not find target node for link", linkToDestroy.linkId)
+        return false
+    end
+    
+    -- 5. Free the ports on both nodes
+    print(string.format("  Destroying link %s: P%d:%s Port%d -> P%d:%s Port%d", 
+        linkToDestroy.linkId,
+        linkToDestroy.initiatingPlayerIndex, initiatingNode.title, linkToDestroy.initiatingPortIndex,
+        linkToDestroy.targetPlayerIndex, targetNode.title, linkToDestroy.targetPortIndex))
+    
+    initiatingNode:clearPort(linkToDestroy.initiatingPortIndex)
+    targetNode:clearPort(linkToDestroy.targetPortIndex)
+    
+    -- 6. Remove the link from the active links list
+    for i, link in ipairs(self.activeConvergenceLinks) do
+        if link.linkId == linkToDestroy.linkId then
+            table.remove(self.activeConvergenceLinks, i)
+            break
+        end
+    end
+    
+    -- 7. Play a sound effect if available
+    if self.audioManager then
+        self.audioManager:playSound("link_break")
+    end
+    
+    print("  Link successfully destroyed!")
+    return true
 end
 
 return { GameService = GameService, TurnPhase = TurnPhase } 

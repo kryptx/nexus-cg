@@ -9,6 +9,7 @@ function AnimationController:new()
     local instance = setmetatable({}, AnimationController)
     instance.activeAnimations = {} -- Stores currently running animations
     instance.nextId = 1            -- Simple ID generator
+    instance.completionCallbacks = {} -- Stores callbacks to run when animations complete
     print("AnimationController initialized.")
     return instance
 end
@@ -26,6 +27,8 @@ end
 --  - rotation (optional, in radians)
 --  - startAlpha (optional, default 1.0)
 --  - endAlpha (optional, default 1.0)
+--  - meta (optional, additional metadata for the animation)
+--  - context (optional, 'hand' or 'grid' to distinguish instance context)
 function AnimationController:addAnimation(params)
     if not params or not params.type or not params.duration or not params.card then
         print("Warning: Invalid parameters for addAnimation.")
@@ -39,6 +42,8 @@ function AnimationController:addAnimation(params)
             print("Warning: Invalid parameters for handShudder animation.")
             return nil
         end
+        -- Automatically set hand context for handShudder if not specified
+        params.context = params.context or 'hand'
     else
         if not params.startWorldPos or not params.endWorldPos or 
            params.startScale == nil or params.endScale == nil then
@@ -73,18 +78,34 @@ function AnimationController:addAnimation(params)
         currentScale = params.startScale, -- Calculated
         currentRotation = params.startRotation or 0, -- Calculated
         currentAlpha = params.startAlpha or 1.0, -- Calculated
-        isComplete = false
+        isComplete = false,
+        meta = params.meta, -- Store any additional metadata
+        context = params.context -- Store context like 'hand' or 'grid'
     }
     self.activeAnimations[id] = animation
-    print(string.format("Started animation %d: %s for card %s with easing %s", 
-          id, params.type, params.card.id, animation.easingType))
+    print(string.format("Started animation %d: %s for card %s with easing %s%s", 
+          id, params.type, params.card.id, animation.easingType,
+          animation.context and (" context: " .. animation.context) or ""))
     return id
+end
+
+-- Register a callback to be run when a specific animation completes
+function AnimationController:registerCompletionCallback(animId, callback)
+    if not animId or not callback or type(callback) ~= "function" then
+        print("Warning: Invalid callback registration")
+        return false
+    end
+    
+    self.completionCallbacks[animId] = callback
+    print(string.format("Registered completion callback for animation %d", animId))
+    return true
 end
 
 -- Update all active animations
 function AnimationController:update(dt)
     local currentTime = love.timer.getTime()
     local completedIds = {}
+    local callbacksToRun = {}
 
     for id, anim in pairs(self.activeAnimations) do
         if not anim.isComplete then
@@ -173,8 +194,24 @@ function AnimationController:update(dt)
                 anim.isComplete = true
                 table.insert(completedIds, id)
                 print(string.format("Animation %d complete.", id))
-                -- TODO: Maybe add optional onComplete callback?
+                
+                -- Check if we have a completion callback for this animation
+                if self.completionCallbacks[id] then
+                    table.insert(callbacksToRun, id)
+                end
             end
+        end
+    end
+
+    -- Run completion callbacks for finished animations
+    for _, id in ipairs(callbacksToRun) do
+        if self.completionCallbacks[id] then
+            print(string.format("Running completion callback for animation %d", id))
+            local success, err = pcall(self.completionCallbacks[id])
+            if not success then
+                print(string.format("Error in animation completion callback: %s", err))
+            end
+            self.completionCallbacks[id] = nil -- Remove the callback after running
         end
     end
 
@@ -190,13 +227,17 @@ function AnimationController:getActiveAnimations()
     return self.activeAnimations
 end
 
--- Get a set/list of card IDs currently being animated
+-- Get a set/list of card instance IDs currently being animated
 function AnimationController:getAnimatingCardIds()
-    local ids = {}
+    local instanceIds = {}
     for _, anim in pairs(self.activeAnimations) do
-        ids[anim.card.id] = true -- Use map as a set for quick lookup
+        -- Skip hand-specific animations for grid rendering
+        if anim.context ~= 'hand' then
+            -- Use the card's instanceId rather than its definition id
+            instanceIds[anim.card.instanceId] = true
+        end
     end
-    return ids
+    return instanceIds
 end
 
 -- Forcefully remove an animation (e.g., if the card is destroyed mid-flight)
