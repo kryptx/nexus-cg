@@ -566,9 +566,8 @@ function Renderer:_drawCardInternal(card, x, y, context)
     local headerIconY = y + margin
     love.graphics.setColor(baseTypeColor[1], baseTypeColor[2], baseTypeColor[3], (baseTypeColor[4] or 1) * alphaOverride)
     love.graphics.rectangle("fill", headerIconX, headerIconY, iconSize, iconSize)
-    love.graphics.setColor(0,0,0, 1.0 * alphaOverride)
-    love.graphics.rectangle("line", headerIconX, headerIconY, iconSize, iconSize)
 
+    -- Draws the actual type icon image (e.g., technology-black.png) over the background
     local typeIcon = self.icons[card.type]
     if typeIcon then
         local typeIconScaleFactor = 0.8
@@ -949,14 +948,21 @@ function Renderer:drawHand(player, selectedIndex)
             local drawPosY = raisedY - borderPadding * drawScale
             love.graphics.setColor(1, 1, 1, 1)
             love.graphics.draw(canvas, drawPosX, drawPosY, 0, drawScale, drawScale)
+
             -- Draw highlight border
-            love.graphics.setLineWidth(3 * drawScale) -- Use drawScale for line width
-            love.graphics.setColor(0, 0, 0, 1)
+            -- Corrected Highlight Border Calculation:
+            -- Get the actual dimensions of the drawn canvas image
+            local canvasDrawW = canvas:getWidth() * drawScale
+            local canvasDrawH = canvas:getHeight() * drawScale
+            local cornerRadius = 2 * drawScale -- Keep scaled corner radius
+
+            love.graphics.setLineWidth(3 * drawScale)
+            love.graphics.setColor(0, 0, 0, 1) -- Black color
             love.graphics.rectangle("line",
-                sx, raisedY, -- Position relative to card content box
-                self.CARD_WIDTH * drawScale,
-                self.CARD_HEIGHT * drawScale,
-                2 * drawScale, 2 * drawScale) -- Use drawScale for radius
+                drawPosX, drawPosY, -- Use the actual canvas draw position (top-left corner)
+                canvasDrawW,      -- Use the actual canvas draw width
+                canvasDrawH,      -- Use the actual canvas draw height
+                cornerRadius, cornerRadius)
         end
     end
 

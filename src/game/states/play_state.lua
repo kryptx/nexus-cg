@@ -100,6 +100,7 @@ function PlayState:init(gameService)
     self.playerOrigins = {}
     self.isPaused = false
     self.showHelpBox = true -- Enable help box by default
+    self.BOTTOM_BUTTON_AREA_HEIGHT = 60 -- <<< STORE CONSTANT ON INSTANCE
 
     -- Camera State
     self.cameraX = -love.graphics.getWidth() / 2 -- Center initial view roughly
@@ -391,16 +392,32 @@ function PlayState:draw(stateManager)
     love.graphics.pop()
 
     -- Draw grid hover highlight (only for current player's grid space)
-    if not self.isDisplayingPrompt then
+    -- Calculate isInSafeArea again here for clarity
+    local screenH = love.graphics.getHeight()
+    local handCardH_Draw = self.renderer.HAND_CARD_HEIGHT or (140 * 0.6)
+    local safeAreaTopY_Draw = screenH - self.BOTTOM_BUTTON_AREA_HEIGHT - handCardH_Draw - 20 -- <<< USE self.
+    local mouseX, mouseY = love.mouse.getPosition() -- Get current mouse position
+    local isInSafeArea_Draw = (mouseY >= safeAreaTopY_Draw)
+
+    if not self.isDisplayingPrompt and not isInSafeArea_Draw then -- <<< Added check for not isInSafeArea_Draw
         local selectedCard = self.selectedHandIndex and currentPlayer.hand[self.selectedHandIndex] or nil
-        -- Only draw highlight if a card is selected AND we are hovering over the grid
+        -- Only draw highlight if a card is selected AND we are hovering over the grid (hoverGridX/Y won't be nil if not in safe area)
         if selectedCard and self.hoverGridX ~= nil and self.hoverGridY ~= nil and self.currentPhase == TurnPhase.BUILD then
-            -- Check placement validity using the game service (ensure this function exists!)
-            -- We use the hoverGridX/Y calculated relative to the current player's origin
+            local currentOrigin = self.playerOrigins[self.gameService.currentPlayerIndex] or {x=0, y=0}
             local isValid = self.gameService:isPlacementValid(self.gameService.currentPlayerIndex, selectedCard, self.hoverGridX, self.hoverGridY)
             self.renderer:drawHoverHighlight(self.hoverGridX, self.hoverGridY, self.cameraX, self.cameraY, self.cameraZoom, selectedCard, isValid, currentOrigin.x, currentOrigin.y)
         end
     end
+
+    -- [[[ Draw UI Safe Area Background ]]]
+    local screenW = love.graphics.getWidth()
+    -- Use the same safeAreaTopY calculation as in the highlight check
+    local safeAreaHeight = screenH - safeAreaTopY_Draw -- This uses the already calculated safeAreaTopY_Draw
+    local originalColor = {love.graphics.getColor()}
+    love.graphics.setColor(0.1, 0.1, 0.1, 0.6) -- Dark, semi-transparent
+    love.graphics.rectangle('fill', 0, safeAreaTopY_Draw, screenW, safeAreaHeight)
+    love.graphics.setColor(originalColor) -- Restore color
+    -- [[[ End Draw UI Safe Area Background ]]]
 
     -- Ensure default line width for screen-space UI (Hand)
     love.graphics.setLineWidth(1)
@@ -921,14 +938,25 @@ function PlayState:mousemoved(stateManager, x, y, dx, dy, istouch)
         return
     end
 
-    -- Update world mouse coordinates
+    -- Define UI Safe Area Top Edge
+    local screenH = love.graphics.getHeight()
+    local handCardH = self.renderer.HAND_CARD_HEIGHT or (140 * 0.6)
+    local safeAreaTopY = screenH - self.BOTTOM_BUTTON_AREA_HEIGHT - handCardH - 20 -- <<< USE self.
+    local isInSafeArea = (y >= safeAreaTopY)
+
+    -- Update world mouse coordinates (needed for panning regardless)
     local worldX, worldY = self.renderer:screenToWorldCoords(x, y, self.cameraX, self.cameraY, self.cameraZoom)
 
-    -- Convert world coordinates to grid coordinates relative to the CURRENT player's origin for hover effects
-    local currentOrigin = self.playerOrigins[self.gameService.currentPlayerIndex] or {x=0, y=0}
-    self.hoverGridX, self.hoverGridY = self.renderer:worldToGridCoords(worldX, worldY, currentOrigin.x, currentOrigin.y)
+    -- Reset hover grid coords
+    self.hoverGridX, self.hoverGridY = nil, nil
 
-    -- Check for hand hover
+    -- Only calculate grid hover if NOT in the safe area
+    if not isInSafeArea then
+        local currentOrigin = self.playerOrigins[self.gameService.currentPlayerIndex] or {x=0, y=0}
+        self.hoverGridX, self.hoverGridY = self.renderer:worldToGridCoords(worldX, worldY, currentOrigin.x, currentOrigin.y)
+    end
+
+    -- Check for hand hover (do this regardless of safe area)
     local currentlyHovering = nil
     for _, bounds in ipairs(self.handCardBounds) do
         if isPointInRect(x, y, bounds) then
