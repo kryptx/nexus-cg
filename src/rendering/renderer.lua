@@ -137,6 +137,9 @@ function Renderer:new()
     instance.icons[Card.Type.RESOURCE] = instance:_loadImage("assets/images/resource-black.png")
     instance.icons[Card.Type.KNOWLEDGE] = instance:_loadImage("assets/images/knowledge-black.png")
 
+    -- Prepare canvas cache for fully-rendered cards at world scale
+    instance.cardCache = {}
+
     return instance
 end
 
@@ -697,26 +700,30 @@ function Renderer:_drawSingleCardInWorld(card, wx, wy, activeLinks, alphaOverrid
     alphaOverride = alphaOverride or 1.0
     useInvalidBorder = useInvalidBorder or false
 
-    local context = {
-        stylePrefix = "CARD",
-        baseFontSizes = {
-            title = self.baseTitleFontSize,
-            cost = self.baseSmallFontSize,
-            effect = self.baseMiniFontSize,
-            artLabel = self.baseStandardFontSize
-        },
-        targetScales = {
-            title = 0.4375,
-            cost = 0.4,
-            effect = 0.36,
-            artLabel = 0.416666667
-        },
-        alpha = alphaOverride,
-        borderType = useInvalidBorder and "invalid" or "normal",
-        activeLinks = activeLinks
-    }
+    -- Save original color state
+    local originalColor = { love.graphics.getColor() }
 
-    self:_drawCardInternal(card, wx, wy, context)
+    -- Draw the pre-rendered card base from cache
+    local canvas = self:_generateCardCanvas(card)
+    local sf = self.worldFontMultiplier or 1
+    local invSf = 1 / sf
+    local borderPadding = self.PORT_RADIUS -- Original units
+    local drawX = wx - borderPadding * invSf
+    local drawY = wy - borderPadding * invSf
+    love.graphics.setColor(1, 1, 1, alphaOverride)
+    love.graphics.draw(canvas, drawX, drawY, 0, invSf, invSf)
+
+    -- Draw invalid border highlight if needed
+    if useInvalidBorder then
+        local lineWidth = self.PORT_RADIUS * 2
+        love.graphics.setLineWidth(lineWidth) -- Use base line width
+        love.graphics.setColor(1, 0, 0, alphaOverride)
+        -- Draw border relative to the card content box (wx, wy)
+        love.graphics.rectangle("line", wx, wy, self.CARD_WIDTH, self.CARD_HEIGHT, 2, 2) -- Use base dimensions
+    end
+
+    -- Restore original color state
+    love.graphics.setColor(originalColor)
 end
 
 -- Draw a player's network grid, applying camera transform
@@ -783,63 +790,40 @@ function Renderer:drawHoveredHandCard(card, sx, sy, scale)
     scale = scale or 1.0
 
     local originalFont = love.graphics.getFont()
-    local originalColor = {love.graphics.getColor()}
+    local originalColor = { love.graphics.getColor() }
     local originalLineWidth = love.graphics.getLineWidth()
 
     -- Calculate adjusted position to keep preview fully on screen
     local screenWidth = love.graphics.getWidth()
     local screenHeight = love.graphics.getHeight()
-    -- Border extends half its line width outwards. Line width is PORT_RADIUS * 2.
     local borderWidthOut = self.PORT_RADIUS * scale
     local cardDrawWidth = CARD_WIDTH * scale
     local cardDrawHeight = CARD_HEIGHT * scale
-
     local drawX = sx
     local drawY = sy
-
-    -- Adjust X to stay within screen bounds
     if drawX - borderWidthOut < 0 then
-        drawX = borderWidthOut -- Align left edge
+        drawX = borderWidthOut
     elseif drawX + cardDrawWidth + borderWidthOut > screenWidth then
-        drawX = screenWidth - cardDrawWidth - borderWidthOut -- Align right edge
+        drawX = screenWidth - cardDrawWidth - borderWidthOut
     end
-
-    -- Adjust Y to stay within screen bounds
     if drawY - borderWidthOut < 0 then
-        drawY = borderWidthOut -- Align top edge
+        drawY = borderWidthOut
     elseif drawY + cardDrawHeight + borderWidthOut > screenHeight then
-        drawY = screenHeight - cardDrawHeight - borderWidthOut -- Align bottom edge
+        drawY = screenHeight - cardDrawHeight - borderWidthOut
     end
 
-    love.graphics.push()
-    -- Use adjusted coordinates for translation
-    love.graphics.translate(drawX, drawY)
-    love.graphics.scale(scale, scale)
-    -- Use original line width divided by scale for consistent border thickness
-    love.graphics.setLineWidth(originalLineWidth / scale)
+    -- Draw the cached card canvas scaled down
+    local sf = self.worldFontMultiplier or 1
+    local invSf = 1 / sf
+    local drawScale = scale * invSf
+    local canvas = self:_generateCardCanvas(card)
+    local borderPadding = self.PORT_RADIUS -- Original units
+    local drawPosX = drawX - borderPadding * drawScale
+    local drawPosY = drawY - borderPadding * drawScale
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.draw(canvas, drawPosX, drawPosY, 0, drawScale, drawScale)
 
-    local context = {
-        stylePrefix = "PREVIEW",
-        baseFontSizes = {
-            title = self.uiBaseStandardSize,
-            cost = self.uiBaseSmallSize,
-            effect = self.uiBaseMiniSize,
-            artLabel = self.uiBaseStandardSize
-        },
-        targetScales = {
-            title = 1.0,
-            cost = 1.0,
-            effect = 0.9,
-            artLabel = 1.0
-        },
-        alpha = 1.0,
-        borderType = "normal"
-    }
-
-    self:_drawCardInternal(card, 0, 0, context)
-
-    love.graphics.pop()
-
+    -- Restore original state
     love.graphics.setFont(originalFont)
     love.graphics.setColor(originalColor)
     love.graphics.setLineWidth(originalLineWidth)
@@ -870,7 +854,7 @@ function Renderer:drawHand(player, selectedIndex)
             title = self.uiBaseStandardSize,
             cost = self.uiBaseSmallSize,
             effect = self.uiBaseMiniSize,
-            artLabel = self.uiBaseStandardSize
+            artLabel = self.baseStandardFontSize
         },
         targetScales = { -- Target scales are 1.0 as overall scaling is done via love.graphics.scale
             title = 1.0,
@@ -883,24 +867,20 @@ function Renderer:drawHand(player, selectedIndex)
         -- activeLinks is not relevant for hand cards
     }
 
-    -- Draw non-selected cards first
+    -- Adjust for cached canvas resolution (baked at worldFontMultiplier)
+    local sf = self.worldFontMultiplier or 1
+    local invSf = 1 / sf
+
+    -- Draw non-selected cards by blitting cached canvas
     for i, card in ipairs(player.hand) do
         if i ~= selectedIndex then
             local sx = HAND_START_X + (i-1) * (HAND_CARD_WIDTH + HAND_SPACING)
             local sy = handStartY
             table.insert(handBounds, { index = i, x = sx, y = sy, w = HAND_CARD_WIDTH, h = HAND_CARD_HEIGHT })
 
-            -- Draw the actual card scaled down
-            love.graphics.push()
-            love.graphics.translate(sx, sy)
-            love.graphics.scale(HAND_CARD_SCALE, HAND_CARD_SCALE)
-            love.graphics.setLineWidth(originalLineWidth / HAND_CARD_SCALE) -- Adjust line width for scale
-
-            self:_drawCardInternal(card, 0, 0, handCardContext)
-
-            love.graphics.pop()
-            -- Restore line width for next iteration or selected card
-            love.graphics.setLineWidth(originalLineWidth)
+            local canvas = self:_generateCardCanvas(card)
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.draw(canvas, sx, sy, 0, HAND_CARD_SCALE * invSf, HAND_CARD_SCALE * invSf)
         end
     end
 
@@ -925,23 +905,23 @@ function Renderer:drawHand(player, selectedIndex)
                 table.insert(handBounds, { index = i, x = sx, y = handStartY, w = HAND_CARD_WIDTH, h = HAND_CARD_HEIGHT })
             end
 
-            -- Draw the selected card scaled down but raised
-            love.graphics.push()
-            love.graphics.translate(sx, sy)
-            love.graphics.scale(HAND_CARD_SCALE, HAND_CARD_SCALE)
-            love.graphics.setLineWidth(originalLineWidth / HAND_CARD_SCALE) -- Adjust line width for scale
-
-            self:_drawCardInternal(card, 0, 0, handCardContext)
-
-            -- Draw highlight border *after* internal card drawing, within the scaled context
-            love.graphics.setLineWidth(3 / HAND_CARD_SCALE) -- Make highlight border thick
-            love.graphics.setColor(0, 0, 0, 1) -- Black border highlight
-            local cornerRadius = 2 / HAND_CARD_SCALE -- Use scaled corner radius consistent with _drawCardInternal border
-            love.graphics.rectangle("line", 0, 0, CARD_WIDTH, CARD_HEIGHT, cornerRadius, cornerRadius)
-
-            love.graphics.pop()
-            -- Restore line width after drawing selected card
-            love.graphics.setLineWidth(originalLineWidth)
+            -- Draw selected card canvas scaled and raised
+            local canvas = self:_generateCardCanvas(card)
+            local borderPadding = self.PORT_RADIUS -- Original units
+            local drawScale = HAND_CARD_SCALE * invSf
+            local raisedY = handStartY - SELECTED_CARD_RAISE
+            local drawPosX = sx - borderPadding * drawScale
+            local drawPosY = raisedY - borderPadding * drawScale
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.draw(canvas, drawPosX, drawPosY, 0, drawScale, drawScale)
+            -- Draw highlight border
+            love.graphics.setLineWidth(3 * drawScale) -- Use drawScale for line width
+            love.graphics.setColor(0, 0, 0, 1)
+            love.graphics.rectangle("line",
+                sx, raisedY, -- Position relative to card content box
+                self.CARD_WIDTH * drawScale,
+                self.CARD_HEIGHT * drawScale,
+                2 * drawScale, 2 * drawScale) -- Use drawScale for radius
         end
     end
 
@@ -1184,6 +1164,58 @@ function Renderer:drawYesNoPrompt(question)
 
     -- Return the calculated bounds for click detection
     return yesBounds, noBounds
+end
+
+function Renderer:_generateCardCanvas(card)
+    if self.cardCache[card.id] then return self.cardCache[card.id] end
+    -- Render at higher resolution (worldFontMultiplier scale)
+    local sf = self.worldFontMultiplier or 1
+    -- Calculate canvas size including padding for half the border width
+    local borderPadding = self.PORT_RADIUS -- Padding needed in sf=1 units
+    local canvasPadding = borderPadding * sf
+    local baseW, baseH = self.CARD_WIDTH * sf, self.CARD_HEIGHT * sf
+    local canvasW, canvasH = baseW + 2 * canvasPadding, baseH + 2 * canvasPadding
+    local canvas = love.graphics.newCanvas(canvasW, canvasH, { mipmaps = "auto" })
+    canvas:setFilter("linear", "linear", 1) -- Use mipmapping
+
+    love.graphics.push()
+    love.graphics.origin()
+    love.graphics.setCanvas(canvas)
+    love.graphics.clear()
+    -- Translate to account for padding before scaling
+    love.graphics.translate(canvasPadding, canvasPadding)
+    -- Scale drawing so 1:1 coordinates map to sf× size on canvas
+    love.graphics.scale(self.worldFontMultiplier or 1, self.worldFontMultiplier or 1)
+    local context = {
+        stylePrefix = "CARD",
+        baseFontSizes = {
+            title = self.baseTitleFontSize,
+            cost = self.baseSmallFontSize,
+            effect = self.baseMiniFontSize,
+            artLabel = self.baseStandardFontSize
+        },
+        targetScales = {
+            title = 0.4375,
+            cost = 0.4,
+            effect = 0.36,
+            artLabel = 0.416666667
+        },
+        alpha = 1.0,
+        borderType = "normal",
+        activeLinks = {}
+    }
+    self:_drawCardInternal(card, 0, 0, context)
+    love.graphics.setCanvas()
+    love.graphics.pop()
+    self.cardCache[card.id] = canvas
+    return canvas
+end
+
+-- Preload canvases for all cards in a list
+function Renderer:preloadCardCanvases(cards)
+    for _, card in pairs(cards) do
+        self:_generateCardCanvas(card)
+    end
 end
 
 return Renderer

@@ -820,7 +820,7 @@ definitions["NODE_CULT_RES_001"] = {
 
 definitions["NODE_RES_CULT_001"] = {
     id = "NODE_RES_CULT_001",
-    title = "Resource Reclamation Art Project",
+    title = "Reclamation Art Project",
     type = CardTypes.RESOURCE,
     buildCost = { material = 3, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
