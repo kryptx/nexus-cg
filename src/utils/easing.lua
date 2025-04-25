@@ -207,6 +207,24 @@ function Easing.inOutBounce(t)
     return Easing.outBounce(t * 2 - 1) * 0.5 + 0.5
 end
 
+-- Shudder easing (vibration effect with decay)
+function Easing.shudder(t)
+    -- Parameters for the shudder effect
+    local frequency = 15  -- Higher = more shakes
+    local amplitude = 0.2  -- Maximum deviation
+    local decay = 2.5      -- How quickly the shudder decays
+    
+    -- Calculate diminishing amplitude over time (starts strong, ends subtle)
+    local currentAmplitude = amplitude * math.exp(-decay * t)
+    
+    -- Generate oscillation with sine wave
+    local oscillation = currentAmplitude * math.sin(frequency * math.pi * t)
+    
+    -- Return the oscillation component only - this creates a pure vibration
+    -- that oscillates around 0 rather than drifting with t
+    return oscillation
+end
+
 -- Apply easing function to a value
 function Easing.apply(progress, start, change, easingFunc)
     easingFunc = easingFunc or Easing.linear

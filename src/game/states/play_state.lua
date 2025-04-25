@@ -356,7 +356,10 @@ function PlayState:draw(stateManager)
         for id, animation in pairs(activeAnimations) do
             if animation.type == 'cardPlay' then
                 self.renderer:drawCardAnimation(animation, self.cameraX, self.cameraY, self.cameraZoom)
+            elseif animation.type == 'shudder' then
+                self.renderer:drawCardAnimation(animation, self.cameraX, self.cameraY, self.cameraZoom)
             end
+            -- handShudder animations will be drawn after the safe area and hand
         end
     end
 
@@ -441,6 +444,16 @@ function PlayState:draw(stateManager)
     -- Now draw the actual hand (will draw over the grid highlight and preview)
     -- Pass animatingCardIds to skip cards being animated
     self.handCardBounds = self.renderer:drawHand(currentPlayer, self.selectedHandIndex, animatingCardIds)
+    
+    -- Draw any handShudder animations AFTER the safe area and hand are drawn
+    if self.animationController then
+        local activeAnimations = self.animationController:getActiveAnimations()
+        for id, animation in pairs(activeAnimations) do
+            if animation.type == 'handShudder' then
+                self.renderer:drawHandCardAnimation(animation)
+            end
+        end
+    end
     
     -- Draw hovered hand card preview near the mouse
     if not self.isDisplayingPrompt and self.hoveredHandIndex then
@@ -688,43 +701,58 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                 local selectedCard = currentPlayer.hand[self.selectedHandIndex]
                 local isValid = self.gameService:isPlacementValid(currentPlayerIndex, selectedCard, gridX, gridY)
                 if isValid then
-                    -- Get start position (center of the hand card)
-                    local handBounds = self.handCardBounds[self.selectedHandIndex]
-                    local startScreenX = handBounds.x + handBounds.w / 2
-                    local startScreenY = handBounds.y + handBounds.h / 2
-                    local startWorldX, startWorldY = self.renderer:screenToWorldCoords(startScreenX, startScreenY, self.cameraX, self.cameraY, self.cameraZoom)
-                    -- Get end position (center of the grid cell)
-                    local endWorldXBase, endWorldYBase = self.renderer:gridToWorldCoords(gridX, gridY, currentOrigin.x, currentOrigin.y)
-                    local endWorldX = endWorldXBase + self.renderer.CARD_WIDTH / 2
-                    local endWorldY = endWorldYBase + self.renderer.CARD_HEIGHT / 2
-                    -- Start Animation!
-                    self.animationController:addAnimation({
-                        type = 'cardPlay',
-                        duration = 0.5, -- Slightly longer to appreciate the effects
-                        card = selectedCard,
-                        startWorldPos = { x = startWorldX, y = startWorldY },
-                        endWorldPos = { x = endWorldX, y = endWorldY },
-                        startScale = self.renderer.HAND_CARD_SCALE or 0.6,
-                        endScale = 1.0,
-                        startRotation = math.pi * 0.1, -- Slight tilt at start
-                        endRotation = 0, -- End with no rotation
-                        easingType = "outBack", -- Use the outBack easing for a slight overshoot
-                        startAlpha = 0.9,
-                        endAlpha = 1.0
-                    })
-                    -- Clear selection immediately so the card disappears from hand
-                    local cardToRemove = self.selectedHandIndex -- Store index before clearing
-                    self:resetSelectionAndStatus() -- Clear selection
-                    -- Actually play the card in the game state (happens after animation)
-                    -- The animation system doesn't handle game logic
-                    local success, message = self.gameService:attemptPlacement(self, cardToRemove, gridX, gridY)
-                    self:updateStatusMessage(message)
-                    -- Note: success check is somewhat redundant as we checked isValid, but good practice
+                    -- Check specifically if player can afford the card
+                    local canAfford = self.gameService:canAffordCard(currentPlayerIndex, selectedCard)
+                    
+                    if canAfford then
+                        -- Get start position (center of the hand card)
+                        local handBounds = self.handCardBounds[self.selectedHandIndex]
+                        local startScreenX = handBounds.x + handBounds.w / 2
+                        local startScreenY = handBounds.y + handBounds.h / 2
+                        local startWorldX, startWorldY = self.renderer:screenToWorldCoords(startScreenX, startScreenY, self.cameraX, self.cameraY, self.cameraZoom)
+                        -- Get end position (center of the grid cell)
+                        local endWorldXBase, endWorldYBase = self.renderer:gridToWorldCoords(gridX, gridY, currentOrigin.x, currentOrigin.y)
+                        local endWorldX = endWorldXBase + self.renderer.CARD_WIDTH / 2
+                        local endWorldY = endWorldYBase + self.renderer.CARD_HEIGHT / 2
+                        -- Start Animation!
+                        self.animationController:addAnimation({
+                            type = 'cardPlay',
+                            duration = 0.5, -- Slightly longer to appreciate the effects
+                            card = selectedCard,
+                            startWorldPos = { x = startWorldX, y = startWorldY },
+                            endWorldPos = { x = endWorldX, y = endWorldY },
+                            startScale = self.renderer.HAND_CARD_SCALE or 0.6,
+                            endScale = 1.0,
+                            startRotation = math.pi * 0.1, -- Slight tilt at start
+                            endRotation = 0, -- End with no rotation
+                            easingType = "outBack", -- Use the outBack easing for a slight overshoot
+                            startAlpha = 0.9,
+                            endAlpha = 1.0
+                        })
+                        -- Clear selection immediately so the card disappears from hand
+                        local cardToRemove = self.selectedHandIndex -- Store index before clearing
+                        self:resetSelectionAndStatus() -- Clear selection
+                        -- Actually play the card in the game state (happens after animation)
+                        -- The animation system doesn't handle game logic
+                        local success, message = self.gameService:attemptPlacement(self, cardToRemove, gridX, gridY)
+                        self:updateStatusMessage(message)
+                        -- Note: success check is somewhat redundant as we checked isValid, but good practice
+                    else
+                        -- Can't afford the card - do shudder animation instead
+                        self:createShudderAnimation(self.selectedHandIndex, "cantAfford")
+                        
+                        -- Get the error message but don't reset selection
+                        local _, message = self.gameService:attemptPlacement(self, self.selectedHandIndex, gridX, gridY)
+                        self:updateStatusMessage(message)
+                    end
                 else
                     -- Placement not valid, update status from gameService
                     local _, message = self.gameService:attemptPlacement(self, self.selectedHandIndex, gridX, gridY)
                     self:updateStatusMessage(message)
                     -- Don't reset selection, allow player to try again
+                    
+                    -- Add shudder animation for invalid placement too
+                    self:createShudderAnimation(self.selectedHandIndex, "invalidPlacement")
                 end
             elseif self.convergenceSelectionState == "selecting_own_output" then
                 -- Handle clicking on network to select output port
@@ -1114,6 +1142,50 @@ function PlayState:resetConvergenceSelection()
     self.targetConvergenceNodePos = nil
     self.targetConvergencePortIndex = nil
     -- We might need to re-evaluate button states here too, but handled in abort logic for now
+end
+
+-- Helper function to create a shudder animation for a card in the player's hand
+function PlayState:createShudderAnimation(cardIndex, errorType)
+    local currentPlayer = self.players[self.gameService.currentPlayerIndex]
+    local selectedCard = currentPlayer.hand[cardIndex]
+    if not selectedCard or not self.handCardBounds or not self.handCardBounds[cardIndex] then
+        print("Warning: Unable to create shudder animation - missing card or bounds")
+        return
+    end
+    
+    -- Calculate the card's expected position in the hand
+    -- This ensures consistent positioning even if the original card isn't drawn
+    local HAND_START_X = 50 -- Match Renderer's constant 
+    local HAND_CARD_WIDTH = self.renderer.HAND_CARD_WIDTH or 60
+    local HAND_SPACING = 10 -- Match Renderer's constant
+    local handStartY = love.graphics.getHeight() - self.BOTTOM_BUTTON_AREA_HEIGHT - (self.renderer.HAND_CARD_HEIGHT or 84)
+    
+    -- Calculate screen position for this specific card index
+    local centerX = HAND_START_X + (cardIndex-1) * (HAND_CARD_WIDTH + HAND_SPACING) + HAND_CARD_WIDTH/2
+    local centerY = handStartY + (self.renderer.HAND_CARD_HEIGHT or 84)/2
+    
+    -- Create the animation with parameters based on error type
+    self.animationController:addAnimation({
+        type = 'handShudder', -- Rename animation type to distinguish from world shudder
+        duration = 0.4,
+        card = selectedCard,
+        -- Keep the card in the same position, but in SCREEN space
+        startScreenPos = { x = centerX, y = centerY },
+        endScreenPos = { x = centerX, y = centerY },
+        -- Keep same scale, just vibrate
+        startScale = self.renderer.HAND_CARD_SCALE or 0.6,
+        endScale = self.renderer.HAND_CARD_SCALE or 0.6,
+        -- No rotation start/end, will be handled inside update
+        startRotation = 0,
+        endRotation = 0,
+        -- Add a tint that fades out
+        startAlpha = 0.8,
+        endAlpha = 1.0,
+        -- Use our shudder easing function
+        easingType = "shudder",
+        -- Metadata for the GameService error message
+        meta = { errorType = errorType or "generic" }
+    })
 end
 
 -- Helper to update UI element positions based on screen size

@@ -34,6 +34,11 @@ function Rules:isPlacementValid(card, network, x, y)
         return false, "Target location is already occupied"
     end
     
+    -- Check Uniqueness Rule (GDD 4.3)
+    if network.cards[card.id] then
+        return false, "Uniqueness Rule: Card already exists in network"
+    end
+    
     -- Reactor is always valid at (0,0) during initialization only (handled elsewhere)
     -- For regular placement, cannot place Reactor
     if card.type == Card.Type.REACTOR then 

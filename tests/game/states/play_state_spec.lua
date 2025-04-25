@@ -786,6 +786,11 @@ describe("PlayState Module", function()
                 return true, "Mock Placement Called" -- Mock success
             end
             
+            -- Add missing mock for canAffordCard
+            state.gameService.canAffordCard = function()
+                return true -- Always affordable in test
+            end
+            
             state.selectedHandIndex = 1
             state.currentPhase = "Build"
 

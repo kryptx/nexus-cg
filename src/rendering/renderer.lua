@@ -651,7 +651,7 @@ function Renderer:_drawCardInternal(card, x, y, context)
     self:_drawTextScaled(card.title or "Untitled", titleX, titleY, titleLimit, "left", titleStyle, context.baseFontSizes.title, context.targetScales.title, alphaOverride)
 
     love.graphics.setColor(originalColor)
-    local costYBase = y + margin - 1
+    local costYBase = y + margin - 2
     local costIconSize = CARD_COST_ICON_SIZE
     local costInnerSpacing = 2
     local costLineHeight = 12
@@ -788,7 +788,7 @@ function Renderer:_drawCardInternal(card, x, y, context)
     -- NEW: Map keywords to icons
     local icon_map = {
         -- Card Types
-        ["Culture"] = "%",    ["culture"] = "%",
+        ["Culture"] = "%%",    ["culture"] = "%%",
         ["Technology"] = "}", ["technology"] = "}",
         ["Resource"] = "~",   ["resource"] = "~",
         ["Knowledge"] = "{",  ["knowledge"] = "{",
@@ -1380,8 +1380,8 @@ function Renderer:_generateCardCanvas(card)
             artLabel = self.baseStandardFontSize
         },
         targetScales = {
-            title = 0.35,
-            cost = 0.4,
+            title = 0.33,
+            cost = 0.35,
             effect = 0.25,
             artLabel = 0.416666667
         },
@@ -1401,6 +1401,63 @@ function Renderer:preloadCardCanvases(cards)
     for _, card in pairs(cards) do
         self:_generateCardCanvas(card)
     end
+end
+
+-- Draw a single card that is currently animating in screen space (for hand cards)
+function Renderer:drawHandCardAnimation(animation)
+    if not animation or not animation.card or not animation.currentScreenPos then return end
+
+    local card = animation.card
+    local screenX = animation.currentScreenPos.x
+    local screenY = animation.currentScreenPos.y
+    local scale = animation.currentScale
+    local alpha = animation.currentAlpha or 1.0
+    local rotation = animation.currentRotation or 0
+
+    -- Get the pre-rendered canvas
+    local canvas = self:_generateCardCanvas(card)
+    if not canvas then
+        print("Warning: Canvas not found for animating hand card: " .. card.id)
+        return
+    end
+
+    -- Calculate draw parameters similar to drawHoveredHandCard
+    local sf = self.canvasRenderScaleFactor or 1
+    local invSf = 1 / sf
+    local drawScale = scale * invSf -- The final scale to draw the high-res canvas
+    local borderPadding = self.PORT_RADIUS -- Original units padding on canvas
+    local canvasW = canvas:getWidth()
+    local canvasH = canvas:getHeight()
+
+    -- For rotation, we need to work with the center of the card
+    local drawW = canvasW * drawScale
+    local drawH = canvasH * drawScale
+    
+    -- Draw the canvas centered at screenX, screenY with the interpolated scale and rotation
+    local originalColor = {love.graphics.getColor()}
+    love.graphics.setColor(1, 1, 1, alpha)
+    
+    if rotation ~= 0 then
+        -- When using rotation, we need to specify the rotation origin (center of the card)
+        love.graphics.draw(
+            canvas,                -- The canvas to draw
+            screenX,               -- X position (center)
+            screenY,               -- Y position (center)
+            rotation,              -- Rotation in radians
+            drawScale,             -- X scale
+            drawScale,             -- Y scale
+            canvasW / 2,           -- Origin X (half canvas width - center point)
+            canvasH / 2            -- Origin Y (half canvas height - center point)
+        )
+    else
+        -- No rotation - calculate top-left corner for drawing
+        local drawPosX = screenX - (drawW / 2)
+        local drawPosY = screenY - (drawH / 2)
+        -- Draw call uses top-left corner and scale
+        love.graphics.draw(canvas, drawPosX, drawPosY, 0, drawScale, drawScale)
+    end
+    
+    love.graphics.setColor(originalColor)
 end
 
 return Renderer

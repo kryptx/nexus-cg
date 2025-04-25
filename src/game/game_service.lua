@@ -246,6 +246,35 @@ function GameService:isPlacementValid(playerIndex, card, gridX, gridY)
     return isValid
 end
 
+-- Check if a player can afford to build a card
+function GameService:canAffordCard(playerIndex, card)
+    local player = self.players[playerIndex]
+    if not player then
+        print("Warning: canAffordCard called with invalid playerIndex: " .. tostring(playerIndex))
+        return false, "Invalid player"
+    end
+    
+    if not card then
+        print("Warning: canAffordCard called with nil card.")
+        return false, "Invalid card"
+    end
+    
+    local costM = card.buildCost.material
+    local costD = card.buildCost.data
+    local canAffordM = player.resources.material >= costM
+    local canAffordD = player.resources.data >= costD
+    
+    if canAffordM and canAffordD then
+        return true
+    else
+        local reasonAfford = "Cannot afford card. Cost: "
+        if costM > 0 then reasonAfford = reasonAfford .. costM .. "M " end
+        if costD > 0 then reasonAfford = reasonAfford .. costD .. "D " end
+        reasonAfford = reasonAfford .. string.format("(Have: %dM %dD)", player.resources.material, player.resources.data)
+        return false, reasonAfford
+    end
+end
+
 -- Attempt Placement
 function GameService:attemptPlacement(state, cardIndex, gridX, gridY)
     if self.currentPhase ~= TurnPhase.BUILD then
