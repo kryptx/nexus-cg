@@ -16,7 +16,7 @@ local MATERIAL_EQUIVALENT = {
     VP = 3.0,
 }
 
-local PORT_COST_ME = 1
+local PORT_COST_ME = 0.5
 local CONVERGENCE_EFFECT_MULTIPLIER = 0.5
 local CONDITIONAL_EFFECT_MULTIPLIER = 0.5
 local MINIMUM_COST_ME = 1.0
@@ -42,16 +42,37 @@ end
 -- Calculate cost from defined ports
 local function calculatePortsCost(definedPorts)
     local count = 0
+    local sideCompletionBonusME = 0
+
     if definedPorts then
+        -- Count total ports for base cost
         for _, present in pairs(definedPorts) do
             if present then
                 count = count + 1
             end
         end
+
+        -- Check for completed sides and add bonus ME (using the same value as PORT_COST_ME)
+        -- Use numeric CardPorts indices as keys
+        local CardPorts = require('src.game.card').Ports -- Require here if not available globally
+        if definedPorts[CardPorts.TOP_LEFT] and definedPorts[CardPorts.TOP_RIGHT] then
+            sideCompletionBonusME = sideCompletionBonusME + PORT_COST_ME
+        end
+        if definedPorts[CardPorts.BOTTOM_LEFT] and definedPorts[CardPorts.BOTTOM_RIGHT] then
+            sideCompletionBonusME = sideCompletionBonusME + PORT_COST_ME
+        end
+        if definedPorts[CardPorts.LEFT_TOP] and definedPorts[CardPorts.LEFT_BOTTOM] then
+            sideCompletionBonusME = sideCompletionBonusME + PORT_COST_ME
+        end
+        if definedPorts[CardPorts.RIGHT_TOP] and definedPorts[CardPorts.RIGHT_BOTTOM] then
+            sideCompletionBonusME = sideCompletionBonusME + PORT_COST_ME
+        end
     end
-    local cost = count * PORT_COST_ME
-    -- print(string.format("Ports Cost: %d ports * %.2f ME/port = %.2f ME", count, PORT_COST_ME, cost))
-    return cost
+
+    local baseCost = count * PORT_COST_ME
+    local totalCost = baseCost + sideCompletionBonusME
+    -- print(string.format("Ports Cost: %d ports * %.2f ME/port + %.2f Side Bonus = %.2f ME", count, PORT_COST_ME, sideCompletionBonusME, totalCost))
+    return totalCost
 end
 
 -- Calculate the ME contribution of a single action within an effect
@@ -217,8 +238,14 @@ local function calculateEffectsCost(activationEffect, convergenceEffect)
 end
 
 -- Convert total ME cost into a Material/Data split
--- Prioritizes covering cost with whole Data units first.
+-- Tries to match the target ME cost using rounding.
 -- Optionally accepts a thematicRatio {material=M_ratio, data=D_ratio} to guide the split.
+
+-- Helper function for standard rounding
+local round = function(n)
+	return math.floor(n + 0.5)
+end
+
 local function convertMEtoCostTable(totalME, thematicRatio)
     local cost = { material = 0, data = 0 }
     local dataValueME = MATERIAL_EQUIVALENT[ResourceType.DATA]
@@ -248,39 +275,29 @@ local function convertMEtoCostTable(totalME, thematicRatio)
         local materialME = totalME * (adjustedMaterialRatio / totalAdjustedRatio)
         local dataME = totalME * (adjustedDataRatio / totalAdjustedRatio)
         
-        -- Convert to actual units
-        local materialUnits = math.floor(materialME / materialValueME)
-        local dataUnits = math.floor(dataME / dataValueME)
+        -- Convert to actual units using rounding
+        local materialUnits = round(materialME / materialValueME)
+        local dataUnits = round(dataME / dataValueME)
         
         -- If we end up with material=0 or data=0 but shouldn't based on the ratio,
         -- make sure we have at least 1 of each if the ratio requires it
         if materialUnits == 0 and M_ratio > 0 then materialUnits = 1 end
         if dataUnits == 0 and D_ratio > 0 then dataUnits = 1 end
         
-        -- One more adjustment to account for rounding - ensure the total ME doesn't exceed the limit
-        local usedME = (materialUnits * materialValueME) + (dataUnits * dataValueME)
-        if usedME > totalME then
-            -- If we're over budget, reduce the more expensive resource (data)
-            if dataUnits > 0 then
-                dataUnits = dataUnits - 1
-            elseif materialUnits > 1 then
-                materialUnits = materialUnits - 1
-            end
-        end
-        
         -- For really small ME values where normal ratio calculation doesn't work well
-        if materialUnits == 0 and dataUnits == 0 then
-            materialUnits = 1 -- Default minimum
+        if materialUnits == 0 and dataUnits == 0 and totalME > 0 then -- Added check for totalME > 0
+            materialUnits = 1 -- Default minimum if ME is positive
         end
         
         cost.material = materialUnits
         cost.data = dataUnits
-    else -- Fallback to default logic: prioritize Data
-        local dataUnits = math.floor(totalME / dataValueME)
+    else -- Fallback logic: also use rounding
+        -- Calculate ideal units based on rounding
+        local dataUnits = round(totalME / dataValueME)
         local remainingME = totalME - (dataUnits * dataValueME)
 
-        -- Cover remainder with Materials
-        local materialUnits = math.ceil(remainingME / materialValueME)
+        -- Cover remainder with Materials, using rounding
+        local materialUnits = round(remainingME / materialValueME)
 
         cost.data = dataUnits
         cost.material = materialUnits

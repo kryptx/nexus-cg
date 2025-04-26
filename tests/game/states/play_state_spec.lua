@@ -180,7 +180,8 @@ end
 local mockAnimationController = {
     addAnimation = function() end, -- Simple mock addAnimation
     getActiveAnimations = function() return {} end, -- Return empty table
-    getAnimatingCardIds = function() return {} end -- Return empty table (set)
+    getAnimatingCardIds = function() return {} end, -- Return empty table (set)
+    registerCompletionCallback = function() end, -- Simple mock registerCompletionCallback
 }
 mockAnimationController.new = function()
     local instance = {}
