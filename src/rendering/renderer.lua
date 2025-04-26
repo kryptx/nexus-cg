@@ -1547,7 +1547,7 @@ function Renderer:_generateCardCanvas(card)
             artLabel = self.baseStandardFontSize
         },
         targetScales = {
-            title = 0.5,
+            title = 0.45,
             cost = 0.35,
             effect = 0.25,
             artLabel = 0.416666667

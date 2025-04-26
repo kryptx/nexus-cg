@@ -6,6 +6,7 @@ local CostCalculator = {}
 local CardTypes = require('src.game.card').Type -- Assuming path is correct relative to this tool
 local CardEffects = require('src.game.card_effects') -- Assuming path is correct
 local ResourceType = CardEffects.ResourceType
+local CardPorts = require('src.game.card').Ports
 
 -- === Configuration Constants ===
 local MATERIAL_EQUIVALENT = {
@@ -16,7 +17,7 @@ local MATERIAL_EQUIVALENT = {
     VP = 3.0,
 }
 
-local PORT_COST_ME = 0.5
+local PORT_COST_ME = 0.75
 local CONVERGENCE_EFFECT_MULTIPLIER = 0.5
 local CONDITIONAL_EFFECT_MULTIPLIER = 0.5
 local MINIMUM_COST_ME = 1.0
@@ -55,7 +56,6 @@ local function calculatePortsCost(definedPorts)
 
         -- Check for completed sides and add bonus ME (using the same value as PORT_COST_ME)
         -- Use numeric CardPorts indices as keys
-        local CardPorts = require('src.game.card').Ports -- Require here if not available globally
         if definedPorts[CardPorts.TOP_LEFT] and definedPorts[CardPorts.TOP_RIGHT] then
             sideCompletionBonusME = sideCompletionBonusME + PORT_COST_ME
         end
@@ -76,9 +76,32 @@ local function calculatePortsCost(definedPorts)
     return totalCost
 end
 
+-- Add dynamic convergence multiplier helper based on number of sides with ports
+local function getDynamicConvergenceMultiplier(definedPorts)
+    if not definedPorts then
+        return CONVERGENCE_EFFECT_MULTIPLIER
+    end
+    local sides = 0
+    if definedPorts[CardPorts.TOP_LEFT] or definedPorts[CardPorts.TOP_RIGHT] then sides = sides + 1 end
+    if definedPorts[CardPorts.BOTTOM_LEFT] or definedPorts[CardPorts.BOTTOM_RIGHT] then sides = sides + 1 end
+    if definedPorts[CardPorts.LEFT_TOP] or definedPorts[CardPorts.LEFT_BOTTOM] then sides = sides + 1 end
+    if definedPorts[CardPorts.RIGHT_TOP] or definedPorts[CardPorts.RIGHT_BOTTOM] then sides = sides + 1 end
+
+    if sides == 1 then
+        return 0.1
+    elseif sides == 2 then
+        return 0.3
+    elseif sides == 3 then
+        return 0.5
+    elseif sides >= 4 then
+        return 0.7
+    end
+    return 0.0
+end
+
 -- Calculate the ME contribution of a single action within an effect
 -- Returns the net ME contribution to the card's calculated cost.
-local function calculateActionContribution(action, isActivationEffect)
+local function calculateActionContribution(action, isActivationEffect, convergenceMultiplier)
     local effectType = action.effect
     local options = action.options or {}
     local conditionConfig = action.condition
@@ -195,7 +218,7 @@ local function calculateActionContribution(action, isActivationEffect)
         -- Effects targeting activator/both/all in activation context have 0 cost contribution by default
         end
     else -- Effect occurs during Convergence (Activator is opponent)
-        local multiplier = CONVERGENCE_EFFECT_MULTIPLIER
+        local multiplier = convergenceMultiplier or CONVERGENCE_EFFECT_MULTIPLIER
         if target == "activator" then effectME = -baseME * multiplier -- Benefit to activator reduces cost; Harm adds cost
         elseif target == "steal" then effectME = -baseME * multiplier -- Steal benefits activator, reduces cost
         elseif target == "owner" then effectME = baseME * multiplier -- Benefit/Harm to owner impacts cost (reduced)
@@ -220,7 +243,7 @@ end
 
 
 -- Calculate the total ME cost contribution from activation and convergence effects
-local function calculateEffectsCost(activationEffect, convergenceEffect)
+local function calculateEffectsCost(activationEffect, convergenceEffect, definedPorts)
     local totalEffectsME = 0
 
     -- Process Activation Effects
@@ -232,8 +255,9 @@ local function calculateEffectsCost(activationEffect, convergenceEffect)
 
     -- Process Convergence Effects
     if convergenceEffect and convergenceEffect.config and convergenceEffect.config.actions then
-         for _, action in ipairs(convergenceEffect.config.actions) do
-            totalEffectsME = totalEffectsME + calculateActionContribution(action, false)
+        local dynMultiplier = getDynamicConvergenceMultiplier(definedPorts)
+        for _, action in ipairs(convergenceEffect.config.actions) do
+            totalEffectsME = totalEffectsME + calculateActionContribution(action, false, dynMultiplier)
         end
     end
 
@@ -332,7 +356,7 @@ function CostCalculator.calculateDerivedCost(cardDefinition, thematicRatio) -- A
     -- end
 
     local portsME = calculatePortsCost(cardDefinition.definedPorts)
-    local effectsME = calculateEffectsCost(cardDefinition.activationEffect, cardDefinition.convergenceEffect)
+    local effectsME = calculateEffectsCost(cardDefinition.activationEffect, cardDefinition.convergenceEffect, cardDefinition.definedPorts)
 
     local totalME = portsME + effectsME
     
