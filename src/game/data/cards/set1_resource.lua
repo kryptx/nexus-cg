@@ -20,11 +20,11 @@ definitions["NODE_RES_001"] = {
           { condition = { type = "adjacency", nodeType = CardTypes.TECHNOLOGY, count = 1 },
             effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 2 } }
       }
-      -- Description: "Grants 2 Material to the owner. If adjacent to 1+ Technology node(s): Grants 2 Energy to the owner."
+      -- Description: "Owner gains 2 Material. If adjacent to 1+ Technology node(s): Owner gains 2 Energy."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = { { effect = "addResourceToBoth", options = { resource = ResourceType.MATERIAL, amount = 1 } } }
-      -- Description: "Grants 1 Material to both the owner and activator."
+      -- Description: "You and the activator gain 1 Material."
   }),
   vpValue = 0,
   imagePath = "assets/images/materials-depot.png",
@@ -54,13 +54,13 @@ definitions["NODE_RES_002"] = {
              options = { amount = 1 }
           }
       }
-      -- Description: "Owner gains 1 Material. If Owner pays 1 Energy: Owner draws 1 card."
+      -- Description: "You gain 1 Material. If you pay 1 Energy: You draw 1 card."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
            { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 1 } }
       }
-      -- Description: "Grants 1 Material to the activator."
+      -- Description: "You and the activator gain 1 Material."
   }),
   vpValue = 1,
   imagePath = "assets/images/automated-drill-site.png",
@@ -85,14 +85,14 @@ definitions["NODE_RES_003"] = {
           { condition = { type = "activatedCardType", count = 2, cardType = CardTypes.CULTURE },
             effect = "gainVPForOwner", options = { amount = 1 } }
       }
-      -- Description: "Owner gains 1 Material. If 2+ Culture card(s) were activated in this chain: Owner gains 1 VP."
+      -- Description: "You gain 1 Material. If 2+ Culture card(s) were activated in this chain: You gain 1 VP."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
            { effect = "gainVPForActivator", options = { amount = 1 } },
            { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
       }
-      -- Description: "Activator gains 1 VP. Grants 1 Material to the owner."
+      -- Description: "You and the activator gain 1 Material."
   }),
   vpValue = 2, 
   imagePath = "assets/images/monument-construction-site.png",
@@ -119,14 +119,14 @@ definitions["NODE_RES_004"] = {
           { condition = { type = "adjacency", nodeType = CardTypes.CULTURE, count = 1 },
             effect = "drawCardsForOwner", options = { amount = 1 } }
       }
-      -- Description: "Owner gains 1 Material. If adjacent to 1+ Culture node(s): Owner draws 1 card."
+      -- Description: "You gain 1 Material. If adjacent to 1+ Culture node(s): You draw 1 card."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
            { effect = "gainVPForActivator", options = { amount = 1 } },
            { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
       }
-      -- Description: "Activator gains 1 VP. Owner gains 1 Material."
+      -- Description: "You and the activator gain 1 Material."
   }),
   vpValue = 1,
   imagePath = "assets/images/resource-reclamation-art-project.png",
@@ -151,14 +151,14 @@ definitions["NODE_RES_005"] = {
           { condition = { type = "adjacency", nodeType = CardTypes.TECHNOLOGY, count = 1 },
             effect = "gainVPForOwner", options = { amount = 1 } }
       }
-      -- Description: "Owner gains 1 Data. If adjacent to 1+ Technology node(s): Owner gains 1 VP."
+      -- Description: "You gain 1 Data. If adjacent to 1+ Technology node(s): You gain 1 VP."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
            { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
            { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
       }
-      -- Description: "Activator gains 1 Data. Owner gains 1 Material."
+      -- Description: "You gain 1 Data. The owner gains 1 Material."
   }),
   vpValue = 1,
   imagePath = "assets/images/materials-science-r&d.png",
@@ -183,14 +183,14 @@ definitions["NODE_RES_006"] = {
           { condition = { type = "adjacency", nodeType = CardTypes.KNOWLEDGE, count = 1 },
             effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
       }
-      -- Description: "Owner gains 1 Data. If adjacent to 1+ Knowledge node(s): Owner gains 1 Data."
+      -- Description: "You gain 1 Data. If adjacent to 1+ Knowledge node(s): You gain 1 Data."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
            { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
            { effect = "gainVPForOwner", options = { amount = 1 } }
       }
-      -- Description: "Activator gains 1 Data. Owner gains 1 VP."
+      -- Description: "You gain 1 Data. You gain 1 VP."
   }),
   vpValue = 1,
   imagePath = "assets/images/geological-survey-outpost.png",
@@ -216,13 +216,13 @@ definitions["NODE_RES_007"] = {
           { condition = { type = "adjacentEmptyCells", count = 2 },
             effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 1 } }
       }
-      -- Description: "Grants 1 Energy to the owner. If adjacent to 2+ empty cell(s): Grants 1 Energy to the owner."
+      -- Description: "You gain 1 Energy. If adjacent to 2+ empty cell(s): You gain 1 Energy."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
        actions = {
            { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
        }
-       -- Description: "Grants 1 Material to the owner."
+       -- Description: "You gain 1 Material."
   }),
   vpValue = 0,
   imagePath = "assets/images/solar-collector-array.png",
@@ -245,7 +245,7 @@ definitions["NODE_RES_008"] = {
             effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 }
           }
       }
-      -- Description: "Owner gains 1 Material. If adjacent to 1+ Resource node(s): Owner gains 1 Material."
+      -- Description: "You gain 1 Material. If adjacent to 1+ Resource node(s): You gain 1 Material."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
@@ -255,7 +255,7 @@ definitions["NODE_RES_008"] = {
             options = { resource = ResourceType.MATERIAL, amount = 2 }
           }
       }
-      -- Description: "If Activator pays 1 Energy: Activator gains 2 Material."
+      -- Description: "If you pay 1 Energy: You gain 2 Material."
   }),
   vpValue = 0, imagePath = "assets/images/asteroid-mining-claim.png", flavorText = "Untapped riches in the belt.",
   definedPorts = { [CardPorts.TOP_RIGHT] = true, [CardPorts.RIGHT_BOTTOM] = true },
@@ -377,6 +377,130 @@ definitions["NODE_RES_013"] = {
   }),
   vpValue = 0, imagePath = "assets/images/resource-distribution-hub.png", flavorText = "Facilitating the flow of vital goods.",
   definedPorts = { [CardPorts.BOTTOM_LEFT] = true, [CardPorts.LEFT_TOP] = true, [CardPorts.RIGHT_BOTTOM] = true }, -- Cult In, Know Out, Res Out
+}
+
+definitions["NODE_RES_014"] = {
+  id = "NODE_RES_014",
+  title = "Salvage Operation",
+  type = CardTypes.RESOURCE,
+  resourceRatio = { material = 1, data = 0 },
+  activationEffect = CardEffects.createActivationEffect({
+      actions = {
+          { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
+          { condition = { type = "adjacentEmptyCells", count = 1 },
+            effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
+      }
+      -- Description: "You gain 1 Material. If adjacent to 1+ empty cell(s): You gain 1 Material."
+  }),
+  convergenceEffect = CardEffects.createConvergenceEffect({
+      actions = {
+          { effect = "addResourceToBoth", options = { resource = ResourceType.MATERIAL, amount = 1 } }
+      }
+      -- Description: "You and the activator gain 1 Material."
+  }),
+  vpValue = 0,
+  imagePath = "assets/images/salvage-operation.png",
+  definedPorts = {
+      [CardPorts.LEFT_BOTTOM] = true,
+      [CardPorts.RIGHT_BOTTOM] = true,
+  },
+  art = nil,
+  flavorText = "Recovering scrap to fuel progress.",
+}
+
+definitions["NODE_RES_015"] = {
+  id = "NODE_RES_015",
+  title = "Alloy Foundry",
+  type = CardTypes.RESOURCE,
+  resourceRatio = { material = 2, data = 1 },
+  activationEffect = CardEffects.createActivationEffect({
+      actions = {
+           { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
+           { condition = { type = "adjacency", nodeType = CardTypes.TECHNOLOGY, count = 1 },
+             effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
+      }
+      -- Description: "You gain 1 Material. If adjacent to 1+ Technology node(s): You gain 1 Material."
+  }),
+  convergenceEffect = CardEffects.createConvergenceEffect({
+      actions = {
+          { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 1 } },
+          { effect = "gainVPForOwner", options = { amount = 1 } }
+      }
+      -- Description: "Activator gains 1 Material. Owner gains 1 VP."
+  }),
+  vpValue = 1,
+  imagePath = "assets/images/alloy-foundry.png",
+  definedPorts = {
+      [CardPorts.TOP_RIGHT] = true,
+      [CardPorts.LEFT_BOTTOM] = true,
+      [CardPorts.RIGHT_BOTTOM] = true,
+  },
+  art = nil,
+  flavorText = "Fusing raw elements into stronger compounds.",
+}
+
+definitions["NODE_RES_016"] = {
+  id = "NODE_RES_016",
+  title = "Resource Exchange Terminal",
+  type = CardTypes.RESOURCE,
+  resourceRatio = { material = 3, data = 1 },
+  activationEffect = CardEffects.createActivationEffect({
+      actions = {
+          { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
+          { condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.DATA, amount = 2 },
+            effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } }
+      }
+      -- Description: "You gain 1 Material. If you pay 2 Data: You gain 2 Material."
+  }),
+  convergenceEffect = CardEffects.createConvergenceEffect({
+      actions = {
+          { condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.DATA, amount = 1 },
+            effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 2 } },
+          { effect = "gainVPForOwner", options = { amount = 1 } }
+      }
+      -- Description: "If Activator pays 1 Data: Activator gains 2 Material. Owner gains 1 VP."
+  }),
+  vpValue = 0,
+  imagePath = "assets/images/resource-exchange-terminal.png",
+  definedPorts = {
+      [CardPorts.RIGHT_TOP] = true,
+      [CardPorts.LEFT_BOTTOM] = true,
+      [CardPorts.RIGHT_BOTTOM] = true,
+  },
+  art = nil,
+  flavorText = "Trading info for raw materials.",
+}
+
+definitions["NODE_RES_017"] = {
+  id = "NODE_RES_017",
+  title = "Deep Shaft Excavator",
+  type = CardTypes.RESOURCE,
+  resourceRatio = { material = 4, data = 2 },
+  activationEffect = CardEffects.createActivationEffect({
+      actions = {
+          { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } },
+          { condition = { type = "activatedCardType", count = 1, cardType = CardTypes.RESOURCE },
+            effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
+      }
+      -- Description: "You gain 2 Material. If a Resource card was activated earlier in this chain: You gain 1 Material."
+  }),
+  convergenceEffect = CardEffects.createConvergenceEffect({
+      actions = {
+          { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 1 } },
+          { condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.ENERGY, amount = 1 },
+            effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 2 } }
+      }
+      -- Description: "Activator gains 1 Material. If Activator pays 1 Energy: Activator gains 2 Material."
+  }),
+  vpValue = 2,
+  imagePath = "assets/images/deep-shaft-excavator.png",
+  definedPorts = {
+      [CardPorts.TOP_LEFT] = true,
+      [CardPorts.LEFT_BOTTOM] = true,
+      [CardPorts.RIGHT_BOTTOM] = true,
+  },
+  art = nil,
+  flavorText = "Delving beyond the surface for rich veins.",
 }
 
 return definitions 

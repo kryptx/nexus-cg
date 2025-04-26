@@ -17,11 +17,11 @@ definitions["NODE_GENESIS_RES_001"] = {
   resourceRatio = { material = 1, data = 0 },
   activationEffect = CardEffects.createActivationEffect({
       actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } } }
-      -- Description: "Grants 1 Material to the owner."
+      -- Description: "You gain 1 Material."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = { { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 1 } } }
-      -- Description: "Grants 1 Material to the activator."
+      -- Description: "You gain 1 Material."
   }),
   vpValue = 0,
   imagePath = "assets/images/genesis-first-spark.png", -- Placeholder path
@@ -43,12 +43,12 @@ definitions["NODE_GENESIS_TECH_001"] = {
   isGenesis = true, -- Mark as a Genesis card
   resourceRatio = { material = 1, data = 0 },
   activationEffect = CardEffects.createActivationEffect({
-      actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } }
-      -- Description: "Grants 1 Data to the owner."
+      actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } } }
+      -- Description: "You gain 1 Material."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = { { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } } }
-      -- Description: "Grants 1 Data to the activator."
+      -- Description: "You gain 1 Data."
   }),
   vpValue = 0,
   imagePath = "assets/images/genesis-initial-circuit.png", -- Placeholder path
@@ -70,12 +70,12 @@ definitions["NODE_GENESIS_KNOW_001"] = {
   isGenesis = true,
   resourceRatio = { material = 1, data = 0 },
    activationEffect = CardEffects.createActivationEffect({
-      actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } }
-      -- Description: "Grants 1 Data to the owner."
+      actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } } }
+      -- Description: "You gain 1 Material."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
-      actions = { { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } } }
-      -- Description: "Grants 1 Data to the activator."
+      actions = { { effect = "drawCardsForActivator", options = { amount = 1 } } }
+      -- Description: "You draw 1 card."
   }),
   vpValue = 0,
   imagePath = "assets/images/genesis-seed-thought.png", -- Placeholder path
@@ -97,12 +97,12 @@ definitions["NODE_GENESIS_CULT_001"] = {
   isGenesis = true,
   resourceRatio = { material = 1, data = 0 },
    activationEffect = CardEffects.createActivationEffect({
-      actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } }
-      -- Description: "Grants 1 Data to the owner."
+      actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } } }
+      -- Description: "You gain 1 Material."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = { { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } } } 
-      -- Description: "Grants 1 Data to the activator."
+      -- Description: "You gain 1 Data."
   }),
   vpValue = 0,
   imagePath = "assets/images/genesis-nascent-meme.png", -- Placeholder path
