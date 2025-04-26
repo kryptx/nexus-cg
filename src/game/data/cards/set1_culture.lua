@@ -454,8 +454,8 @@ definitions["NODE_CULT_013"] = {
           { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
           {
               condition = { type = "convergenceLinks", count = 1 },
-              effect = "addResource", 
-              options = { amount = 1 }
+              effect = "addResourceToOwner",
+              options = { resource = ResourceType.MATERIAL, amount = 1 }
           }
       }
       -- Description: "Owner gains 1 Material. If 1+ convergence link attached: Owner gains 1 Material."

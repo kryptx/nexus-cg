@@ -260,4 +260,30 @@ describe("CardEffects.generateEffectDescription", function()
         assert.are.equal(expected, CardEffects.generateEffectDescription(config))
     end)
 
+    -- Explicit context tests for imperative wording
+    it("uses imperative for activator in activation context when explicit context", function()
+        local config = { actions = { { effect = "drawCardsForActivator", options = { amount = 2 } } } }
+        assert.are.equal("Draw 2 cards.", CardEffects.generateEffectDescription(config, "activation"))
+    end)
+
+    it("uses imperative for activator in convergence context when explicit context", function()
+        local config = { actions = { { effect = "drawCardsForActivator", options = { amount = 3 } } } }
+        assert.are.equal("Draw 3 cards.", CardEffects.generateEffectDescription(config, "convergence"))
+    end)
+
+    it("does not use imperative for owner in convergence context", function()
+        local config = { actions = { { effect = "drawCardsForOwner", options = { amount = 1 } } } }
+        assert.are.equal("Owner draws 1 card.", CardEffects.generateEffectDescription(config, "convergence"))
+    end)
+
+    it("uses imperative for activator resource effects in activation context", function()
+        local config = { actions = { { effect = "addResourceToActivator", options = { resource = CardEffects.ResourceType.DATA, amount = 3 } } } }
+        assert.are.equal("Gain 3 Data.", CardEffects.generateEffectDescription(config, "activation"))
+    end)
+
+    it("uses imperative for owner resource effects in activation context", function()
+        local config = { actions = { { effect = "addResourceToOwner", options = { resource = CardEffects.ResourceType.ENERGY, amount = 1 } } } }
+        assert.are.equal("Gain 1 Energy.", CardEffects.generateEffectDescription(config, "activation"))
+    end)
+
 end)

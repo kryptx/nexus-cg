@@ -773,6 +773,25 @@ function Renderer:_drawCardInternal(card, x, y, context)
         love.graphics.draw(image, drawX, drawY, 0, scale, scale)
         love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride)
         love.graphics.rectangle("line", x + margin, imageY, areaW, areaH)
+        
+        -- Draw flavor text box if the card has flavor text
+        if card.flavorText and card.flavorText ~= "" then
+            -- Semi-transparent black box covering bottom third of the artwork
+            local flavorBoxHeight = areaH / 3
+            local flavorBoxY = imageY + areaH - flavorBoxHeight
+            love.graphics.setColor(0, 0, 0, 0.5 * alphaOverride) -- Semi-transparent black
+            love.graphics.rectangle("fill", x + margin, flavorBoxY, areaW, flavorBoxHeight)
+            
+            -- Draw flavor text using the white font style similar to convergence text
+            local flavorTextY = flavorBoxY + 1 -- Small padding from top of flavor box
+            local flavorTextLimit = areaW - 2 -- Small padding on left and right
+            love.graphics.setColor(originalColor) -- Restore original color for _drawTextScaled
+            self:_drawTextScaled(card.flavorText, x + margin + 2, flavorTextY, flavorTextLimit, "left", 
+                                 "CARD_EFFECT_CONVERGENCE", -- Use the white font style 
+                                 context.baseFontSizes.effect, 
+                                 context.targetScales.effect, 
+                                 0.75 * alphaOverride)
+        end
     else
         love.graphics.setColor(0.6, 0.6, 0.6, 1.0 * alphaOverride)
         -- Use areaW and imageH for the placeholder rectangle
@@ -896,6 +915,18 @@ function Renderer:_drawSingleCardInWorld(card, wx, wy, activeLinks, alphaOverrid
         love.graphics.setColor(1, 0, 0, alphaOverride)
         -- Draw border relative to the card content box (wx, wy)
         love.graphics.rectangle("line", wx, wy, self.CARD_WIDTH, self.CARD_HEIGHT, 2, 2) -- Use base dimensions
+    end
+
+    -- Dynamic: Draw token count on card in world view if > 0
+    if card.tokens and card.tokens > 0 then
+        love.graphics.setColor(0, 0, 0, alphaOverride)
+        -- Use a small UI font for token count
+        local fontOld = love.graphics.getFont()
+        local tokenFont = self.fonts.uiSmall or fontOld
+        love.graphics.setFont(tokenFont)
+        -- Position at bottom-left inside card
+        love.graphics.print("Tokens: " .. card.tokens, wx + 5, wy + self.CARD_HEIGHT - 15)
+        love.graphics.setFont(fontOld)
     end
 
     -- Restore original color state

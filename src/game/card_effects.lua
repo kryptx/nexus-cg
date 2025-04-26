@@ -15,25 +15,68 @@ CardEffects.ResourceType = {
 }
 
 -- Helper function to generate descriptions for resource effects (NO TRAILING PERIODS)
-local function generateResourceDescription(actionEffect, resource, amount)
+local function generateResourceDescription(actionEffect, resource, amount, context)
     local resourceName = resource:sub(1, 1):upper() .. resource:sub(2) -- Capitalize first letter
+    local isImperative = false
+    
+    -- Check if we should use imperative form:
+    -- For activation effects, both owner and activator use imperative (you)
+    -- For convergence effects, only activator uses imperative
+    if context then
+        if context.effectType == "activation" then
+            if actionEffect:find("Owner") or actionEffect:find("Activator") then
+                isImperative = true
+            end
+        elseif context.effectType == "convergence" then
+            if actionEffect:find("Activator") then
+                isImperative = true
+            end
+        end
+    end
     
     if actionEffect == "addResourceToOwner" then
-        return string.format("Owner gains %d %s", amount, resourceName)
+        if isImperative then
+            return string.format("Gain %d %s", amount, resourceName) 
+        else
+            return string.format("Owner gains %d %s", amount, resourceName)
+        end
     elseif actionEffect == "addResourceToActivator" then
-        return string.format("Activator gains %d %s", amount, resourceName)
+        if isImperative then
+            return string.format("Gain %d %s", amount, resourceName)
+        else
+            return string.format("Activator gains %d %s", amount, resourceName)
+        end
     elseif actionEffect == "addResourceToBoth" then
-        return string.format("Owner and activator gain %d %s", amount, resourceName)
+        if isImperative then
+            return string.format("You and the %s gain %d %s", 
+                context.effectType == "activation" and "activator" or "owner",
+                amount, resourceName)
+        else
+            return string.format("Owner and activator gain %d %s", amount, resourceName)
+        end
     elseif actionEffect == "addResourceToAllPlayers" then
         return string.format("All players gain %d %s", amount, resourceName)
     elseif actionEffect == "gainResourcePerNodeOwner" then
          local nodeType = "Any" -- Placeholder, actual type depends on options
-         return string.format("Owner gains %d %s per %s node...", amount, resourceName, nodeType)
+         if isImperative then
+             return string.format("Gain %d %s per %s node...", amount, resourceName, nodeType)
+         else
+             return string.format("Owner gains %d %s per %s node...", amount, resourceName, nodeType)
+         end
     elseif actionEffect == "gainResourcePerNodeActivator" then
          local nodeType = "Any" -- Placeholder
-         return string.format("Activator gains %d %s per %s node...", amount, resourceName, nodeType)
+         if isImperative then
+             return string.format("Gain %d %s per %s node...", amount, resourceName, nodeType)
+         else
+             return string.format("Activator gains %d %s per %s node...", amount, resourceName, nodeType)
+         end
     elseif actionEffect == "stealResource" then
-         return string.format("Activator steals %d %s from the owner.", amount, resourceName)
+        if isImperative then
+            return string.format("Steal %d %s from the %s", 
+                amount, resourceName, context.effectType == "activation" and "activator" or "owner")
+        else
+            return string.format("Activator steals %d %s from the owner.", amount, resourceName)
+        end
     end
     
     -- Return a generic description if no match, let generateOtherDescription handle specifics
@@ -41,46 +84,121 @@ local function generateResourceDescription(actionEffect, resource, amount)
 end
 
 -- Generates descriptions for non-resource effects (or resource effects not covered above) (NO TRAILING PERIODS)
-local function generateOtherDescription(actionEffect, options)
+local function generateOtherDescription(actionEffect, options, context)
+    local isImperative = false
+    
+    -- Check if we should use imperative form:
+    -- For activation effects, both owner and activator use imperative (you)
+    -- For convergence effects, only activator uses imperative
+    if context then
+        if context.effectType == "activation" then
+            if actionEffect:find("Owner") or actionEffect:find("Activator") then
+                isImperative = true
+            end
+        elseif context.effectType == "convergence" then
+            if actionEffect:find("Activator") then
+                isImperative = true
+            end
+        end
+    end
+
     if actionEffect == "drawCardsForActivator" then
-        return string.format("Activator draws %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
+        if isImperative then
+            return string.format("Draw %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
+        else
+            return string.format("Activator draws %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
+        end
     elseif actionEffect == "drawCardsForOwner" then
-        return string.format("Owner draws %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
+        if isImperative and context and context.effectType == "activation" then
+            return string.format("Draw %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
+        else
+            return string.format("Owner draws %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
+        end
     elseif actionEffect == "drawCardsForAllPlayers" then
         return string.format("All players draw %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
     elseif actionEffect == "gainVPForActivator" then
-        return string.format("Activator gains %d VP", options.amount or 1)
+        if isImperative and context and context.effectType == "convergence" then
+            return string.format("Gain %d VP", options.amount or 1)
+        else
+            return string.format("Activator gains %d VP", options.amount or 1)
+        end
     elseif actionEffect == "gainVPForOwner" then
-        return string.format("Owner gains %d VP", options.amount or 1)
+        if isImperative and context and context.effectType == "activation" then
+            return string.format("Gain %d VP", options.amount or 1)
+        else
+            return string.format("Owner gains %d VP", options.amount or 1)
+        end
     elseif actionEffect == "gainVPForBoth" then
-        return string.format("Owner and Activator gain %d VP", options.amount or 1)
+        if isImperative then
+            return string.format("You and the %s gain %d VP", 
+                context.effectType == "activation" and "activator" or "owner",
+                options.amount or 1)
+        else
+            return string.format("Owner and Activator gain %d VP", options.amount or 1)
+        end
     elseif actionEffect == "forceDiscardCardsOwner" then
-        return string.format("Owner discards %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
+        if isImperative and context and context.effectType == "activation" then
+            return string.format("Discard %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
+        else
+            return string.format("Owner discards %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
+        end
     elseif actionEffect == "forceDiscardCardsActivator" then
-        return string.format("Activator discards %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
+        if isImperative and context and context.effectType == "convergence" then
+            return string.format("Discard %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
+        else
+            return string.format("Activator discards %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
+        end
     elseif actionEffect == "destroyRandomLinkOnNode" then
         return "Destroy a random convergence link on this node"
     -- === Refined Resource Descriptions handled here now ===
     elseif actionEffect == "stealResource" then
         local resourceName = options.resource:sub(1, 1):upper() .. options.resource:sub(2)
-        return string.format("Activator steals %d %s from the owner", options.amount or 1, resourceName)
+        if isImperative then
+            return string.format("Steal %d %s from the %s", 
+                options.amount or 1, 
+                resourceName, 
+                context.effectType == "activation" and "activator" or "owner")
+        else
+            return string.format("Activator steals %d %s from the owner", options.amount or 1, resourceName)
+        end
     elseif actionEffect == "gainResourcePerNodeOwner" then
          local resourceName = options.resource:sub(1, 1):upper() .. options.resource:sub(2)
          local nodeType = options.nodeType or "Any" 
-         return string.format("Owner gains %d %s per %s node in their network", options.amount or 1, resourceName, nodeType)
+         if isImperative and context and context.effectType == "activation" then
+             return string.format("Gain %d %s per %s node in your network", options.amount or 1, resourceName, nodeType)
+         else
+             return string.format("Owner gains %d %s per %s node in their network", options.amount or 1, resourceName, nodeType)
+         end
     elseif actionEffect == "gainResourcePerNodeActivator" then
          local resourceName = options.resource:sub(1, 1):upper() .. options.resource:sub(2)
          local nodeType = options.nodeType or "Any"
-         return string.format("Activator gains %d %s per %s node in the owner's network", options.amount or 1, resourceName, nodeType)
+         if isImperative and context and context.effectType == "convergence" then
+             return string.format("Gain %d %s per %s node in the owner's network", options.amount or 1, resourceName, nodeType)
+         else
+             return string.format("Activator gains %d %s per %s node in the owner's network", options.amount or 1, resourceName, nodeType)
+         end
     -- === NEW EFFECT DESCRIPTIONS ===
     elseif actionEffect == "activatorStealResourceFromChainOwners" then
          local resourceName = options.resource and (options.resource:sub(1, 1):upper() .. options.resource:sub(2)) or "Resource"
          local amount = options.amount or 1
-         return string.format("Activator steals %d %s from each owner of nodes activated this chain", amount, resourceName)
+         if isImperative and context and context.effectType == "convergence" then
+             return string.format("Steal %d %s from each owner of nodes activated this chain", amount, resourceName)
+         else
+             return string.format("Activator steals %d %s from each owner of nodes activated this chain", amount, resourceName)
+         end
     elseif actionEffect == "ownerStealResourceFromChainOwners" then
          local resourceName = options.resource and (options.resource:sub(1, 1):upper() .. options.resource:sub(2)) or "Resource"
          local amount = options.amount or 1
-         return string.format("Owner steals %d %s from each owner of nodes activated this chain", amount, resourceName)
+         if isImperative and context and context.effectType == "activation" then
+             return string.format("Steal %d %s from each owner of nodes activated this chain", amount, resourceName)
+         else
+             return string.format("Owner steals %d %s from each owner of nodes activated this chain", amount, resourceName)
+         end
+    -- === TOKEN EFFECT DESCRIPTIONS ===
+    elseif actionEffect == "addToken" then
+        return "Add 1 token to this node"
+    elseif actionEffect == "removeTokens" then
+        return "Remove all tokens from this node"
     -- =====================================================
     end
     return "Unknown other effect" -- Note: No trailing period here either
@@ -242,6 +360,24 @@ local function evaluatePaymentOfferCondition(conditionConfig, gameService, activ
     return canAfford
 end
 
+-- NEW: Checks if a node has enough tokens accumulated
+local function evaluateHasTokensCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
+    if not sourceNode or not sourceNode.card then 
+        print("Error: sourceNode is required to evaluate hasTokens condition.")
+        return false
+    end
+    
+    local nodeCard = sourceNode.card
+    -- Initialize tokens field on the card if it doesn't exist
+    nodeCard.tokens = nodeCard.tokens or 0
+    
+    local requiredCount = conditionConfig.count or 1
+    local currentTokens = nodeCard.tokens
+    
+    print(string.format("Evaluated hasTokens condition: Current=%d, Required=%d", currentTokens, requiredCount))
+    return currentTokens >= requiredCount
+end
+
 -- Central condition evaluator
 local function evaluateCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
     if not conditionConfig then return true end -- No condition means it passes
@@ -257,10 +393,12 @@ local function evaluateCondition(conditionConfig, gameService, activatingPlayer,
         return evaluateActivationChainLengthCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
     elseif conditionType == "activatedCardType" then
         return evaluateActivatedCardTypeCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
-    elseif conditionType == "adjacentEmptyCells" then -- Add new condition type check
+    elseif conditionType == "adjacentEmptyCells" then
         return evaluateAdjacentEmptyCellsCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
-    elseif conditionType == "paymentOffer" then -- Add new condition type check
+    elseif conditionType == "paymentOffer" then
         return evaluatePaymentOfferCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
+    elseif conditionType == "hasTokens" then
+        return evaluateHasTokensCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
     else
         print(string.format("Warning: Unknown condition type '%s' to evaluate.", conditionType))
         return false -- Fail safely for unknown condition types
@@ -269,10 +407,25 @@ end
 
 -- === CONDITION DESCRIPTION HELPER (Updated for port terminology) ===
 
-local function generateConditionDescription(conditionConfig)
+local function generateConditionDescription(conditionConfig, context)
     if not conditionConfig then return "" end
     local type = conditionConfig.type
     local count = conditionConfig.count or 1
+    local useYou = false
+    
+    -- Check if we should use "you" instead of "Owner"/"Activator"
+    if context then
+        if context.effectType == "activation" then
+            if conditionConfig.payer == "Owner" or conditionConfig.payer == "Activator" then
+                useYou = true
+            end
+        elseif context.effectType == "convergence" then
+            if conditionConfig.payer == "Activator" then
+                useYou = true
+            end
+        end
+    end
+    
     if type == "adjacency" then
         local nodeType = conditionConfig.nodeType or "Any"
         return string.format("If adjacent to %d+ %s nodes: ", count, nodeType)
@@ -285,14 +438,19 @@ local function generateConditionDescription(conditionConfig)
     elseif type == "activatedCardType" then
         local cardType = conditionConfig.cardType or "Unknown"
         return string.format("If %d+ %s nodes activated this chain: ", count, cardType)
-    elseif type == "adjacentEmptyCells" then -- Add description for new condition
+    elseif type == "adjacentEmptyCells" then
         return string.format("If adjacent to %d+ empty cell(s): ", count)
-    elseif type == "paymentOffer" then -- Add description for payment offer
+    elseif type == "hasTokens" then
+        return string.format("If %d+ tokens on this node: ", count)
+    elseif type == "paymentOffer" then
         local payer = conditionConfig.payer or "Player" -- Default if missing
+        if useYou and payer ~= "Player" then 
+            payer = "you"
+        end
         local resource = conditionConfig.resource or "Resource"
         local amount = conditionConfig.amount or 1
         local resourceName = resource:sub(1, 1):upper() .. resource:sub(2)
-        return string.format("If %s pays %d %s: ", payer, amount, resourceName)
+        return string.format("If %s pay%s %d %s: ", payer, useYou and "" or "s", amount, resourceName)
     else
         print(string.format("Warning: Unknown condition type '%s' for description.", type))
         return "If condition met: "
@@ -300,16 +458,16 @@ local function generateConditionDescription(conditionConfig)
 end
 
 -- Helper to get the raw action description without period
-local function generateActionDescription(action)
+local function generateActionDescription(action, context)
     local effectType = action.effect
     local options = action.options or {}
     local actionText = ""
     
     -- Determine which description generator to use
     if effectType == "addResourceToOwner" or effectType == "addResourceToActivator" or effectType == "addResourceToBoth" or effectType == "addResourceToAllPlayers" then
-         actionText = generateResourceDescription(effectType, options.resource, options.amount or 1)
+         actionText = generateResourceDescription(effectType, options.resource, options.amount or 1, context)
     else
-        actionText = generateOtherDescription(effectType, options)
+        actionText = generateOtherDescription(effectType, options, context)
     end
     
     if actionText:find("Unknown") then
@@ -493,6 +651,23 @@ function CardEffects._executeSingleAction(effectType, options, gameService, acti
         _executeChainSteal(activatingPlayer, options.resource, options.amount, gameService)
     elseif effectType == "ownerStealResourceFromChainOwners" then
         _executeChainSteal(owner, options.resource, options.amount, gameService)
+    -- === TOKEN EFFECTS ===
+    elseif effectType == "addToken" then
+        local nodeCard = sourceNode and sourceNode.card
+        if nodeCard then
+            nodeCard.tokens = (nodeCard.tokens or 0) + 1
+            print(string.format("Added token to node, now has %d tokens", nodeCard.tokens))
+        else
+            print("Warning: Could not add token, sourceNode or card missing")
+        end
+    elseif effectType == "removeTokens" then
+        local nodeCard = sourceNode and sourceNode.card
+        if nodeCard then
+            nodeCard.tokens = 0
+            print("Removed all tokens from node")
+        else
+            print("Warning: Could not remove tokens, sourceNode or card missing")
+        end
     -- ================================
     else
         print(string.format("Warning: Unknown effect type '%s' encountered during direct execution.", effectType))
@@ -503,7 +678,13 @@ end
 
 -- Public function to generate a combined description for an effect block (list of actions)
 -- Groups actions by condition, joins with ";", adds period at the end of each group.
-function CardEffects.generateEffectDescription(config)
+function CardEffects.generateEffectDescription(config, effectType)
+    -- Only setup context when effectType is explicitly provided
+    local context = nil
+    if effectType then
+        context = { effectType = effectType }
+    end
+    
     local actions = config.actions or {}
     if not actions or #actions == 0 then return "" end -- Handle empty actions
 
@@ -520,9 +701,9 @@ function CardEffects.generateEffectDescription(config)
         local blockHasMultipleActions = false
 
         if isConditionalBlock then
-            conditionText = generateConditionDescription(currentCondition)
+            conditionText = generateConditionDescription(currentCondition, context)
             -- Process the first action in the conditional block
-            table.insert(blockActionDescriptions, generateActionDescription(currentAction))
+            table.insert(blockActionDescriptions, generateActionDescription(currentAction, context))
             
             -- Look ahead for consecutive actions with the same condition
             local j = i + 1
@@ -531,10 +712,10 @@ function CardEffects.generateEffectDescription(config)
                 local nextCondition = nextAction.condition
                 
                 -- Check if conditions are the same (both non-nil and same description text)
-                local sameCondition = (nextCondition ~= nil and conditionText == generateConditionDescription(nextCondition))
+                local sameCondition = (nextCondition ~= nil and conditionText == generateConditionDescription(nextCondition, context))
                                      
                 if sameCondition then
-                    table.insert(blockActionDescriptions, generateActionDescription(nextAction))
+                    table.insert(blockActionDescriptions, generateActionDescription(nextAction, context))
                     j = j + 1 -- Continue matching
                     blockHasMultipleActions = true
                 else
@@ -544,7 +725,7 @@ function CardEffects.generateEffectDescription(config)
             i = j -- Move main index past the processed conditional block
         else
             -- Action has no condition, it forms its own block of one
-            table.insert(blockActionDescriptions, generateActionDescription(currentAction))
+            table.insert(blockActionDescriptions, generateActionDescription(currentAction, context))
             i = i + 1 -- Move to the next action
         end
         
@@ -620,7 +801,7 @@ function CardEffects.createActivationEffect(config)
         return overallStatus 
     end
     
-    local fullDescription = CardEffects.generateEffectDescription(config) -- Description logic unchanged
+    local fullDescription = CardEffects.generateEffectDescription(config, "activation") -- Specify activation context
 
     return {
         description = fullDescription,
@@ -629,7 +810,12 @@ function CardEffects.createActivationEffect(config)
     }
 end
 
--- Alias for convergence effects (same structure and creation logic)
-CardEffects.createConvergenceEffect = CardEffects.createActivationEffect
+-- Create a convergence effect with the right description context
+function CardEffects.createConvergenceEffect(config)
+    local effect = CardEffects.createActivationEffect(config)
+    -- Override the description with the convergence context
+    effect.description = CardEffects.generateEffectDescription(config, "convergence")
+    return effect
+end
 
 return CardEffects 
