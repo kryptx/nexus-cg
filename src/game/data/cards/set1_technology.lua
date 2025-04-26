@@ -394,7 +394,7 @@ definitions["NODE_TECH_013"] = {
     activationEffect = CardEffects.createActivationEffect({
         actions = { 
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
-            { condition = { type = "adjacentEmptyCells", count = 3 },
+            { condition = { type = "adjacentEmptyCells", count = 2 },
               effect = "gainVPForOwner", options = { amount = 1 } }
         }
         -- Description: "Owner gains 1 Data. If adjacent to 3+ empty cell(s): Owner gains 1 VP."
