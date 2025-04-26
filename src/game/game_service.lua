@@ -973,5 +973,20 @@ function GameService:forcePlayerDiscard(player, amount)
     end
 end
 
+-- NEW: Transfer resource between players
+function GameService:transferResource(fromPlayer, toPlayer, resourceType, amount)
+    if not fromPlayer or not toPlayer then
+        print("Warning: transferResource called with invalid players")
+        return false
+    end
+    if fromPlayer:spendResource(resourceType, amount) then
+        toPlayer:addResource(resourceType, amount)
+        return true
+    else
+        print(string.format("Warning: transferResource failed: %s could not spend %d %s", fromPlayer.name or tostring(fromPlayer.id), amount, resourceType))
+        return false
+    end
+end
+
 return { GameService = GameService, TurnPhase = TurnPhase } 
 

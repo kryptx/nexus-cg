@@ -267,7 +267,7 @@ local function evaluateAdjacentEmptyCellsCondition(conditionConfig, gameService,
         return false
     end
 
-    local neighbors = sourceNetwork:getAdjacentCoords(sourceNode.position)
+    local neighbors = sourceNetwork:getAdjacentCoords(sourceNode.position.x, sourceNode.position.y) -- Pass x and y explicitly
     local emptyCount = 0
     local requiredCount = conditionConfig.count or 1
 

@@ -271,8 +271,7 @@ definitions["NODE_TECH_009"] = {
     resourceRatio = { material = 1, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
-            { condition = { type = "satisfiedInputs", count = 1 },
-              effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
+            { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
             { condition = { type = "satisfiedInputs", count = 3 },
               effect = "gainVPForOwner", options = { amount = 2 } }
         }

@@ -1,0 +1,547 @@
+▲ ~/dev/nexus ❯ love .                                                                                     2m
+Root main.lua: Bootstrapping from src/main.lua...
+Calculating derived costs for all card definitions...
+Debug: Attempted to require CostCalculator.
+Debug: CostCalculator module loaded successfully.
+Debug: Found 74 definitions to process.
+Debug: Processing definition ID: NODE_KNOW_013
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_013
+CostCalc Debug [NODE_KNOW_013]: Ports=2.80, Effects=1.20, RawTotal=4.00, MinAppliedTotal=4.00
+Debug: Finished call for ID: NODE_KNOW_013. Result was OK
+Debug: Processing definition ID: NODE_KNOW_014
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_014
+CostCalc Debug [NODE_KNOW_014]: Ports=1.40, Effects=-1.35, RawTotal=0.05, MinAppliedTotal=1.00
+Debug: Finished call for ID: NODE_KNOW_014. Result was OK
+Debug: Processing definition ID: NODE_KNOW_015
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_015
+CostCalc Debug [NODE_KNOW_015]: Ports=2.10, Effects=-0.50, RawTotal=1.60, MinAppliedTotal=1.60
+Debug: Finished call for ID: NODE_KNOW_015. Result was OK
+Debug: Processing definition ID: NODE_KNOW_016
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_016
+CostCalc Debug [NODE_KNOW_016]: Ports=2.10, Effects=4.75, RawTotal=6.85, MinAppliedTotal=6.85
+Debug: Finished call for ID: NODE_KNOW_016. Result was OK
+Debug: Processing definition ID: NODE_RES_014
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_014
+CostCalc Debug [NODE_RES_014]: Ports=1.40, Effects=1.80, RawTotal=3.20, MinAppliedTotal=3.20
+Debug: Finished call for ID: NODE_RES_014. Result was OK
+Debug: Processing definition ID: NODE_KNOW_017
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_017
+CostCalc Debug [NODE_KNOW_017]: Ports=2.80, Effects=-0.60, RawTotal=2.20, MinAppliedTotal=2.20
+Debug: Finished call for ID: NODE_KNOW_017. Result was OK
+Debug: Processing definition ID: NODE_RES_015
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_015
+CostCalc Debug [NODE_RES_015]: Ports=2.10, Effects=2.50, RawTotal=4.60, MinAppliedTotal=4.60
+Debug: Finished call for ID: NODE_RES_015. Result was OK
+Debug: Processing definition ID: NODE_KNOW_018
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_018
+CostCalc Debug [NODE_KNOW_018]: Ports=2.80, Effects=-1.30, RawTotal=1.50, MinAppliedTotal=1.50
+Debug: Finished call for ID: NODE_KNOW_018. Result was OK
+Debug: Processing definition ID: NODE_GENESIS_TECH_001
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_GENESIS_TECH_001
+CostCalc Debug [NODE_GENESIS_TECH_001]: Ports=4.20, Effects=-0.40, RawTotal=3.80, MinAppliedTotal=1.90
+Debug: Finished call for ID: NODE_GENESIS_TECH_001. Result was OK
+Debug: Processing definition ID: NODE_RES_016
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_016
+CostCalc Debug [NODE_RES_016]: Ports=2.80, Effects=-0.40, RawTotal=2.40, MinAppliedTotal=2.40
+Debug: Finished call for ID: NODE_RES_016. Result was OK
+Debug: Processing definition ID: NODE_KNOW_019
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_019
+CostCalc Debug [NODE_KNOW_019]: Ports=2.80, Effects=-0.25, RawTotal=2.55, MinAppliedTotal=2.55
+Debug: Finished call for ID: NODE_KNOW_019. Result was OK
+Debug: Processing definition ID: NODE_GENESIS_KNOW_001
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_GENESIS_KNOW_001
+CostCalc Debug [NODE_GENESIS_KNOW_001]: Ports=4.20, Effects=-0.40, RawTotal=3.80, MinAppliedTotal=1.90
+Debug: Finished call for ID: NODE_GENESIS_KNOW_001. Result was OK
+Debug: Processing definition ID: NODE_RES_017
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_017
+CostCalc Debug [NODE_RES_017]: Ports=2.10, Effects=0.25, RawTotal=2.35, MinAppliedTotal=2.35
+Debug: Finished call for ID: NODE_RES_017. Result was OK
+Debug: Processing definition ID: NODE_KNOW_020
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_020
+CostCalc Debug [NODE_KNOW_020]: Ports=2.80, Effects=4.60, RawTotal=7.40, MinAppliedTotal=7.40
+Debug: Finished call for ID: NODE_KNOW_020. Result was OK
+Debug: Processing definition ID: NODE_GENESIS_CULT_001
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_GENESIS_CULT_001
+CostCalc Debug [NODE_GENESIS_CULT_001]: Ports=4.20, Effects=-0.40, RawTotal=3.80, MinAppliedTotal=1.90
+Debug: Finished call for ID: NODE_GENESIS_CULT_001. Result was OK
+Debug: Processing definition ID: NODE_RES_001
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_001
+CostCalc Debug [NODE_RES_001]: Ports=2.10, Effects=3.50, RawTotal=5.60, MinAppliedTotal=5.60
+Debug: Finished call for ID: NODE_RES_001. Result was OK
+Debug: Processing definition ID: NODE_RES_002
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_002
+CostCalc Debug [NODE_RES_002]: Ports=3.50, Effects=0.25, RawTotal=3.75, MinAppliedTotal=3.75
+Debug: Finished call for ID: NODE_RES_002. Result was OK
+Debug: Processing definition ID: NODE_RES_003
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_003
+CostCalc Debug [NODE_RES_003]: Ports=4.90, Effects=1.50, RawTotal=6.40, MinAppliedTotal=6.40
+Debug: Finished call for ID: NODE_RES_003. Result was OK
+Debug: Processing definition ID: NODE_RES_004
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_004
+CostCalc Debug [NODE_RES_004]: Ports=2.80, Effects=0.60, RawTotal=3.40, MinAppliedTotal=3.40
+Debug: Finished call for ID: NODE_RES_004. Result was OK
+Debug: Processing definition ID: NODE_RES_005
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_005
+CostCalc Debug [NODE_RES_005]: Ports=2.80, Effects=2.80, RawTotal=5.60, MinAppliedTotal=5.60
+Debug: Finished call for ID: NODE_RES_005. Result was OK
+Debug: Processing definition ID: NODE_RES_006
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_006
+CostCalc Debug [NODE_RES_006]: Ports=4.20, Effects=3.30, RawTotal=7.50, MinAppliedTotal=7.50
+Debug: Finished call for ID: NODE_RES_006. Result was OK
+Debug: Processing definition ID: NODE_RES_007
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_007
+CostCalc Debug [NODE_RES_007]: Ports=2.10, Effects=4.25, RawTotal=6.35, MinAppliedTotal=6.35
+Debug: Finished call for ID: NODE_RES_007. Result was OK
+Debug: Skipping definition ID: REACTOR_BASE because it has a buildCost.
+Debug: Processing definition ID: NODE_CULT_005
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_CULT_005
+CostCalc Debug [NODE_CULT_005]: Ports=4.20, Effects=1.05, RawTotal=5.25, MinAppliedTotal=5.25
+Debug: Finished call for ID: NODE_CULT_005. Result was OK
+Debug: Processing definition ID: NODE_CULT_006
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_CULT_006
+CostCalc Debug [NODE_CULT_006]: Ports=2.80, Effects=-2.15, RawTotal=0.65, MinAppliedTotal=1.00
+Debug: Finished call for ID: NODE_CULT_006. Result was OK
+Debug: Processing definition ID: NODE_CULT_007
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_CULT_007
+CostCalc Debug [NODE_CULT_007]: Ports=2.80, Effects=2.35, RawTotal=5.15, MinAppliedTotal=5.15
+Debug: Finished call for ID: NODE_CULT_007. Result was OK
+Debug: Processing definition ID: NODE_CULT_008
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_CULT_008
+CostCalc Debug [NODE_CULT_008]: Ports=1.40, Effects=0.40, RawTotal=1.80, MinAppliedTotal=1.80
+Debug: Finished call for ID: NODE_CULT_008. Result was OK
+Debug: Processing definition ID: NODE_TECH_002
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_002
+CostCalc Debug [NODE_TECH_002]: Ports=2.10, Effects=3.75, RawTotal=5.85, MinAppliedTotal=5.85
+Debug: Finished call for ID: NODE_TECH_002. Result was OK
+Debug: Processing definition ID: NODE_TECH_008
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_008
+CostCalc Debug [NODE_TECH_008]: Ports=2.80, Effects=9.05, RawTotal=11.85, MinAppliedTotal=11.85
+Debug: Finished call for ID: NODE_TECH_008. Result was OK
+Debug: Processing definition ID: NODE_KNOW_001
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_001
+CostCalc Debug [NODE_KNOW_001]: Ports=2.80, Effects=1.10, RawTotal=3.90, MinAppliedTotal=3.90
+Debug: Finished call for ID: NODE_KNOW_001. Result was OK
+Debug: Processing definition ID: NODE_TECH_011
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_011
+CostCalc Debug [NODE_TECH_011]: Ports=2.80, Effects=5.10, RawTotal=7.90, MinAppliedTotal=7.90
+Debug: Finished call for ID: NODE_TECH_011. Result was OK
+Debug: Processing definition ID: NODE_TECH_005
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_005
+CostCalc Debug [NODE_TECH_005]: Ports=2.10, Effects=8.00, RawTotal=10.10, MinAppliedTotal=10.10
+Debug: Finished call for ID: NODE_TECH_005. Result was OK
+Debug: Processing definition ID: NODE_RES_013
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_013
+CostCalc Debug [NODE_RES_013]: Ports=2.10, Effects=1.75, RawTotal=3.85, MinAppliedTotal=3.85
+Debug: Finished call for ID: NODE_RES_013. Result was OK
+Debug: Processing definition ID: NODE_KNOW_002
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_002
+CostCalc Debug [NODE_KNOW_002]: Ports=4.90, Effects=0.00, RawTotal=4.90, MinAppliedTotal=4.90
+Debug: Finished call for ID: NODE_KNOW_002. Result was OK
+Debug: Processing definition ID: NODE_TECH_006
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_006
+CostCalc Debug [NODE_TECH_006]: Ports=4.20, Effects=2.90, RawTotal=7.10, MinAppliedTotal=7.10
+Debug: Finished call for ID: NODE_TECH_006. Result was OK
+Debug: Processing definition ID: NODE_TECH_004
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_004
+CostCalc Debug [NODE_TECH_004]: Ports=2.80, Effects=2.17, RawTotal=4.97, MinAppliedTotal=4.97
+Debug: Finished call for ID: NODE_TECH_004. Result was OK
+Debug: Processing definition ID: NODE_CULT_011
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_CULT_011
+CostCalc Debug [NODE_CULT_011]: Ports=2.80, Effects=1.85, RawTotal=4.65, MinAppliedTotal=4.65
+Debug: Finished call for ID: NODE_CULT_011. Result was OK
+Debug: Processing definition ID: NODE_KNOW_003
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_003
+CostCalc Debug [NODE_KNOW_003]: Ports=4.20, Effects=-1.70, RawTotal=2.50, MinAppliedTotal=2.50
+Debug: Finished call for ID: NODE_KNOW_003. Result was OK
+Debug: Processing definition ID: NODE_TECH_010
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_010
+CostCalc Debug [NODE_TECH_010]: Ports=2.10, Effects=-3.25, RawTotal=-1.15, MinAppliedTotal=1.00
+Debug: Finished call for ID: NODE_TECH_010. Result was OK
+Debug: Processing definition ID: NODE_TECH_003
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_003
+CostCalc Debug [NODE_TECH_003]: Ports=4.90, Effects=4.50, RawTotal=9.40, MinAppliedTotal=9.40
+Debug: Finished call for ID: NODE_TECH_003. Result was OK
+Debug: Processing definition ID: NODE_CULT_012
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_CULT_012
+CostCalc Debug [NODE_CULT_012]: Ports=2.80, Effects=-3.40, RawTotal=-0.60, MinAppliedTotal=1.00
+Debug: Finished call for ID: NODE_CULT_012. Result was OK
+Debug: Processing definition ID: NODE_KNOW_004
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_004
+CostCalc Debug [NODE_KNOW_004]: Ports=4.20, Effects=2.40, RawTotal=6.60, MinAppliedTotal=6.60
+Debug: Finished call for ID: NODE_KNOW_004. Result was OK
+Debug: Processing definition ID: NODE_RES_012
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_012
+CostCalc Debug [NODE_RES_012]: Ports=2.80, Effects=2.00, RawTotal=4.80, MinAppliedTotal=4.80
+Debug: Finished call for ID: NODE_RES_012. Result was OK
+Debug: Processing definition ID: NODE_TECH_007
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_007
+CostCalc Debug [NODE_TECH_007]: Ports=2.80, Effects=-0.35, RawTotal=2.45, MinAppliedTotal=2.45
+Debug: Finished call for ID: NODE_TECH_007. Result was OK
+Debug: Processing definition ID: NODE_TECH_012
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_012
+CostCalc Debug [NODE_TECH_012]: Ports=1.40, Effects=-1.90, RawTotal=-0.50, MinAppliedTotal=1.00
+Debug: Finished call for ID: NODE_TECH_012. Result was OK
+Debug: Processing definition ID: NODE_KNOW_005
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_005
+CostCalc Debug [NODE_KNOW_005]: Ports=4.90, Effects=1.00, RawTotal=5.90, MinAppliedTotal=5.90
+Debug: Finished call for ID: NODE_KNOW_005. Result was OK
+Debug: Processing definition ID: NODE_TECH_009
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_009
+CostCalc Debug [NODE_TECH_009]: Ports=4.20, Effects=1.90, RawTotal=6.10, MinAppliedTotal=6.10
+Debug: Finished call for ID: NODE_TECH_009. Result was OK
+Debug: Processing definition ID: NODE_CULT_009
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_CULT_009
+CostCalc Debug [NODE_CULT_009]: Ports=1.40, Effects=1.75, RawTotal=3.15, MinAppliedTotal=3.15
+Debug: Finished call for ID: NODE_CULT_009. Result was OK
+Debug: Processing definition ID: NODE_TECH_013
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_013
+CostCalc Debug [NODE_TECH_013]: Ports=1.40, Effects=2.20, RawTotal=3.60, MinAppliedTotal=3.60
+Debug: Finished call for ID: NODE_TECH_013. Result was OK
+Debug: Processing definition ID: NODE_KNOW_006
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_006
+CostCalc Debug [NODE_KNOW_006]: Ports=2.80, Effects=-0.80, RawTotal=2.00, MinAppliedTotal=2.00
+Debug: Finished call for ID: NODE_KNOW_006. Result was OK
+Debug: Processing definition ID: NODE_CULT_004
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_CULT_004
+CostCalc Debug [NODE_CULT_004]: Ports=4.90, Effects=0.25, RawTotal=5.15, MinAppliedTotal=5.15
+Debug: Finished call for ID: NODE_CULT_004. Result was OK
+Debug: Processing definition ID: NODE_RES_008
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_008
+CostCalc Debug [NODE_RES_008]: Ports=1.40, Effects=-0.05, RawTotal=1.35, MinAppliedTotal=1.35
+Debug: Finished call for ID: NODE_RES_008. Result was OK
+Debug: Processing definition ID: NODE_TECH_014
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_014
+CostCalc Debug [NODE_TECH_014]: Ports=2.10, Effects=1.85, RawTotal=3.95, MinAppliedTotal=3.95
+Debug: Finished call for ID: NODE_TECH_014. Result was OK
+Debug: Processing definition ID: NODE_KNOW_007
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_007
+CostCalc Debug [NODE_KNOW_007]: Ports=2.80, Effects=2.30, RawTotal=5.10, MinAppliedTotal=5.10
+Debug: Finished call for ID: NODE_KNOW_007. Result was OK
+Debug: Processing definition ID: NODE_CULT_003
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_CULT_003
+CostCalc Debug [NODE_CULT_003]: Ports=4.90, Effects=7.25, RawTotal=12.15, MinAppliedTotal=12.15
+Debug: Finished call for ID: NODE_CULT_003. Result was OK
+Debug: Processing definition ID: NODE_CULT_014
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_CULT_014
+CostCalc Debug [NODE_CULT_014]: Ports=2.80, Effects=1.25, RawTotal=4.05, MinAppliedTotal=4.05
+Debug: Finished call for ID: NODE_CULT_014. Result was OK
+Debug: Processing definition ID: NODE_TECH_015
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_015
+CostCalc Debug [NODE_TECH_015]: Ports=2.10, Effects=2.75, RawTotal=4.85, MinAppliedTotal=4.85
+Debug: Finished call for ID: NODE_TECH_015. Result was OK
+Debug: Processing definition ID: NODE_KNOW_008
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_008
+CostCalc Debug [NODE_KNOW_008]: Ports=4.20, Effects=1.80, RawTotal=6.00, MinAppliedTotal=6.00
+Debug: Finished call for ID: NODE_KNOW_008. Result was OK
+Debug: Processing definition ID: NODE_RES_010
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_010
+CostCalc Debug [NODE_RES_010]: Ports=1.40, Effects=0.75, RawTotal=2.15, MinAppliedTotal=2.15
+Debug: Finished call for ID: NODE_RES_010. Result was OK
+Debug: Processing definition ID: NODE_CULT_002
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_CULT_002
+CostCalc Debug [NODE_CULT_002]: Ports=2.10, Effects=1.25, RawTotal=3.35, MinAppliedTotal=3.35
+Debug: Finished call for ID: NODE_CULT_002. Result was OK
+Debug: Processing definition ID: NODE_TECH_016
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_016
+CostCalc Debug [NODE_TECH_016]: Ports=2.10, Effects=2.00, RawTotal=4.10, MinAppliedTotal=4.10
+Debug: Finished call for ID: NODE_TECH_016. Result was OK
+Debug: Processing definition ID: NODE_KNOW_009
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_009
+CostCalc Debug [NODE_KNOW_009]: Ports=2.10, Effects=-1.50, RawTotal=0.60, MinAppliedTotal=1.00
+Debug: Finished call for ID: NODE_KNOW_009. Result was OK
+Debug: Processing definition ID: NODE_GENESIS_RES_001
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_GENESIS_RES_001
+CostCalc Debug [NODE_GENESIS_RES_001]: Ports=4.20, Effects=0.30, RawTotal=4.50, MinAppliedTotal=2.25
+Debug: Finished call for ID: NODE_GENESIS_RES_001. Result was OK
+Debug: Processing definition ID: NODE_RES_009
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_009
+CostCalc Debug [NODE_RES_009]: Ports=1.40, Effects=2.80, RawTotal=4.20, MinAppliedTotal=4.20
+Debug: Finished call for ID: NODE_RES_009. Result was OK
+Debug: Processing definition ID: NODE_TECH_017
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_017
+CostCalc Debug [NODE_TECH_017]: Ports=2.10, Effects=-1.00, RawTotal=1.10, MinAppliedTotal=1.10
+Debug: Finished call for ID: NODE_TECH_017. Result was OK
+Debug: Processing definition ID: NODE_KNOW_010
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_010
+CostCalc Debug [NODE_KNOW_010]: Ports=1.40, Effects=-0.90, RawTotal=0.50, MinAppliedTotal=1.00
+Debug: Finished call for ID: NODE_KNOW_010. Result was OK
+Debug: Processing definition ID: NODE_TECH_001
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_001
+CostCalc Debug [NODE_TECH_001]: Ports=2.10, Effects=2.25, RawTotal=4.35, MinAppliedTotal=4.35
+Debug: Finished call for ID: NODE_TECH_001. Result was OK
+Debug: Processing definition ID: NODE_CULT_001
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_CULT_001
+CostCalc Debug [NODE_CULT_001]: Ports=2.10, Effects=3.00, RawTotal=5.10, MinAppliedTotal=5.10
+Debug: Finished call for ID: NODE_CULT_001. Result was OK
+Debug: Processing definition ID: NODE_TECH_018
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_TECH_018
+CostCalc Debug [NODE_TECH_018]: Ports=2.10, Effects=-0.50, RawTotal=1.60, MinAppliedTotal=1.60
+Debug: Finished call for ID: NODE_TECH_018. Result was OK
+Debug: Processing definition ID: NODE_KNOW_011
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_011
+CostCalc Debug [NODE_KNOW_011]: Ports=1.40, Effects=2.10, RawTotal=3.50, MinAppliedTotal=3.50
+Debug: Finished call for ID: NODE_KNOW_011. Result was OK
+Debug: Processing definition ID: NODE_RES_011
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_RES_011
+CostCalc Debug [NODE_RES_011]: Ports=2.10, Effects=0.90, RawTotal=3.00, MinAppliedTotal=3.00
+Debug: Finished call for ID: NODE_RES_011. Result was OK
+Debug: Processing definition ID: NODE_CULT_013
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_CULT_013
+CostCalc Debug [NODE_CULT_013]: Ports=2.10, Effects=-1.00, RawTotal=1.10, MinAppliedTotal=1.10
+Debug: Finished call for ID: NODE_CULT_013. Result was OK
+Debug: Processing definition ID: NODE_CULT_010
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_CULT_010
+CostCalc Debug [NODE_CULT_010]: Ports=1.40, Effects=-2.60, RawTotal=-1.20, MinAppliedTotal=1.00
+Debug: Finished call for ID: NODE_CULT_010. Result was OK
+Debug: Processing definition ID: NODE_KNOW_012
+Debug: About to call CostCalculator.calculateDerivedCost for ID: NODE_KNOW_012
+CostCalc Debug [NODE_KNOW_012]: Ports=1.40, Effects=4.10, RawTotal=5.50, MinAppliedTotal=5.50
+Debug: Finished call for ID: NODE_KNOW_012. Result was OK
+Finished calculating derived costs.
+love.load() - Initializing Game Manager
+AnimationController initialized.
+Failed to load sound: card_place from assets/sounds/card_place.wav
+Could not open file assets/sounds/card_place.wav. Does not exist.
+Failed to load sound: card_draw from assets/sounds/card_draw.wav
+Could not open file assets/sounds/card_draw.wav. Does not exist.
+Failed to load sound: button_click from assets/sounds/button_click.wav
+Could not open file assets/sounds/button_click.wav. Does not exist.
+Failed to load sound: activation from assets/sounds/activation.wav
+Could not open file assets/sounds/activation.wav. Does not exist.
+Failed to load sound: convergence from assets/sounds/convergence.wav
+Could not open file assets/sounds/convergence.wav. Does not exist.
+Failed to load sound: paradigm_shift from assets/sounds/paradigm_shift.wav
+Could not open file assets/sounds/paradigm_shift.wav. Does not exist.
+Failed to load music: menu from assets/music/menu_theme.ogg
+Could not open file assets/music/menu_theme.ogg. Does not exist.
+Failed to load music: gameplay from assets/music/gameplay_theme.ogg
+Could not open file assets/music/gameplay_theme.ogg. Does not exist.
+Game Service Initialized.
+Renderer initialized.
+Loaded image: assets/images/energy.png
+Loaded image: assets/images/data.png
+Loaded image: assets/images/materials.png
+Loaded image: assets/images/technology-black.png
+Loaded image: assets/images/culture-black.png
+Loaded image: assets/images/resource-black.png
+Loaded image: assets/images/knowledge-black.png
+Successfully loaded title BMFont: assets/fonts/titlefont.fnt
+Successfully loaded white BMFont: assets/fonts/imagefont-white.fnt
+Title font multiplier: 4.5
+Recalculating layout for 1280 x 720
+Initial layout calculated using window size: 1280x720
+Registered state: menu
+Registered state: play
+Switching state from nil to menu
+Entering Menu State
+MenuState init
+State Manager initialized.
+Enter pressed, changing to Play State
+Switching state from menu to play
+Entering Play State - Initializing Game...
+Created player: Player 1 (ID: 1)
+Player 1 gained 1 energy (Total: 1)
+Player 1 gained 3 data (Total: 3)
+Player 1 gained 4 material (Total: 4)
+Initialized Network for Player 1
+[Network] Placing reactor 'Reactor Core' at (0,0) for Player 1
+Placed card Reactor Core (REACTOR_BASE) at (0,0) in Player 1's network.
+[Network] Successfully initialized network with reactor for Player 1
+Initialized Player 1 with reactor.
+Created player: Player 2 (ID: 2)
+Player 2 gained 1 energy (Total: 1)
+Player 2 gained 3 data (Total: 3)
+Player 2 gained 4 material (Total: 4)
+Initialized Network for Player 2
+[Network] Placing reactor 'Reactor Core' at (0,0) for Player 2
+Placed card Reactor Core (REACTOR_BASE) at (0,0) in Player 2's network.
+[Network] Successfully initialized network with reactor for Player 2
+Initialized Player 2 with reactor.
+Initializing main deck...
+  Collected Genesis card NODE_GENESIS_TECH_001
+  Collected Genesis card NODE_GENESIS_KNOW_001
+  Collected Genesis card NODE_GENESIS_CULT_001
+  Collected Genesis card NODE_GENESIS_RES_001
+Separated 4 Genesis cards.
+Main deck initialized with 138 regular cards.
+Initializing paradigm decks...
+Initialized 2 Standard Paradigms (shuffled) and 1 Genesis Paradigms.
+Shuffling Genesis card pool...
+Dealing 1 Genesis card to each player...
+Player 1 added card 'Seed Thought' (NODE_GENESIS_KNOW_001) to hand.
+  Dealt Genesis card 'Seed Thought' to Player 1.
+Player 2 added card 'First Spark' (NODE_GENESIS_RES_001) to hand.
+  Dealt Genesis card 'First Spark' to Player 2.
+Shuffling 2 remaining Genesis cards into deck...
+Deck now contains 140 cards (including Genesis).
+Dealing 6 starting cards to each player...
+Player 1 added card 'Bio-Research Lab' (NODE_KNOW_005) to hand.
+Player 1 added card 'Advanced Processing Unit' (NODE_TECH_002) to hand.
+Player 1 added card 'Historical Archive Access' (NODE_CULT_008) to hand.
+Player 1 added card 'Deep Shaft Excavator' (NODE_RES_017) to hand.
+Player 1 added card 'Cultural Exchange' (NODE_CULT_002) to hand.
+Player 1 added card 'Bio-Printer Feedstock' (NODE_RES_012) to hand.
+Player 2 added card 'Hydroponics Bay' (NODE_RES_009) to hand.
+Player 2 added card 'Sabotage Drone Bay' (NODE_TECH_010) to hand.
+Player 2 added card 'Applied Arts Workshop' (NODE_TECH_003) to hand.
+Player 2 added card 'Xeno-Linguistics Lab' (NODE_KNOW_010) to hand.
+Player 2 added card 'Materials Science R&D' (NODE_RES_005) to hand.
+Player 2 added card 'Holographic Theater' (NODE_CULT_004) to hand.
+Finished dealing initial hands.
+Setting initial paradigm...
+Initial Paradigm set to: 'Genesis: Standard Operations' (ID: genesis_base)
+  (Effect function exists for genesis_base)
+[Service] Performing initial energy gain for Player 1...
+[Energy Gain] Calculating for Player 1 (Player 1). Base gain: 1
+  - No convergence links found TO opponents.
+Player 1 gained 1 energy (Total: 2)
+  Added 1 Energy to Player 1. New total: 2
+[Service] Player 1 advanced to Build phase.
+Game initialized with 2 players. Player 1 starts in Build phase.
+Music track not found: menu
+Player 1 origin set to: (0, 0)
+Player 2 origin set to: (1300, 0)
+Recalculating layout for 1280 x 720
+Play State Initialization Complete.
+Loaded image: assets/images/reactor-core.png
+Loaded image: assets/images/genesis-seed-thought.png
+Loaded image: assets/images/bio-research-lab.png
+Loaded image: assets/images/advanced-processing-unit.png
+Loaded image: assets/images/historical-archive-access.png
+Loaded image: assets/images/deep-shaft-excavator.png
+Loaded image: assets/images/cultural-exchange.png
+Loaded image: assets/images/bio-printer-feedstock.png
+Started animation 1: cardPlay for card NODE_KNOW_005 with easing outBack context: grid
+Registered completion callback for animation 1
+Animation 1 complete.
+Running completion callback for animation 1
+[Service] Attempting placement of 'Bio-Research Lab' at (-1,0)
+  Placement valid and affordable.
+Player 1 spent 2 material (Remaining: 2)
+Player 1 spent 2 data (Remaining: 1)
+Placed card Bio-Research Lab (NODE_KNOW_005) at (-1,0) in Player 1's network.
+Sound not found: card_place
+[Service] Player 1 advanced to Activate phase.
+[Service] Player 1 advanced to Converge phase.
+[Service] Player 1 advanced to Cleanup phase.
+[Service] Entering Cleanup Phase for Player 1
+[DEBUG] Checking if deck is empty. Deck size: 128, isEmpty: false
+[DEBUG] Attempting to draw card. Current deck size: 128
+[DEBUG] Drew card: Solar Collector Array (ID: NODE_RES_007). Remaining deck size: 127
+Sound not found: card_draw
+Player 1 added card 'Solar Collector Array' (NODE_RES_007) to hand.
+  Player 1 drew 1 card (Cleanup Phase).
+[Energy Gain] Calculating for Player 2 (Player 2). Base gain: 1
+  - No convergence links found TO opponents.
+Player 2 gained 1 energy (Total: 2)
+  Added 1 Energy to Player 2. New total: 2
+[Service] Player 2 advanced to Build phase.
+[Service] Turn ended for Player 1. Starting turn for Player 2 in Build phase.
+Centering view on Player 2 grid area.
+Loaded image: assets/images/genesis-first-spark.png
+Loaded image: assets/images/hydroponics-bay.png
+Loaded image: assets/images/sabotage-drone-bay.png
+Loaded image: assets/images/applied-arts-workshop.png
+Loaded image: assets/images/xeno-linguistics-lab.png
+Loaded image: assets/images/materials-science-r&d.png
+Loaded image: assets/images/holographic-theater.png
+Started animation 2: cardPlay for card NODE_CULT_004 with easing outBack context: grid
+Registered completion callback for animation 2
+Animation 2 complete.
+Running completion callback for animation 2
+[Service] Attempting placement of 'Holographic Theater' at (-1,0)
+  Placement valid and affordable.
+Player 2 spent 2 material (Remaining: 2)
+Player 2 spent 2 data (Remaining: 1)
+Placed card Holographic Theater (NODE_CULT_004) at (-1,0) in Player 2's network.
+Sound not found: card_place
+[Service] Player 2 advanced to Activate phase.
+Advanced to phase: Activate
+[Service] Player 2 advanced to Converge phase.
+Advanced to phase: Converge
+Starting convergence selection for type: Technology
+Clicked on card 'Holographic Theater' at (-1,0), port 4
+Warning: getAdjacentCoordForPort called with invalid portIndex: nil
+Initiating port selected: P2 (-1,0) Port 4. State -> selecting_opponent_input
+Potential target: Player 1 Card 'Bio-Research Lab' at (-1,0), port 2
+Target port validated. Attempting convergence...
+[Service] Convergence Attempt: P2 Node(-1,0):Port4 -> P1 Node(-1,0):Port2 | Type: Technology
+  Convergence Port Validation Passed!
+Player Player 2 used their Technology link set. (1 total initiated)
+Card NODE_CULT_004: Port 4 marked as occupied by link convLink_1.
+Card NODE_KNOW_005: Port 2 marked as occupied by link convLink_1.
+  Added link convLink_1 to activeConvergenceLinks.
+[Paradigm] Triggering shift: First Convergence!
+[Paradigm] Shifted from 'Genesis: Standard Operations' to 'Cultural Boom' (cultural_boom).
+[Paradigm] Triggering shift: Universal Convergence!
+[Paradigm] Shifted from 'Cultural Boom' to 'Resource Scarcity' (resource_scarcity).
+  New Paradigm Active: 'Resource Scarcity'
+  Convergence Link Established! (Technology)
+PlayState detected Paradigm Shift!
+[Service] Player 2 advanced to Cleanup phase.
+[Service] Entering Cleanup Phase for Player 2
+[DEBUG] Checking if deck is empty. Deck size: 127, isEmpty: false
+[DEBUG] Attempting to draw card. Current deck size: 127
+[DEBUG] Drew card: Synaptic Media Hub (ID: NODE_CULT_003). Remaining deck size: 126
+Sound not found: card_draw
+Player 2 added card 'Synaptic Media Hub' (NODE_CULT_003) to hand.
+  Player 2 drew 1 card (Cleanup Phase).
+[Energy Gain] Calculating for Player 1 (Player 1). Base gain: 1
+  - No convergence links found TO opponents.
+Player 1 gained 1 energy (Total: 3)
+  Added 1 Energy to Player 1. New total: 3
+[Service] Player 1 advanced to Build phase.
+[Service] Turn ended for Player 2. Starting turn for Player 1 in Build phase.
+Centering view on Player 1 grid area.
+Loaded image: assets/images/solar-collector-array.png
+[Service] Player 1 advanced to Activate phase.
+Advanced to phase: Activate
+Right-click targeted Player 2's card 'Holographic Theater' at grid (-1,0)
+[Pathfinder] START: Target=Holographic Theater (NODE_CULT_004, P2), Reactor=Reactor Core (REACTOR_BASE, P1), Activator=P1
+[Pathfinder] Initial Queue: Target NODE_CULT_004 (P2). Visited Key: 2_NODE_CULT_004
+[Pathfinder] Dequeue: Current=NODE_CULT_004 (P2), PathLen=1, VisitedKey=2_NODE_CULT_004
+  [Pathfinder Adjacency] Exploring neighbors of NODE_CULT_004 (P2)...
+      >> FAILED ADJACENCY CHECK #2: Neighbor @(-1,-1) node=nil, visited=nil
+      >> SKIPPING Port 2: IsOutput=false, Available=true
+      >> SKIPPING Port 3: IsOutput=false, Available=true
+      >> SKIPPING Port 4: IsOutput=true, Available=false
+      >> SKIPPING Port 5: IsOutput=true, Available=false
+      >> SKIPPING Port 6: IsOutput=false, Available=false
+      >> SKIPPING Port 7: IsOutput=false, Available=true
+      >> SKIPPING Port 8: IsOutput=true, Available=false
+  [Pathfinder Convergence] Exploring links for NODE_CULT_004 (P2)...
+      >> Enqueueing CONVERGENCE: NODE_KNOW_005 (P1) via Link convLink_1 (Technology)
+[Pathfinder] Dequeue: Current=NODE_KNOW_005 (P1), PathLen=2, VisitedKey=1_NODE_KNOW_005
+  [Pathfinder Adjacency] Exploring neighbors of NODE_KNOW_005 (P1)...
+      >> SKIPPING Port 1: IsOutput=true, Available=false
+      >> SKIPPING Port 2: IsOutput=false, Available=false
+      >> SKIPPING Port 3: IsOutput=false, Available=false
+      >> SKIPPING Port 4: IsOutput=true, Available=false
+      >> FAILED ADJACENCY CHECK #2: Neighbor @(-2,0) node=nil, visited=nil
+      >> SKIPPING Port 6: IsOutput=false, Available=true
+      >> SKIPPING Port 7: IsOutput=false, Available=true
+      >> Enqueueing ADJACENT: REACTOR_BASE (P1)
+  [Pathfinder Convergence] Exploring links for NODE_KNOW_005 (P1)...
+[Pathfinder] Dequeue: Current=REACTOR_BASE (P1), PathLen=3, VisitedKey=1_REACTOR_BASE
+[Pathfinder] SUCCESS: Reached Reactor REACTOR_BASE. Path Cost=3, ConvStart=true
+Player 1 spent 2 energy (Remaining: 1)
+Sound not found: activation
+  [CARD DEBUG] >>> Entering Card:activateConvergence for Holographic Theater (ID: NODE_CULT_004)
+Condition passed (or no condition) for action 'gainVPForActivator'. Executing directly...
+Directly executing action: gainVPForActivator
+Player 1 VP changed by 1 (Total: 1)
+  Awarded 1 VP to Player 1 (Total: 1)
+Error: src/game/network.lua:109: attempt to perform arithmetic on local 'y' (a nil value)
+stack traceback:
+        [love "boot.lua"]:352: in function '__sub'
+        src/game/network.lua:109: in function 'getAdjacentCoords'
+        src/game/card_effects.lua:270: in function 'evaluateCondition'
+        src/game/card_effects.lua:696: in function 'activate'
+        src/game/card.lua:211: in function 'activateConvergence'
+        src/game/activation_service.lua:283: in function '_processActivationPath'
+        src/game/activation_service.lua:219: in function 'attemptActivationGlobal'
+        src/game/states/play_state.lua:989: in function 'mousepressed'
+        src/core/state_manager.lua:84: in function 'mousepressed'
+        src/main.lua:71: in function <src/main.lua:69>
+        [love "callbacks.lua"]:154: in function <[love "callbacks.lua"]:144>
+        [C]: in function 'xpcall'

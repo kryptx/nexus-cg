@@ -1125,8 +1125,6 @@ function PlayState:wheelmoved(stateManager, x, y)
     -- Calculate new camera position to keep world coords under cursor
     self.cameraX = worldMouseX - (self.lastMouseX / self.cameraZoom)
     self.cameraY = worldMouseY - (self.lastMouseY / self.cameraZoom)
-
-    print(string.format("Zoom changed to: %.2f", self.cameraZoom))
 end
 
 function PlayState:keypressed(stateManager, key)
