@@ -311,7 +311,7 @@ definitions["NODE_TECH_010"] = {
         actions = {
             {
                 condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.ENERGY, amount = 1 }, 
-                effect = "activatorStealResourceFromChainOwners",
+                effect = "ownerStealResourceFromChainOwners",
                 options = { resource = ResourceType.MATERIAL, amount = 1 } 
             }
         }
