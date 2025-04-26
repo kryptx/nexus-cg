@@ -55,8 +55,6 @@ local headers = {
     "isGenesis",
     "buildCostMaterial",
     "buildCostData",
-    "derivedCostMaterial",
-    "derivedCostData",
     "vpValue",
     "activationEffectDescription",
     "convergenceEffectDescription",

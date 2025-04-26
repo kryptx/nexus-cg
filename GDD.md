@@ -192,7 +192,12 @@ These form the main draw deck and are the building blocks of player networks.
     *   **Build Cost:** Resources required to play the card into the network (e.g., X Material, Y Data). Clearly displayed.
     *   **Action Effect:** Text describing the effect triggered when activated by its owner via path activation (originating from one of its Input ports).
     *   **Convergence Effect:** Text describing the effect triggered when activated by an opponent via a Convergence Link targeting one of its Input ports.
-    *   **(Optional) VP Value:** Some cards might grant VP at game end (indicated by a VP icon/number).
+    *   **Thematic Effect Alignment:** Action and Convergence effects should strongly align with the node's type:
+        *   **Culture:** Focus on VP generation, player influence, card draw/manipulation.
+        *   **Knowledge:** Focus on data manipulation, information gain (viewing hands/decks), card draw/filtering.
+        *   **Technology:** Focus on energy efficiency, modifying activation costs, complex actions, building/placement advantages.
+        *   **Resource:** Focus on material/energy generation, resource conversion, network efficiency.
+    *   (Optional) VP Value: Some cards might grant VP at game end (indicated by a VP icon/number).
     *   **(Optional) Flavor Text:** Thematic text.
 
 *   **Seed Cards:** A specific subset of Node Cards used for the starting player hands. Functionally identical layout, likely with simpler/fewer present ports. *Note: Seed Cards are dealt after Genesis Cards.*

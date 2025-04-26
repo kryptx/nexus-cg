@@ -16,9 +16,9 @@ local MATERIAL_EQUIVALENT = {
     VP = 3.0,
 }
 
-local PORT_COST_ME = 0.5
+local PORT_COST_ME = 1
 local CONVERGENCE_EFFECT_MULTIPLIER = 0.5
-local CONDITIONAL_EFFECT_MULTIPLIER = 0.75
+local CONDITIONAL_EFFECT_MULTIPLIER = 0.5
 local MINIMUM_COST_ME = 1.0
 
 -- === Helper Functions ===
@@ -231,27 +231,51 @@ local function convertMEtoCostTable(totalME, thematicRatio)
     local useRatio = type(M_ratio) == "number" and M_ratio >= 0 and
                      type(D_ratio) == "number" and D_ratio >= 0 and
                      (M_ratio + D_ratio > 0) -- Avoid division by zero
-
+    
     if useRatio then
-        -- print(string.format("  Using Ratio: %.1f M : %.1f D", M_ratio, D_ratio))
-        local totalRatio = M_ratio + D_ratio
-
-        -- Calculate target ME for Data based on ratio
-        local targetDataME = totalME * (D_ratio / totalRatio)
-        -- Determine how many *full* Data units fit within this target
-        local dataUnits = math.floor(targetDataME / dataValueME)
-
-        local meCoveredByData = dataUnits * dataValueME
-        local remainingME = totalME - meCoveredByData
-
-        -- Cover the rest with Materials
-        local materialUnits = math.ceil(remainingME / materialValueME)
-
-        cost.data = dataUnits
+        -- Calculate how much of the totalME should go to each resource type
+        local totalRatioParts = M_ratio + D_ratio
+        
+        -- The trick: Adjust the ratio based on the ME cost of each resource type
+        -- Since data costs 2 ME per unit, we need to adjust the ratio 
+        -- If we want 3:1 material:data, and data costs 2x as much,
+        -- the ME distribution should be 3:2 (not 3:1)
+        local adjustedMaterialRatio = M_ratio
+        local adjustedDataRatio = D_ratio * (dataValueME / materialValueME)
+        local totalAdjustedRatio = adjustedMaterialRatio + adjustedDataRatio
+        
+        -- Calculate ME values
+        local materialME = totalME * (adjustedMaterialRatio / totalAdjustedRatio)
+        local dataME = totalME * (adjustedDataRatio / totalAdjustedRatio)
+        
+        -- Convert to actual units
+        local materialUnits = math.floor(materialME / materialValueME)
+        local dataUnits = math.floor(dataME / dataValueME)
+        
+        -- If we end up with material=0 or data=0 but shouldn't based on the ratio,
+        -- make sure we have at least 1 of each if the ratio requires it
+        if materialUnits == 0 and M_ratio > 0 then materialUnits = 1 end
+        if dataUnits == 0 and D_ratio > 0 then dataUnits = 1 end
+        
+        -- One more adjustment to account for rounding - ensure the total ME doesn't exceed the limit
+        local usedME = (materialUnits * materialValueME) + (dataUnits * dataValueME)
+        if usedME > totalME then
+            -- If we're over budget, reduce the more expensive resource (data)
+            if dataUnits > 0 then
+                dataUnits = dataUnits - 1
+            elseif materialUnits > 1 then
+                materialUnits = materialUnits - 1
+            end
+        end
+        
+        -- For really small ME values where normal ratio calculation doesn't work well
+        if materialUnits == 0 and dataUnits == 0 then
+            materialUnits = 1 -- Default minimum
+        end
+        
         cost.material = materialUnits
-
+        cost.data = dataUnits
     else -- Fallback to default logic: prioritize Data
-        -- print("  Using Default Split Logic (Prioritize Data)")
         local dataUnits = math.floor(totalME / dataValueME)
         local remainingME = totalME - (dataUnits * dataValueME)
 
@@ -311,3 +335,4 @@ function CostCalculator.calculateDerivedCost(cardDefinition, thematicRatio) -- A
 end
 
 return CostCalculator
+
