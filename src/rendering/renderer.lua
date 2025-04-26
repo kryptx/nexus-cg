@@ -1435,13 +1435,19 @@ end
 -- NEW: Draw Yes/No Prompt Box
 -- Draws a modal box with the question and returns bounds for Yes/No buttons
 -- Returns: yesBounds {x, y, w, h}, noBounds {x, y, w, h}
-function Renderer:drawYesNoPrompt(question)
+function Renderer:drawYesNoPrompt(question, displayOptions)
     local screenW = love.graphics.getWidth()  -- Get current width
     local screenH = love.graphics.getHeight() -- Get current height
+    
+    displayOptions = displayOptions or {}
+    local showCard = displayOptions.showCard
+    local desiredCardScale = displayOptions.cardScale or 2.0 -- Keep the desired scale
+    local highlightEffect = displayOptions.highlightEffect
+    local sourceNode = displayOptions.sourceNode
 
     -- Box Appearance
     local boxWidth = screenW * 0.5  -- 50% of screen width
-    local boxHeight = screenH * 0.3 -- 30% of screen height
+    local boxHeight = screenH * 0.4 -- 40% of screen height (might need adjustment)
     local boxX = (screenW - boxWidth) / 2
     local boxY = (screenH - boxHeight) / 2
     local padding = 20
@@ -1462,6 +1468,7 @@ function Renderer:drawYesNoPrompt(question)
     local buttonFont = self.fonts.uiStandard or love.graphics.getFont()
     local questionMaxWidth = boxWidth - (2 * padding)
     local questionTextY = boxY + padding
+    local questionTextHeight = questionFont:getHeight() -- Get height for layout
 
     -- 1. Draw Background Overlay (dim the background)
     local originalColor = {love.graphics.getColor()}
@@ -1483,8 +1490,71 @@ function Renderer:drawYesNoPrompt(question)
     love.graphics.setFont(questionFont)
     love.graphics.setColor(StyleGuide.PROMPT_BOX_TEXT_COLOR or {1, 1, 1, 1}) -- Use style or fallback
     love.graphics.printf(question or "Confirm?", boxX + padding, questionTextY, questionMaxWidth, "center")
+    
+    -- 5. Draw the Card if requested and available
+    if showCard and sourceNode and sourceNode.card then
+        -- Calculate available space for the card
+        local availableHeight = buttonStartY - (questionTextY + questionTextHeight) - (2 * padding)
+        local availableWidth = boxWidth - (2 * padding)
+        
+        -- Calculate maximum scale based on available space
+        local maxScaleHeight = availableHeight / self.CARD_HEIGHT
+        local maxScaleWidth = availableWidth / self.CARD_WIDTH
+        local maxScale = math.min(maxScaleHeight, maxScaleWidth)
+        
+        -- Use the smaller of desired scale and max possible scale
+        local finalCardScale = math.min(desiredCardScale, maxScale)
+        
+        -- Recalculate card dimensions and position based on final scale
+        local cardWidth = self.CARD_WIDTH * finalCardScale
+        local cardHeight = self.CARD_HEIGHT * finalCardScale
+        local cardX = boxX + (boxWidth - cardWidth) / 2
+        local cardY = questionTextY + questionTextHeight + padding + (availableHeight - cardHeight) / 2 -- Center vertically in available space
+        
+        -- Get the pre-rendered canvas for the card
+        local canvas = self:_generateCardCanvas(sourceNode.card)
+        if canvas then
+            -- Save current state
+            local originalFont = love.graphics.getFont()
+            local originalColor = {love.graphics.getColor()}
+            
+            -- Draw the cached canvas at the desired scale and position
+            local sf = self.canvasRenderScaleFactor or 1
+            local invSf = 1 / sf
+            local drawScale = finalCardScale * invSf -- Final scale to draw the high-res canvas
+            local borderPadding = self.PORT_RADIUS -- Original units padding on canvas
+            local canvasW = canvas:getWidth()
+            local canvasH = canvas:getHeight()
+            local drawW = canvasW * drawScale
+            local drawH = canvasH * drawScale
+            
+            -- Calculate top-left draw position (relative to card content box, not canvas edge)
+            local drawPosX = cardX
+            local drawPosY = cardY
+            
+            love.graphics.setColor(1, 1, 1, 1) -- Ensure full alpha for the canvas
+            love.graphics.draw(canvas, drawPosX - (borderPadding * drawScale), drawPosY - (borderPadding*drawScale), 0, drawScale, drawScale)
+            
+            -- Optionally draw a highlight border or effect
+            if highlightEffect then
+                 love.graphics.setLineWidth(2)
+                 love.graphics.setColor(1, 1, 0, 0.8) -- Yellow highlight
+                 love.graphics.rectangle("line", drawPosX - (borderPadding * drawScale), drawPosY- (borderPadding*drawScale), drawW, drawH)
+                 love.graphics.setLineWidth(1)
+            end
+            
+            -- Restore state
+            love.graphics.setFont(originalFont)
+            love.graphics.setColor(originalColor)
+        else
+            print(string.format("Warning: Could not get canvas for card '%s' in prompt.", sourceNode.card.id))
+            -- Optionally draw a fallback placeholder if canvas fails
+            love.graphics.setColor(1, 0, 0, 0.5) -- Red semi-transparent placeholder
+            love.graphics.rectangle("fill", cardX, cardY, cardWidth, cardHeight)
+        end
+    end
 
-    -- 5. Draw Buttons (Simple Rectangles for now, could use Button class later)
+    -- 6. Draw Buttons (Simple Rectangles for now, could use Button class later)
     -- Yes Button
     local yesBounds = { x = yesButtonX, y = buttonStartY, w = buttonWidth, h = buttonHeight }
     love.graphics.setColor(0.3, 0.7, 0.3, 1) -- Greenish

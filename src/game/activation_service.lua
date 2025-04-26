@@ -30,10 +30,11 @@ end
 
 -- Find Activation Path (Global BFS)
 -- Searches across networks using adjacency and convergence links.
--- Returns: boolean (isValid), pathData { path={ {card=Card, owner=Player}, ... }, cost=int, isConvergenceStart=bool }, reason (string)
-function ActivationService:findGlobalActivationPath(targetCard, activatorReactor, activatingPlayer)
+-- Returns: boolean (foundAny), list<pathData> | nil, reason | nil
+-- pathData = { path={ {card=Card, owner=Player, traversedLinkType=string|nil}, ... }, cost=int, isConvergenceStart=bool }
+function ActivationService:findGlobalActivationPaths(targetCard, activatorReactor, activatingPlayer)
     local gs = self.gameService
-    print(string.format("[Pathfinder] START: Target=%s (%s, P%d), Reactor=%s (%s, P%d), Activator=P%d",
+    print(string.format("[Pathfinder] START (Find All Shortest): Target=%s (%s, P%d), Reactor=%s (%s, P%d), Activator=P%d",
         targetCard and targetCard.title or "NIL",
         targetCard and targetCard.id or "NIL",
         targetCard and targetCard.owner and targetCard.owner.id or -1,
@@ -45,49 +46,66 @@ function ActivationService:findGlobalActivationPath(targetCard, activatorReactor
 
     if not targetCard or not activatorReactor or not activatingPlayer then
         print("[Pathfinder] FAIL: Invalid arguments.")
-        return false, nil, "Invalid arguments to findGlobalActivationPath"
+        return false, nil, "Invalid arguments to findGlobalActivationPaths"
     end
 
     local queue = {}
-    local visited = {} -- Track visited card INSTANCES to prevent cycles
+    local visitedCost = {} -- Track visited card INSTANCES and the minimum cost to reach them { [playerID_cardID] = cost }
+    local shortestPaths = {}
+    local minCostFound = math.huge
 
     local startOwner = targetCard.owner
     if not startOwner then
         print(string.format("[Pathfinder] FAIL: Target card %s has no owner!", targetCard.id))
         return false, nil, string.format("Target card %s has no owner!", targetCard.id)
     end
-    -- Path elements now include traversedLinkType
+
     local initialPath = { { card = targetCard, owner = startOwner, traversedLinkType = nil } }
     table.insert(queue, { node = targetCard, owner = startOwner, path = initialPath })
 
-    -- Use composite key for visited set: playerID_cardID
     local startVisitedKey = startOwner.id .. "_" .. targetCard.id
-    visited[startVisitedKey] = true 
-    print(string.format("[Pathfinder] Initial Queue: Target %s (P%d). Visited Key: %s", targetCard.id, startOwner.id, startVisitedKey))
+    visitedCost[startVisitedKey] = 1 -- Cost is path length (1 initially)
+    print(string.format("[Pathfinder] Initial Queue: Target %s (P%d). Visited Key: %s, Initial Cost: 1", targetCard.id, startOwner.id, startVisitedKey))
 
     while #queue > 0 do
         local currentState = table.remove(queue, 1)
         local currentNode = currentState.node
         local currentOwner = currentState.owner
         local currentPath = currentState.path
+        local currentCost = #currentPath
         local currentVisitedKey = currentOwner.id .. "_" .. currentNode.id
-        print(string.format("[Pathfinder] Dequeue: Current=%s (P%d), PathLen=%d, VisitedKey=%s", currentNode.id, currentOwner.id, #currentPath, currentVisitedKey))
+        print(string.format("[Pathfinder] Dequeue: Current=%s (P%d), PathLen=%d, VisitedKey=%s", currentNode.id, currentOwner.id, currentCost, currentVisitedKey))
+
+        -- Pruning: If we've already found shorter paths, or this path is longer than the min cost to reach this node, skip
+        if currentCost > minCostFound or currentCost > (visitedCost[currentVisitedKey] or math.huge) then
+            print(string.format("  >> Pruning path: CurrentCost (%d) > minCostFound (%d) or visitedCost[%s] (%d)", currentCost, minCostFound, currentVisitedKey, visitedCost[currentVisitedKey] or -1))
+            goto continue -- Use goto to skip to the end of the loop iteration
+        end
 
         if currentNode == activatorReactor then
-            local isConvergenceStart = false
-            if #currentPath > 1 then
-                isConvergenceStart = currentPath[1].owner ~= currentPath[2].owner
+            print(string.format("[Pathfinder] Reached Reactor %s. Path Cost=%d.", activatorReactor.id, currentCost))
+            if currentCost < minCostFound then
+                print(string.format("  >> New shortest path found! Old minCost=%f, New minCost=%f. Resetting paths.", minCostFound, currentCost))
+                minCostFound = currentCost
+                shortestPaths = {} -- Reset shortest paths
             end
-
-            local activationPath = shallow_copy(currentPath)
-
-            local pathData = {
-                path = activationPath,
-                cost = #activationPath, 
-                isConvergenceStart = isConvergenceStart
-            }
-            print(string.format("[Pathfinder] SUCCESS: Reached Reactor %s. Path Cost=%d, ConvStart=%s", activatorReactor.id, pathData.cost, tostring(isConvergenceStart)))
-            return true, pathData, nil
+            -- Only add if it matches the current minimum cost
+            if currentCost == minCostFound then
+                local isConvergenceStart = false
+                if #currentPath > 1 then
+                    isConvergenceStart = currentPath[1].owner ~= currentPath[2].owner
+                end
+                local activationPath = shallow_copy(currentPath)
+                local pathData = {
+                    path = activationPath,
+                    cost = currentCost, -- Use actual path length
+                    isConvergenceStart = isConvergenceStart
+                }
+                print(string.format("  >> Storing shortest path. Total shortest paths now: %d", #shortestPaths + 1))
+                table.insert(shortestPaths, pathData)
+            end
+            -- Continue searching for other paths of the same length
+            goto continue -- Don't explore neighbors from the reactor
         end
 
         -- Explore Neighbors (Adjacency within the same network)
@@ -98,29 +116,34 @@ function ActivationService:findGlobalActivationPath(targetCard, activatorReactor
                 local adjacentPos = currentNode.network:getAdjacentCoordForPort(currentNode.position.x, currentNode.position.y, portIndex)
                 if adjacentPos then
                     local neighborNode = currentOwner.network:getCardAt(adjacentPos.x, adjacentPos.y)
-                    local neighborVisitedKey = neighborNode and (currentOwner.id .. "_" .. neighborNode.id) or nil
-                    if neighborNode and not visited[neighborVisitedKey] then 
-                        local neighborPortIndex = currentNode.network:getOpposingPortIndex(portIndex)
-                        local neighborProps = neighborNode:getPortProperties(neighborPortIndex)
-                        if neighborProps and not neighborProps.is_output and neighborNode:isPortAvailable(neighborPortIndex) and neighborProps.type == portProps.type then
-                            visited[neighborVisitedKey] = true
-                            local newPath = shallow_copy(currentPath)
-                            table.insert(newPath, { card = neighborNode, owner = currentOwner, traversedLinkType = nil })
-                            print(string.format("      >> Enqueueing ADJACENT: %s (P%d)", neighborNode.id, currentOwner.id))
-                            table.insert(queue, { node = neighborNode, owner = currentOwner, path = newPath })
+                    if neighborNode then
+                        local neighborVisitedKey = currentOwner.id .. "_" .. neighborNode.id
+                        local neighborCost = currentCost + 1
+                        -- Check cost before checking port properties for efficiency
+                        if neighborCost <= (visitedCost[neighborVisitedKey] or math.huge) and neighborCost <= minCostFound then
+                           local neighborPortIndex = currentNode.network:getOpposingPortIndex(portIndex)
+                           local neighborProps = neighborNode:getPortProperties(neighborPortIndex)
+                           if neighborProps and not neighborProps.is_output and neighborNode:isPortAvailable(neighborPortIndex) and neighborProps.type == portProps.type then
+                               visitedCost[neighborVisitedKey] = neighborCost -- Update cost if lower or equal
+                               local newPath = shallow_copy(currentPath)
+                               table.insert(newPath, { card = neighborNode, owner = currentOwner, traversedLinkType = nil })
+                               print(string.format("      >> Enqueueing ADJACENT: %s (P%d) at cost %f", neighborNode.id, currentOwner.id, neighborCost))
+                               table.insert(queue, { node = neighborNode, owner = currentOwner, path = newPath })
+                            else
+                               print(string.format("      >> FAILED ADJACENCY CHECK #3: Neighbor %s (P%d) Port %d. Props=%s, IsOutput=%s, Available=%s, TypeMatch=%s",
+                                    neighborNode.id, currentOwner.id, neighborPortIndex,
+                                    tostring(neighborProps),
+                                    neighborProps and tostring(neighborProps.is_output),
+                                    neighborNode:isPortAvailable(neighborPortIndex),
+                                    neighborProps and portProps and tostring(neighborProps.type == portProps.type)))
+                           end
                         else
-                           print(string.format("      >> FAILED ADJACENCY CHECK #3: Neighbor %s (P%d) Port %d. Props=%s, IsOutput=%s, Available=%s, TypeMatch=%s",
-                                neighborNode.id, currentOwner.id, neighborPortIndex,
-                                tostring(neighborProps),
-                                neighborProps and tostring(neighborProps.is_output),
-                                neighborNode:isPortAvailable(neighborPortIndex),
-                                neighborProps and portProps and tostring(neighborProps.type == portProps.type)))
+                            print(string.format("      >> SKIPPING ADJACENT (Cost Check): Neighbor %s (P%d). neighborCost (%d) vs visitedCost (%d) or minCostFound (%d)",
+                                neighborNode.id, currentOwner.id, neighborCost, visitedCost[neighborVisitedKey] or -1, minCostFound))
                         end
                     else
-                        print(string.format("      >> FAILED ADJACENCY CHECK #2: Neighbor @(%s,%s) node=%s, visited=%s",
-                            tostring(adjacentPos and adjacentPos.x), tostring(adjacentPos and adjacentPos.y),
-                            tostring(neighborNode and neighborNode.id),
-                            neighborVisitedKey and tostring(visited[neighborVisitedKey])))
+                        print(string.format("      >> FAILED ADJACENCY CHECK #2: No neighbor node @(%s,%s)",
+                            tostring(adjacentPos and adjacentPos.x), tostring(adjacentPos and adjacentPos.y)))
                     end
                 else
                     print(string.format("      >> FAILED ADJACENCY CHECK #1b: adjacentPos is nil for Port %d", portIndex))
@@ -134,44 +157,70 @@ function ActivationService:findGlobalActivationPath(targetCard, activatorReactor
         print(string.format("  [Pathfinder Convergence] Exploring links for %s (P%d)...", currentNode.id, currentOwner.id))
         for _, link in ipairs(gs.activeConvergenceLinks) do
             local neighborNode, neighborOwner, neighborNodeId, neighborPlayerIndex, neighborPortIndex, currentPortIndex
+            local isInitiator = false -- Track if the current node is the link initiator
             if link.initiatingNodeId == currentNode.id and link.initiatingPlayerIndex == currentOwner.id then
                 neighborNodeId, neighborPlayerIndex = link.targetNodeId, link.targetPlayerIndex
                 neighborPortIndex, currentPortIndex = link.targetPortIndex, link.initiatingPortIndex
+                isInitiator = true
             elseif link.targetNodeId == currentNode.id and link.targetPlayerIndex == currentOwner.id then
                 neighborNodeId, neighborPlayerIndex = link.initiatingNodeId, link.initiatingPlayerIndex
                 neighborPortIndex, currentPortIndex = link.initiatingPortIndex, link.targetPortIndex
+                isInitiator = false
             end
+
             if neighborNodeId and neighborPlayerIndex then
                 neighborOwner = gs.players[neighborPlayerIndex]
                 neighborNode = neighborOwner and neighborOwner.network:getCardById(neighborNodeId) or nil
-            end
-            local neighborVisitedKeyConv = neighborNode and (neighborOwner.id .. "_" .. neighborNode.id) or nil
-            if neighborNode and not visited[neighborVisitedKeyConv] then
-                local outputNode, inputNode, outputPortIdx, inputPortIdx
-                if link.initiatingNodeId == currentNode.id then
-                    outputNode, inputNode = currentNode, neighborNode
-                    outputPortIdx, inputPortIdx = currentPortIndex, neighborPortIndex
+                if neighborNode then
+                    local neighborVisitedKeyConv = neighborOwner.id .. "_" .. neighborNode.id
+                    local neighborCost = currentCost + 1
+                    if neighborCost <= (visitedCost[neighborVisitedKeyConv] or math.huge) and neighborCost <= minCostFound then
+                        local outputNode, inputNode, outputPortIdx, inputPortIdx
+                        if isInitiator then
+                            outputNode, inputNode = currentNode, neighborNode
+                            outputPortIdx, inputPortIdx = currentPortIndex, neighborPortIndex
+                        else
+                            outputNode, inputNode = neighborNode, currentNode
+                            outputPortIdx, inputPortIdx = neighborPortIndex, currentPortIndex
+                        end
+                        local oProps, iProps = outputNode:getPortProperties(outputPortIdx), inputNode:getPortProperties(inputPortIdx)
+                        -- Check link validity (port types, availability/occupation)
+                        if oProps and oProps.is_output and iProps and not iProps.is_output and
+                           (outputNode:getOccupyingLinkId(outputPortIdx) == nil or outputNode:getOccupyingLinkId(outputPortIdx) == link.linkId) and
+                           (inputNode:getOccupyingLinkId(inputPortIdx) == nil or inputNode:getOccupyingLinkId(inputPortIdx) == link.linkId) and
+                           oProps.type == iProps.type then
+                            visitedCost[neighborVisitedKeyConv] = neighborCost -- Update cost
+                            local newPath = shallow_copy(currentPath)
+                            table.insert(newPath, { card = neighborNode, owner = neighborOwner, traversedLinkType = link.linkType })
+                            print(string.format("      >> Enqueueing CONVERGENCE: %s (P%d) via Link %s (%s) at cost %f", neighborNode.id, neighborOwner.id, link.linkId, link.linkType, neighborCost))
+                            table.insert(queue, { node = neighborNode, owner = neighborOwner, path = newPath })
+                        else
+                            print(string.format("      >> FAILED CONVERGENCE CHECK #3: Link %s. oProps=%s, iProps=%s, oOcc=%s, iOcc=%s, TypeMatch=%s",
+                                link.linkId, tostring(oProps), tostring(iProps),
+                                tostring(outputNode:getOccupyingLinkId(outputPortIdx)),
+                                tostring(inputNode:getOccupyingLinkId(inputPortIdx)),
+                                oProps and iProps and tostring(oProps.type == iProps.type)))
+                        end
+                    else
+                         print(string.format("      >> SKIPPING CONVERGENCE (Cost Check): Neighbor %s (P%d). neighborCost (%d) vs visitedCost (%d) or minCostFound (%s)",
+                                neighborNode.id, neighborOwner.id, neighborCost, visitedCost[neighborVisitedKeyConv] or -1, minCostFound))
+                    end
                 else
-                    outputNode, inputNode = neighborNode, currentNode
-                    outputPortIdx, inputPortIdx = neighborPortIndex, currentPortIndex
+                    print(string.format("      >> FAILED CONVERGENCE CHECK #2: Could not find neighbor node %s for P%d", neighborNodeId, neighborPlayerIndex))
                 end
-                local oProps, iProps = outputNode:getPortProperties(outputPortIdx), inputNode:getPortProperties(inputPortIdx)
-                if oProps and oProps.is_output and iProps and not iProps.is_output and
-                   (outputNode:getOccupyingLinkId(outputPortIdx) == nil or outputNode:getOccupyingLinkId(outputPortIdx) == link.linkId) and
-                   (inputNode:getOccupyingLinkId(inputPortIdx) == nil or inputNode:getOccupyingLinkId(inputPortIdx) == link.linkId) and
-                   oProps.type == iProps.type then
-                    visited[neighborVisitedKeyConv] = true
-                    local newPath = shallow_copy(currentPath)
-                    table.insert(newPath, { card = neighborNode, owner = neighborOwner, traversedLinkType = link.linkType })
-                    print(string.format("      >> Enqueueing CONVERGENCE: %s (P%d) via Link %s (%s)", neighborNode.id, neighborOwner.id, link.linkId, link.linkType))
-                    table.insert(queue, { node = neighborNode, owner = neighborOwner, path = newPath })
-                end
-            end
-        end
+            end -- End if neighborNodeId and neighborPlayerIndex
+        end -- End for link in links
+
+        ::continue:: -- Label for goto, used for skipping exploration from pruned paths or reactor
     end
 
-    print("[Pathfinder] FAIL: Queue empty, Reactor not found.")
-    return false, nil, "No valid activation path exists to the activator's reactor."
+    if #shortestPaths > 0 then
+        print(string.format("[Pathfinder] SUCCESS: Found %d shortest path(s) with cost %d.", #shortestPaths, minCostFound))
+        return true, shortestPaths, nil
+    else
+        print("[Pathfinder] FAIL: Queue empty or no paths reached reactor within cost limits.")
+        return false, nil, "No valid activation path exists to the activator's reactor."
+    end
 end
 
 -- Update attemptActivationGlobal to use internal pathfinder
@@ -192,16 +241,23 @@ function ActivationService:attemptActivationGlobal(activatingPlayerIndex, target
     local activatorReactor = activatingPlayer.network:findReactor()
     if not activatorReactor then return false, "Error: Activating player's reactor not found." end
 
-    local isValid, pathData, reason
+    local foundAny, shortestPathsData, reason
     -- Allow overrides via GameService for testing if defined, else use internal pathfinder
-    if gs.findGlobalActivationPath then
-        isValid, pathData, reason = gs:findGlobalActivationPath(targetCard, activatorReactor, activatingPlayer)
+    -- TODO: Update external calls if gs.findGlobalActivationPath is used for testing override
+    if gs.findGlobalActivationPaths then -- Check for potentially overridden function
+        foundAny, shortestPathsData, reason = gs:findGlobalActivationPaths(targetCard, activatorReactor, activatingPlayer)
     else
-        isValid, pathData, reason = self:findGlobalActivationPath(targetCard, activatorReactor, activatingPlayer)
+        foundAny, shortestPathsData, reason = self:findGlobalActivationPaths(targetCard, activatorReactor, activatingPlayer)
     end
+
     local path, cost, isConvStart
-    if isValid and pathData then
-        path = pathData.path; cost = pathData.cost - 1; isConvStart = pathData.isConvergenceStart
+    if foundAny and shortestPathsData and #shortestPathsData > 0 then
+        -- TODO: Implement choice mechanism here. For now, just take the first path.
+        local firstPathData = shortestPathsData[1]
+        path = firstPathData.path
+        cost = firstPathData.cost - 1 -- Activation cost is path length - 1
+        isConvStart = firstPathData.isConvergenceStart
+        print(string.format("[Activation] Using first of %d shortest paths found. Cost: %d", #shortestPathsData, cost))
     else
         return false, string.format("No valid global activation path: %s", reason or "Unknown reason")
     end

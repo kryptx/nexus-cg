@@ -140,7 +140,7 @@ definitions["NODE_TECH_005"] = {
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 1 } },
-            { condition = { type = "adjacency", nodeType = CardTypes.RESOURCE, count = 1 },
+            { condition = { type = "adjacency", nodeType = CardTypes.RESOURCE, count = 2 },
               effect = "gainResourcePerNodeOwner", options = { resource = ResourceType.ENERGY, amount = 1, nodeType = CardTypes.RESOURCE } }
         }
         -- Description: "Owner gains 1 Energy. If adjacent to 1+ Resource node(s): Owner gains 1 Energy per Resource node in their network."

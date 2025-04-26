@@ -421,17 +421,17 @@ definitions["NODE_CULT_012"] = {
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           {
-            condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.DATA, amount = 2 },
+            condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.DATA, amount = 1 },
             effect = "forceDiscardRandomCardsActivator", 
-            options = { amount = 2 } 
+            options = { amount = 1 } 
           },
           { 
-            condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.DATA, amount = 2 },
+            condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.DATA, amount = 1 },
             effect = "gainVPForOwner", 
             options = { amount = 1 } 
           }
       }
-      -- Description: "If Owner pays 2 Data: Activator discards 2 cards; Owner gains 1 VP."
+      -- Description: "If you pay 1 Data: Discard 1 card; Gain 1 VP."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {

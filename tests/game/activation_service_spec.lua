@@ -93,7 +93,7 @@ end
 -- ==========================================
 -- Tests for global activation pathfinding
 -- ==========================================
-describe("ActivationService:findGlobalActivationPath", function()
+describe("ActivationService:findGlobalActivationPaths", function()
     local gameService, service, p1, p2, p3, net1, net2, net3
     local p1_reactor, p1_out_node, p1_node_a, p2_in_node, p2_node_b, p3_node_c
 
@@ -144,30 +144,40 @@ describe("ActivationService:findGlobalActivationPath", function()
             targetPortIndex = CardPorts.LEFT_BOTTOM,
             linkType = Card.Type.RESOURCE
         })
-        local valid, pathData, reason = service:findGlobalActivationPath(p2_in_node, p1_reactor, p1)
-        assert.is_true(valid, reason)
+        local foundAny, pathsData, reason = service:findGlobalActivationPaths(p2_in_node, p1_reactor, p1)
+        assert.is_true(foundAny, reason)
+        assert.is_table(pathsData)
+        assert.are.equal(1, #pathsData)
+        local pathData = pathsData[1]
         assert.are.equal(3, pathData.cost)
         assert.is_true(pathData.isConvergenceStart)
         assert.are.same({"P2_IN","P1_OUT","P1_R"}, getPathIds(pathData))
     end)
 
     it("should find a path within a single network (no convergence)", function()
-        local valid, pathData, reason = service:findGlobalActivationPath(p1_out_node, p1_reactor, p1)
-        assert.is_true(valid, reason)
+        local foundAny, pathsData, reason = service:findGlobalActivationPaths(p1_out_node, p1_reactor, p1)
+        assert.is_true(foundAny, reason)
+        assert.is_table(pathsData)
+        assert.are.equal(1, #pathsData)
+        local pathData = pathsData[1]
         assert.are.equal(2, pathData.cost)
         assert.is_false(pathData.isConvergenceStart)
         assert.are.same({"P1_OUT","P1_R"}, getPathIds(pathData))
     end)
 
     it("should not find a path if target is disconnected", function()
-        local valid, pathData, reason = service:findGlobalActivationPath(p2_in_node, p1_reactor, p1)
-        assert.is_false(valid)
+        local foundAny, pathsData, reason = service:findGlobalActivationPaths(p2_in_node, p1_reactor, p1)
+        assert.is_false(foundAny)
+        assert.is_nil(pathsData)
         assert.matches("No valid activation path", reason or "", 1, true)
     end)
 
     it("should find a path when target is adjacent to the reactor", function()
-        local valid, pathData, reason = service:findGlobalActivationPath(p1_out_node, p1_reactor, p1)
-        assert.is_true(valid, reason)
+        local foundAny, pathsData, reason = service:findGlobalActivationPaths(p1_out_node, p1_reactor, p1)
+        assert.is_true(foundAny, reason)
+        assert.is_table(pathsData)
+        assert.are.equal(1, #pathsData)
+        local pathData = pathsData[1]
         assert.are.equal(2, pathData.cost)
         assert.is_false(pathData.isConvergenceStart)
         assert.are.same({"P1_OUT","P1_R"}, getPathIds(pathData))
@@ -175,8 +185,9 @@ describe("ActivationService:findGlobalActivationPath", function()
 
     it("should not find a path if blocked by an occupied port (adjacency)", function()
         p1_out_node.occupiedPorts = { [CardPorts.LEFT_TOP] = "blocker" }
-        local valid = service:findGlobalActivationPath(p1_out_node, p1_reactor, p1)
-        assert.is_false(valid)
+        local foundAny, pathsData, reason = service:findGlobalActivationPaths(p1_out_node, p1_reactor, p1)
+        assert.is_false(foundAny)
+        assert.is_nil(pathsData)
         p1_out_node.occupiedPorts = {}
     end)
 
@@ -187,8 +198,9 @@ describe("ActivationService:findGlobalActivationPath", function()
             targetPortIndex = CardPorts.LEFT_BOTTOM, linkType = Card.Type.RESOURCE
         })
         p2_in_node.occupiedPorts = { [CardPorts.LEFT_BOTTOM] = "blocker" }
-        local valid = service:findGlobalActivationPath(p2_in_node, p1_reactor, p1)
-        assert.is_false(valid)
+        local foundAny, pathsData, reason = service:findGlobalActivationPaths(p2_in_node, p1_reactor, p1)
+        assert.is_false(foundAny)
+        assert.is_nil(pathsData)
         p2_in_node.occupiedPorts = {}
     end)
 
@@ -203,8 +215,11 @@ describe("ActivationService:findGlobalActivationPath", function()
             initiatingPortIndex = CardPorts.RIGHT_BOTTOM, targetPlayerIndex = 2, targetNodeId = "P2_B",
             targetPortIndex = CardPorts.LEFT_BOTTOM, linkType = Card.Type.RESOURCE
         })
-        local valid, pathData, reason = service:findGlobalActivationPath(p3_node_c, p1_reactor, p1)
-        assert.is_true(valid, reason)
+        local foundAny, pathsData, reason = service:findGlobalActivationPaths(p3_node_c, p1_reactor, p1)
+        assert.is_true(foundAny, reason)
+        assert.is_table(pathsData)
+        assert.are.equal(1, #pathsData)
+        local pathData = pathsData[1]
         assert.are.equal(4, pathData.cost)
         assert.is_true(pathData.isConvergenceStart)
         assert.are.same({"P3_C","P2_B","P1_A","P1_R"}, getPathIds(pathData))
@@ -247,8 +262,11 @@ describe("ActivationService:findGlobalActivationPath", function()
             initiatingPortIndex = CardPorts.LEFT_TOP, targetPlayerIndex = 1, targetNodeId = "P1_ST",
             targetPortIndex = CardPorts.RIGHT_TOP, linkType = Card.Type.KNOWLEDGE
         })
-        local valid, pathData, reason = service:findGlobalActivationPath(p2_ic, p1_reactor, p1)
-        assert.is_true(valid, reason)
+        local foundAny, pathsData, reason = service:findGlobalActivationPaths(p2_ic, p1_reactor, p1)
+        assert.is_true(foundAny, reason)
+        assert.is_table(pathsData)
+        assert.are.equal(1, #pathsData)
+        local pathData = pathsData[1]
         assert.are.equal(3, pathData.cost)
         assert.is_true(pathData.isConvergenceStart)
         assert.are.same({"P2_IC","P1_ST","P1_R"}, getPathIds(pathData))
@@ -293,10 +311,11 @@ describe("ActivationService:attemptActivationGlobal", function()
         net2 = createMockNetwork2({ p2_target }); p2.network = net2
         p2_target.owner, p2_target.network = p2, net2
         -- Stub pathfinder
-        gameService.findGlobalActivationPath = function(self, targetCard, activatorReactor, activatingPlayer)
+        gameService.findGlobalActivationPaths = function(self, targetCard, activatorReactor, activatingPlayer)
             if targetCard.id == "P2_T" and activatorReactor.id == "P1_R" and activatingPlayer.id == 1 then
                 local path = { { card = p2_target, owner = p2 }, { card = p1_inter, owner = p1 }, { card = p1_reactor, owner = p1 } }
-                return true, { path = path, cost = #path, isConvergenceStart = true }, nil
+                local pathData = { path = path, cost = #path, isConvergenceStart = true }
+                return true, { pathData }, nil
             end
             return false, nil, "Mock path not found"
         end
@@ -316,7 +335,11 @@ describe("ActivationService:attemptActivationGlobal", function()
 
     it("should fail if path is unaffordable", function()
         -- Stub to always find a path
-        gameService.findGlobalActivationPath = function() local path = { { card = p2_target, owner = p2 }, { card = p1_inter, owner = p1 }, { card = p1_reactor, owner = p1 } } return true, { path = path, cost = #path, isConvergenceStart = true }, nil end
+        gameService.findGlobalActivationPaths = function()
+            local path = { { card = p2_target, owner = p2 }, { card = p1_inter, owner = p1 }, { card = p1_reactor, owner = p1 } }
+            local pathData = { path = path, cost = #path, isConvergenceStart = true }
+            return true, { pathData }, nil
+        end
         p1.resources.energy = 1
         local success, msg = service:attemptActivationGlobal(1, 2, 1, 1)
         assert.is_false(success)
@@ -324,7 +347,7 @@ describe("ActivationService:attemptActivationGlobal", function()
     end)
 
     it("should fail if no path is found", function()
-        gameService.findGlobalActivationPath = function() return false, nil, "No route" end
+        gameService.findGlobalActivationPaths = function() return false, nil, "No route" end
         local success, msg = service:attemptActivationGlobal(1, 2, 1, 1)
         assert.is_false(success)
         assert.matches("No valid global activation path: No route", msg)

@@ -852,7 +852,13 @@ describe("PlayState Module", function()
 
         it("should call attemptActivationGlobal with right mouse button", function()
             -- Arrange
-            patchPlayer1NetworkForActivation() -- << Patch network specifically for this test
+            -- Stub pathfinding to force single-path fallback
+            state.gameService.activationService.findGlobalActivationPaths = function(self, targetCard, activatorReactor, activatingPlayer)
+                -- Return foundAny=true and a single dummy path (fallback will call attemptActivationGlobal)
+                return true, { { path = {} } }, nil
+            end
+            state.selectedHandIndex = nil
+            state.currentPhase = "Activate"
 
             local activation_called_with = nil
             state.gameService.attemptActivationGlobal = function(self, act_idx, target_idx, gx_arg, gy_arg) -- Replace with new mock signature
@@ -860,9 +866,6 @@ describe("PlayState Module", function()
                 return true, "Mock Activation Called" -- Mock success
             end
             
-            state.selectedHandIndex = nil
-            state.currentPhase = "Activate"
-
             -- Act
             state:mousepressed(nil, 400, 300, 2) -- Right click
 

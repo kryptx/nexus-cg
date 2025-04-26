@@ -104,9 +104,12 @@ function GameService:initializeGame(playerCount)
         })
         
         -- Set starting resources
-        player:addResource('energy', 1)
-        player:addResource('data', 3)
-        player:addResource('material', 4)
+        -- player:addResource('energy', 1)
+        -- player:addResource('data', 3)
+        -- player:addResource('material', 4)
+        player:addResource('energy', 10)
+        player:addResource('data', 10)
+        player:addResource('material', 20)
         
         -- Create reactor card first using Card constructor with reactor definition
         local reactorData = CardDefinitions["REACTOR_BASE"]
@@ -808,7 +811,7 @@ function GameService:performEnergyGain(player)
 end
 
 -- NEW: Request Yes/No input from a player
-function GameService:requestPlayerYesNo(player, question, callback)
+function GameService:requestPlayerYesNo(player, question, callback, displayOptions)
     if self.isWaitingForInput then
         print("Warning: GameService already waiting for input. Ignoring new request.")
         return -- Avoid overwriting a pending request
@@ -823,6 +826,7 @@ function GameService:requestPlayerYesNo(player, question, callback)
     self.pendingPlayer = player
     self.pendingQuestion = question
     self.pendingInputCallback = callback
+    self.pendingDisplayOptions = displayOptions or {} -- Store display options
 
     -- NOTE: The game state (e.g., PlayState) needs to observe 'isWaitingForInput'
     -- and 'pendingQuestion'/'pendingPlayer' to display the prompt.
@@ -846,12 +850,20 @@ function GameService:providePlayerYesNoAnswer(answer)
     self.pendingQuestion = nil
     self.pendingPlayer = nil
     self.pendingInputCallback = nil
+    self.pendingDisplayOptions = nil -- Clear display options
     
     -- Call the callback with the answer
     if callback and type(callback) == "function" then
         callback(player, answer)
     else
         print("Warning: No valid callback found for player answer.")
+    end
+
+    -- After player decides (either accept or decline), resume any paused activation chain
+    if self.activationService and self.activationService.pausedActivationContext then
+        print("[GameService] Resuming activation chain after player input...")
+        local status, resumeMsg = self.activationService:resumeActivation()
+        if resumeMsg then print(resumeMsg) end
     end
 end
 

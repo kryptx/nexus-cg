@@ -12,6 +12,7 @@ local GameService = ServiceModule.GameService -- Extract the actual GameService 
 local TurnPhase = ServiceModule.TurnPhase -- Extract TurnPhase constants
 local StyleGuide = require('src.rendering.styles') -- Require the styles
 local Text = require('src.ui.text') -- Need Text for wrapping
+local SequencePicker = require('src.ui.sequence_picker')
 
 local PlayState = {}
 
@@ -90,6 +91,7 @@ end
 function PlayState:init(animationController, gameService) -- Accept animationController and gameService
     -- Initialize state variables
     self.players = {}
+    self.sequencePicker = nil -- NEW: Sequence picker overlay
     self.renderer = Renderer:new() -- Create renderer instance
     self.animationController = animationController -- Store the controller
     self.selectedHandIndex = nil -- Track selected card in hand
@@ -288,6 +290,10 @@ end
 
 function PlayState:update(stateManager, dt)
     local mx, my = love.mouse.getPosition()
+    if self.sequencePicker then
+        self.sequencePicker:update()
+        return
+    end
     local mouseDown = love.mouse.isDown(1)
 
     -- If displaying prompt, only update essential UI or nothing game-related
@@ -333,6 +339,14 @@ end
 
 function PlayState:draw(stateManager)
     love.graphics.clear(0.3, 0.3, 0.3, 1)
+    if self.sequencePicker then
+        -- Draw resource UI behind sequence picker so the player can still see their resources
+        local currentPlayer = self.players[self.gameService.currentPlayerIndex]
+        -- Render the UI (VP, resources, links) in the foreground
+        self.sequencePicker:draw()
+        self.renderer:drawUI(currentPlayer, nil, self.currentPhase, nil)
+        return
+    end
     if not self.players or #self.players == 0 or not self.renderer then return end
 
     -- Get current player for UI/Hand drawing later
@@ -549,7 +563,10 @@ function PlayState:draw(stateManager)
         self.promptQuestion = self.gameService.pendingQuestion
         if self.renderer.drawYesNoPrompt then
             -- Draw the prompt and store the button bounds it returns
-            self.promptYesBounds, self.promptNoBounds = self.renderer:drawYesNoPrompt(self.promptQuestion)
+            self.promptYesBounds, self.promptNoBounds = self.renderer:drawYesNoPrompt(
+                self.promptQuestion, 
+                self.gameService.pendingDisplayOptions
+            )
         else
             -- Fallback if renderer function doesn't exist yet
             love.graphics.setColor(1,0,0,1)
@@ -602,6 +619,10 @@ local function isPointInRect(px, py, rect)
 end
 
 function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
+    if self.sequencePicker then
+        self.sequencePicker:handleMousePressed(x, y)
+        return
+    end
     -- NEW: Check if prompt is active FIRST
     if self.isDisplayingPrompt then
         if button == 1 then -- Only left click for prompt buttons
@@ -986,10 +1007,28 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
  
              -- If a valid target was found, attempt global activation
              if targetCard then
-                 local success, message = self.gameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayerIndex, targetGridX, targetGridY)
-                 self:updateStatusMessage(message)
+                 -- Retrieve all shortest paths
+                 local activatingPlayer = self.players[activatingPlayerIndex]
+                 local activatorReactor = activatingPlayer.network:findReactor()
+                 local foundAny, pathsData, reason = self.gameService.activationService:findGlobalActivationPaths(targetCard, activatorReactor, activatingPlayer)
+                 if foundAny then
+                     if #pathsData > 1 then
+                         -- Show sequence picker for player choice
+                         self.sequencePicker = SequencePicker:new(self.renderer, pathsData, function(idx)
+                             local chosen = pathsData[idx]
+                             self.sequencePicker = nil
+                             local status, msg = self:executeChosenActivation(chosen)
+                             self:updateStatusMessage(msg)
+                         end)
+                     else
+                         -- Only one path: fallback to original activation call for existing tests
+                         local success, msg = self.gameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayerIndex, targetGridX, targetGridY)
+                         self:updateStatusMessage(msg)
+                     end
+                 else
+                     self:updateStatusMessage("No valid global activation path: " .. reason)
+                 end
              else
-                 -- No valid target card clicked
                  self:updateStatusMessage("Right-click a valid node (not a Reactor) to activate.")
              end
              
@@ -1280,6 +1319,20 @@ function PlayState:resize(stateManager, w, h)
     -- Optional: Adjust camera or other view elements if necessary
     -- For example, if the camera view should maintain aspect ratio or re-center
     -- print(string.format("PlayState received resize: %d x %d", w, h))
+end
+
+-- Execute a chosen activation path without pathfinding
+function PlayState:executeChosenActivation(pathData)
+    local idx = self.gameService.currentPlayerIndex
+    local player = self.players[idx]
+    local cost = #pathData.path - 1
+    if player.resources.energy < cost then
+        return false, string.format("Not enough energy. Cost: %d E (Have: %d E)", cost, player.resources.energy)
+    end
+    player:spendResource('energy', cost)
+    self.gameService.audioManager:playSound('activation')
+    local messages = { string.format("Activated global path (Cost %d E):", cost) }
+    return self.gameService.activationService:_processActivationPath(pathData.path, player, pathData.isConvergenceStart, messages)
 end
 
 return PlayState 

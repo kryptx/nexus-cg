@@ -155,24 +155,26 @@ end
 -- Checks adjacency condition
 local function evaluateAdjacencyCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
     if not sourceNetwork or not sourceNode or not sourceNode.position then return false end
-    -- Use the newly added Network:getNeighbors relative to the node executing the effect
-    local neighbors = sourceNetwork:getNeighbors(sourceNode.position) 
+    -- Network:getNeighbors returns Card instances of adjacent cards
+    local neighbors = sourceNetwork:getNeighbors(sourceNode.position)
     local count = 0
     local requiredType = conditionConfig.nodeType
     local requiredCount = conditionConfig.count or 1
-    for _, neighborNode in ipairs(neighbors) do
-        if neighborNode and neighborNode.card and neighborNode.card.type == requiredType then
+    for _, neighborCard in ipairs(neighbors) do
+        if neighborCard and neighborCard.type == requiredType then
             count = count + 1
         end
     end
-    print(string.format("Evaluated adjacency condition: %d/%d %s found adjacent to %s", count, requiredCount, requiredType, sourceNode.position))
+    -- Log with explicit coordinates
+    print(string.format("Evaluated adjacency condition: %d/%d %s found adjacent to (%d,%d)",
+        count, requiredCount, requiredType, sourceNode.position.x, sourceNode.position.y))
     return count >= requiredCount
 end
 
 -- Checks convergence link condition
 local function evaluateConvergenceLinkCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode)
-    if not sourceNode then return false end
-    local currentLinks = sourceNode:getConvergenceLinkCount() 
+    if not sourceNode or not sourceNode.card or not sourceNode.card.getConvergenceLinkCount then return false end
+    local currentLinks = sourceNode.card:getConvergenceLinkCount()
     local requiredCount = conditionConfig.count or 1
     return currentLinks >= requiredCount
 end
@@ -430,33 +432,95 @@ end
 -- costResource, costAmount: From the conditionConfig
 -- actionToExecute: The original action table {effect=..., options=...} that was guarded by the paymentOffer condition
 -- gameService, activatingPlayer, sourceNetwork, sourceNode: Original execution context
-local function _requestPaymentAndExecute(playerToAsk, costResource, costAmount, actionToExecute, gameService, activatingPlayer, sourceNetwork, sourceNode)
+local function _requestPaymentAndExecute(playerToAsk, costResource, costAmount, actionToExecute, actionIndex, actionsList, gameService, activatingPlayer, sourceNetwork, sourceNode)
     -- NOTE: We already know the player *can* pay because evaluatePaymentOfferCondition passed.
     
-    local questionString = string.format("Pay %d %s?", costAmount, costResource:sub(1, 1):upper() .. costResource:sub(2))
+    -- Determine the correct context for generating the benefit description
+    local owner = sourceNetwork.owner
+    local benefitContext
+    if playerToAsk == owner then
+        -- If the owner is being asked, provide the 'activation' context 
+        -- to generateActionDescription. This ensures its internal logic 
+        -- uses imperative phrasing for "Owner" effects (e.g., "Draw 1 card") 
+        -- from the owner's perspective during this payment step.
+        benefitContext = { effectType = "activation" }
+    else
+        -- If the activator is being asked, use the original context derived
+        -- from the effect definition (activation or convergence). This maintains
+        -- correct phrasing (e.g., "Owner draws 1 card" or imperative "Gain X" 
+        -- if the effect targets the activator).
+        benefitContext = { effectType = actionToExecute.condition and "convergence" or "activation" }
+    end
+    
+    -- Generate a more informative description of what the player will get using the determined context
+    local benefitDescription = generateActionDescription({
+        effect = actionToExecute.effect,
+        options = actionToExecute.options or {}
+    }, benefitContext)
+    
+    -- Create a detailed question with payment cost and benefit
+    local questionString = string.format("Pay %d %s to: %s", 
+        costAmount, 
+        costResource:sub(1, 1):upper() .. costResource:sub(2),
+        benefitDescription)
+        
+    -- For resource gains, make it even more visually clear
+    if actionToExecute.effect:find("addResource") and actionToExecute.options and actionToExecute.options.resource then
+        local gainedResource = actionToExecute.options.resource:sub(1, 1):upper() .. actionToExecute.options.resource:sub(2)
+        local gainedAmount = actionToExecute.options.amount or 1
+        questionString = string.format("Pay %d %s to gain %d %s", 
+            costAmount, 
+            costResource:sub(1, 1):upper() .. costResource:sub(2),
+            gainedAmount,
+            gainedResource)
+    end
+
+    -- Options to enhance the display
+    local displayOptions = {
+        showCard = true,        -- Show the card being activated
+        cardScale = 2.0,        -- Show at 200% scale
+        highlightEffect = true,  -- Highlight the effect text
+        sourceNode = sourceNode -- Include the node to display
+    }
 
     -- Create the callback function containing the logic to run *after* player chooses
-    local afterChoiceCallback = function(playerWhoAnswered, answer) -- Correctly accept both args
-        if answer then -- Use the 'answer' boolean passed as the second argument
+    local afterChoiceCallback = function(playerWhoAnswered, answer)
+        -- Handle payment agreement or decline
+        if answer then
             print(string.format("[Callback] Player %d agreed to pay %d %s.", playerWhoAnswered.id, costAmount, costResource))
-            -- Actually spend the resource
             if playerWhoAnswered:spendResource(costResource, costAmount) then
                 print(string.format("[Callback] Player %d paid %d %s. Executing original action '%s'...", playerWhoAnswered.id, costAmount, costResource, actionToExecute.effect))
-
-                -- Directly execute the original action that was behind the paywall
+                -- Execute the original paid action
                 CardEffects._executeSingleAction(actionToExecute.effect, actionToExecute.options, gameService, activatingPlayer, sourceNetwork, sourceNode)
-
             else
-                print(string.format("Warning: Failed to spend resource in _requestPaymentAndExecute callback for player %d even after initial check.", playerWhoAnswered.id))
+                print(string.format("Warning: Failed to spend resource for player %d after passing initial check.", playerWhoAnswered.id))
             end
         else
             print(string.format("[Callback] Player %d chose not to pay %d %s.", playerWhoAnswered.id, costAmount, costResource))
-            -- If player declined, do nothing further.
+        end
+        -- Continue with any remaining actions in the effect
+        for j = actionIndex + 1, #actionsList do
+            local nextAction = actionsList[j]
+            local cond = nextAction.condition
+            local eff = nextAction.effect
+            local opts = nextAction.options or {}
+            if not cond or evaluateCondition(cond, gameService, activatingPlayer, sourceNetwork, sourceNode) then
+                print(string.format("[Callback] Continuing action '%s' after payment step...", eff))
+                CardEffects._executeSingleAction(eff, opts, gameService, activatingPlayer, sourceNetwork, sourceNode)
+            else
+                print(string.format("[Callback] Skipping action '%s' due to failed condition.", eff))
+            end
+        end
+        -- After processing remaining actions, resume the activation chain if paused
+        if gameService.activationService and gameService.activationService.resumeActivation then
+            print("[Effect] Resuming activation chain after payment resolution...")
+            local status, resumeMsg = gameService.activationService:resumeActivation()
+            if resumeMsg then print(resumeMsg) end
         end
     end
 
-    -- Request the input from the player via GameService
-    gameService:requestPlayerYesNo(playerToAsk, questionString, afterChoiceCallback)
+    -- Request the input from the player via GameService, passing display options
+    gameService:requestPlayerYesNo(playerToAsk, questionString, afterChoiceCallback, displayOptions)
     print(string.format("[Effect] Requesting payment (%d %s) from player %d for action '%s'. Waiting for response...", costAmount, costResource, playerToAsk.id, actionToExecute.effect))
     -- Signal that we are now waiting for input
     return "waiting"
@@ -707,6 +771,8 @@ function CardEffects.createActivationEffect(config)
                         conditionConfig.resource, 
                         conditionConfig.amount or 1,
                         action, -- Pass the whole action table {condition=..., effect=..., options=...}
+                        i, -- Pass the index of the action in the actions list
+                        actions, -- Pass the entire actions list
                         gameService, activatingPlayer, sourceNetwork, sourceNode
                     )
                 else
