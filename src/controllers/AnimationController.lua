@@ -231,11 +231,8 @@ end
 function AnimationController:getAnimatingCardIds()
     local instanceIds = {}
     for _, anim in pairs(self.activeAnimations) do
-        -- Skip hand-specific animations for grid rendering
-        if anim.context ~= 'hand' then
-            -- Use the card's instanceId rather than its definition id
-            instanceIds[anim.card.instanceId] = true
-        end
+        -- Use the card's instanceId rather than its definition id
+        instanceIds[anim.card.instanceId] = true
     end
     return instanceIds
 end
