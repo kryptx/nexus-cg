@@ -436,36 +436,21 @@ local function _requestPaymentAndExecute(playerToAsk, costResource, costAmount, 
     local questionString = string.format("Pay %d %s?", costAmount, costResource:sub(1, 1):upper() .. costResource:sub(2))
 
     -- Create the callback function containing the logic to run *after* player chooses
-    local afterChoiceCallback = function(wantsToPay)
-        if wantsToPay then
-            -- Use the existing spendResource which includes the check and deduction
-            local spentSuccessfully = playerToAsk:spendResource(costResource, costAmount)
-            if spentSuccessfully then
-                -- Execute the *original* action's effect
-                print(string.format("[Callback] Player %d paid %d %s. Executing original action '%s'...", playerToAsk.id, costAmount, costResource, actionToExecute.effect))
-                
-                -- TEMPORARY: Create a mini-activation effect just for this one action
-                -- This reuses the existing effect execution logic without needing a massive switch statement here.
-                -- We pass the original context.
-                -- This avoids duplicating the entire effect execution logic inside this callback.
-                -- local tempEffectConfig = { actions = { actionToExecute } } -- Wrap the single action
-                -- local tempEffect = CardEffects.createActivationEffect(tempEffectConfig) 
-                
-                -- IMPORTANT: Activate the temporary effect. It should NOT have the paymentOffer condition anymore,
-                -- so it won't recurse infinitely. We pass nil for condition evaluation context if needed, 
-                -- but createActivationEffect handles the logic.
-                -- Need to ensure the temporary activation doesn't re-evaluate the payment condition.
-                -- Modify createActivationEffect to handle this possibility, or make a simpler direct execution helper.
+    local afterChoiceCallback = function(playerWhoAnswered, answer) -- Correctly accept both args
+        if answer then -- Use the 'answer' boolean passed as the second argument
+            print(string.format("[Callback] Player %d agreed to pay %d %s.", playerWhoAnswered.id, costAmount, costResource))
+            -- Actually spend the resource
+            if playerWhoAnswered:spendResource(costResource, costAmount) then
+                print(string.format("[Callback] Player %d paid %d %s. Executing original action '%s'...", playerWhoAnswered.id, costAmount, costResource, actionToExecute.effect))
 
-                -- Let's try a direct execution helper approach for simplicity first.
-                -- We need a function to map effect type/options directly to game actions.
+                -- Directly execute the original action that was behind the paywall
                 CardEffects._executeSingleAction(actionToExecute.effect, actionToExecute.options, gameService, activatingPlayer, sourceNetwork, sourceNode)
 
             else
-                print(string.format("Warning: Failed to spend resource in _requestPaymentAndExecute callback for player %d even after initial check.", playerToAsk.id))
+                print(string.format("Warning: Failed to spend resource in _requestPaymentAndExecute callback for player %d even after initial check.", playerWhoAnswered.id))
             end
         else
-            print(string.format("[Callback] Player %d chose not to pay %d %s.", playerToAsk.id, costAmount, costResource))
+            print(string.format("[Callback] Player %d chose not to pay %d %s.", playerWhoAnswered.id, costAmount, costResource))
             -- If player declined, do nothing further.
         end
     end

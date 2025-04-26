@@ -125,7 +125,6 @@ definitions["NODE_TECH_004"] = {
     definedPorts = {
         [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
         [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
-        [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
         [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
         [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
     },

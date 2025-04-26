@@ -57,7 +57,7 @@ NODE_RES_017,Deep Shaft Excavator,RESOURCE,,1,1,2,Gain 2 Material. If 1+ Resourc
 NODE_TECH_001,Basic Processing Unit,TECHNOLOGY,,4,0,0,Gain 1 Data. If 2+ nodes activated this chain: Gain 1 Energy.,Gain 1 Data.,No,No,Yes,Yes,No,No,Yes,No
 NODE_TECH_002,Advanced Processing Unit,TECHNOLOGY,,3,1,1,Gain 1 Data. If you pay 1 Energy: Gain 2 Data.,Owner and activator gain 1 Data.,No,No,Yes,Yes,No,Yes,No,No
 NODE_TECH_003,Applied Arts Workshop,TECHNOLOGY,,6,2,1,Gain 1 Material. If 2+ inputs connected: Gain 1 Data per Culture node in your network.,Gain 1 Data. Owner gains 1 Material.,Yes,Yes,No,Yes,No,Yes,Yes,No
-NODE_TECH_004,Automated Fabricator,TECHNOLOGY,,3,2,1,Gain 1 Material. If adjacent to 2+ empty cells: Gain 2 Material.,Gain 1 Material. If 2+ links attached: Owner gains 1 Energy.,No,No,Yes,Yes,Yes,No,Yes,Yes
+NODE_TECH_004,Automated Fabricator,TECHNOLOGY,,2,1,1,Gain 1 Material. If adjacent to 2+ empty cells: Gain 2 Material.,Gain 1 Material. If 2+ links attached: Owner gains 1 Energy.,No,No,Yes,Yes,No,No,Yes,Yes
 NODE_TECH_005,Geothermal Tap,TECHNOLOGY,,4,3,1,Gain 1 Energy. If adjacent to 1+ Resource nodes: Gain 1 Energy per Resource node in your network.,Gain 1 Energy. If 3+ nodes activated this chain: Owner gains 1 VP.,No,No,Yes,No,No,No,Yes,Yes
 NODE_TECH_006,Digital Art Synthesizer,TECHNOLOGY,,2,3,0,Draw 1 card. If adjacent to 1+ Culture nodes: Gain 1 VP.,If 1+ Culture nodes activated this chain: Draw 2 cards.,Yes,Yes,Yes,Yes,No,No,No,No
 NODE_TECH_007,Quantum Simulation Lab,TECHNOLOGY,,1,1,1,If you pay 2 Data: Draw 2 cards.,Gain 1 Data. If 1+ inputs connected: Owner gains 1 VP.,No,No,Yes,Yes,Yes,Yes,No,No
