@@ -508,4 +508,111 @@ definitions["NODE_CULT_014"] = {
   vpValue = 1, imagePath = "assets/images/cultural-artifact-factory.png", flavorText = "Reproducing the symbols of a lost era.",
   definedPorts = { [CardPorts.BOTTOM_LEFT] = true, [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.RIGHT_BOTTOM] = true }, -- Cult In, Tech Out, Res Out
 }
+
+-- Adding four new culture cards to reach 18 and improve port balance
+
+definitions["NODE_CULT_015"] = {
+  id = "NODE_CULT_015",
+  title = "Interactive Mural",
+  type = CardTypes.CULTURE,
+  resourceRatio = { material = 1, data = 1 },
+  activationEffect = CardEffects.createActivationEffect({
+      actions = {
+          { effect = "drawCardsForOwner", options = { amount = 1 } },
+      }
+  }),
+  convergenceEffect = CardEffects.createConvergenceEffect({
+      actions = {
+          { effect = "gainVPForActivator", options = { amount = 1 } },
+      }
+  }),
+  vpValue = 0,
+  imagePath = "assets/images/interactive-mural.png",
+  flavorText = "Art that responds to its audience.",
+  definedPorts = {
+      [CardPorts.TOP_LEFT] = true,      -- Culture Output
+      [CardPorts.BOTTOM_LEFT] = true,   -- Culture Input
+      [CardPorts.LEFT_TOP] = true,      -- Knowledge Output
+      [CardPorts.BOTTOM_RIGHT] = true,  -- Technology Output
+  },
+}
+
+definitions["NODE_CULT_016"] = {
+  id = "NODE_CULT_016",
+  title = "Cultural Symposium",
+  type = CardTypes.CULTURE,
+  resourceRatio = { material = 2, data = 1 },
+  activationEffect = CardEffects.createActivationEffect({
+      actions = {
+          { effect = "gainVPForOwner", options = { amount = 1 } },
+      }
+  }),
+  convergenceEffect = CardEffects.createConvergenceEffect({
+      actions = {
+          { effect = "drawCardsForActivator", options = { amount = 1 } },
+      }
+  }),
+  vpValue = 1,
+  imagePath = "assets/images/cultural-symposium.png",
+  flavorText = "Ideas converge to forge new paths.",
+  definedPorts = {
+      [CardPorts.TOP_LEFT] = true,      -- Culture Output
+      [CardPorts.BOTTOM_LEFT] = true,   -- Culture Input
+      [CardPorts.LEFT_TOP] = true,      -- Knowledge Output
+      [CardPorts.BOTTOM_RIGHT] = true,  -- Technology Output
+  },
+}
+
+definitions["NODE_CULT_017"] = {
+  id = "NODE_CULT_017",
+  title = "Virtual Coliseum",
+  type = CardTypes.CULTURE,
+  resourceRatio = { material = 1, data = 2 },
+  activationEffect = CardEffects.createActivationEffect({
+      actions = {
+          { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
+      }
+  }),
+  convergenceEffect = CardEffects.createConvergenceEffect({
+      actions = {
+          { effect = "gainVPForActivator", options = { amount = 1 } },
+      }
+  }),
+  vpValue = 0,
+  imagePath = "assets/images/virtual-coliseum.png",
+  flavorText = "Spectacles that transcend space-time.",
+  definedPorts = {
+      [CardPorts.TOP_LEFT] = true,
+      [CardPorts.BOTTOM_LEFT] = true,
+      [CardPorts.LEFT_TOP] = true,
+      [CardPorts.BOTTOM_RIGHT] = true,
+  },
+}
+
+definitions["NODE_CULT_018"] = {
+  id = "NODE_CULT_018",
+  title = "Cultural Archive",
+  type = CardTypes.CULTURE,
+  resourceRatio = { material = 1, data = 3 },
+  activationEffect = CardEffects.createActivationEffect({
+      actions = {
+          { effect = "drawCardsForOwner", options = { amount = 2 } },
+      }
+  }),
+  convergenceEffect = CardEffects.createConvergenceEffect({
+      actions = {
+          { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
+      }
+  }),
+  vpValue = 1,
+  imagePath = "assets/images/cultural-archive.png",
+  flavorText = "Preserving the echoes of civilization.",
+  definedPorts = {
+      [CardPorts.TOP_LEFT] = true,
+      [CardPorts.BOTTOM_LEFT] = true,
+      [CardPorts.LEFT_TOP] = true,
+      [CardPorts.BOTTOM_RIGHT] = true,
+  },
+}
+
 return definitions 

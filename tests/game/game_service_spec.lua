@@ -392,7 +392,14 @@ describe("GameService Module", function()
             mockPlayer1.hand = { 
                 createMockCard("H1", "H1"), 
                 createMockCard("H2", "H2"), 
-                createMockCard("H3", "H3") 
+                createMockCard("H3", "H3"),
+                createMockCard("H4", "H4"),
+                createMockCard("H5", "H5"),
+                createMockCard("H6", "H6"),
+                createMockCard("H7", "H7"),
+                createMockCard("H8", "H8"),
+                createMockCard("H9", "H9"),
+                createMockCard("H10", "H10")
             }
             assert.are.equal(require('src.game.rules').MIN_HAND_SIZE, #mockPlayer1.hand, "Pre-condition: Hand size should be MIN_HAND_SIZE")
              -- service.currentPhase is set in before_each (CONVERGE)

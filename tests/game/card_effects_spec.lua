@@ -29,7 +29,7 @@ describe("CardEffects.generateEffectDescription", function()
                 { effect = "gainVPForActivator", options = { amount = 2 } }
             }
         }
-        assert.are.equal("Activator gains 2 VP.", CardEffects.generateEffectDescription(config))
+        assert.are.equal("Gain 2 VP.", CardEffects.generateEffectDescription(config))
     end)
 
     it("should format multiple actions without conditions correctly", function()
@@ -40,7 +40,7 @@ describe("CardEffects.generateEffectDescription", function()
             }
         }
         -- Each gets its own period as they are separate blocks
-        assert.are.equal("Activator gains 1 VP. Owner draws 3 cards.", CardEffects.generateEffectDescription(config))
+        assert.are.equal("Gain 1 VP. Owner draws 3 cards.", CardEffects.generateEffectDescription(config))
     end)
 
     it("should format a single action with a condition correctly", function()
@@ -53,7 +53,7 @@ describe("CardEffects.generateEffectDescription", function()
                 }
             }
         }
-        assert.are.equal("If 1+ links attached: Activator gains 1 VP.", CardEffects.generateEffectDescription(config))
+        assert.are.equal("If 1+ links attached: Gain 1 VP.", CardEffects.generateEffectDescription(config))
     end)
 
     it("should group multiple actions with the same condition using semicolons", function()
@@ -71,7 +71,7 @@ describe("CardEffects.generateEffectDescription", function()
                 }
             }
         }
-        assert.are.equal("If 1+ links attached: Activator gains 1 VP; Activator draws 2 cards.", CardEffects.generateEffectDescription(config))
+        assert.are.equal("If 1+ links attached: Gain 1 VP; Draw 2 cards.", CardEffects.generateEffectDescription(config))
     end)
     
     it("should handle multiple actions with different conditions", function()
@@ -89,7 +89,7 @@ describe("CardEffects.generateEffectDescription", function()
                 }
             }
         }
-        assert.are.equal("If 1+ links attached: Activator gains 1 VP. If adjacent to 2+ Data nodes: Activator draws 2 cards.", CardEffects.generateEffectDescription(config))
+        assert.are.equal("If 1+ links attached: Gain 1 VP. If adjacent to 2+ Data: Draw 2 cards.", CardEffects.generateEffectDescription(config))
     end)
 
     it("should correctly format mixed conditional and non-conditional actions", function()
@@ -120,7 +120,7 @@ describe("CardEffects.generateEffectDescription", function()
                 }
             }
         }
-        local expected = "If 1+ links attached: Activator gains 1 VP; Owner draws 1 card. Owner and activator gain 5 Energy. If adjacent to 1+ Factory nodes: Activator draws 2 cards. Owner gains 10 VP."
+        local expected = "If 1+ links attached: Gain 1 VP; Owner draws 1 card. Owner and activator gain 5 Energy. If adjacent to 1+ Factory: Draw 2 cards. Owner gains 10 VP."
         assert.are.equal(expected, CardEffects.generateEffectDescription(config))
     end)
     
@@ -152,12 +152,12 @@ describe("CardEffects.generateEffectDescription", function()
             }
         }
         -- Both actions share the same condition, so they should be joined by a semicolon.
-        local expected = "If Activator pays 2 Data: Activator gains 3 VP; Activator draws 1 card."
+        local expected = "If Activator pays 2 Data: Gain 3 VP; Draw 1 card."
         -- Let's use the actual effect names for clarity during refactoring, then fix if needed
         assert.are.equal(expected, CardEffects.generateEffectDescription(config))
 
         -- Refined expectation with generated descriptions:
-        local refined_expected = "If Activator pays 2 Data: Activator gains 3 VP; Activator draws 1 card."
+        local refined_expected = "If Activator pays 2 Data: Gain 3 VP; Draw 1 card."
         assert.are.equal(refined_expected, CardEffects.generateEffectDescription(config))
     end)
 
@@ -225,7 +225,7 @@ describe("CardEffects.generateEffectDescription", function()
                 } 
             }
         }
-        assert.are.equal("If condition met: Activator gains 1 VP.", CardEffects.generateEffectDescription(config))
+        assert.are.equal("If condition met: Gain 1 VP.", CardEffects.generateEffectDescription(config))
         assert.are.equal(1, #print_calls)
         assert.match("Warning: Unknown condition type 'unknownCondition' for description.", print_calls[1], 1, true)
     end)
@@ -256,7 +256,7 @@ describe("CardEffects.generateEffectDescription", function()
             }
         }
         -- Both actions share the same payment condition, should be joined by semicolon.
-        local expected = "If Owner pays 2 Data: Activator discards 2 random cards; Owner gains 1 VP."
+        local expected = "If Owner pays 2 Data: Discard 2 random cards; Owner gains 1 VP."
         assert.are.equal(expected, CardEffects.generateEffectDescription(config))
     end)
 
