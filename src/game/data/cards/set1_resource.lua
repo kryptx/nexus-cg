@@ -18,9 +18,9 @@ definitions["NODE_RES_001"] = {
       actions = {
           { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } },
           { condition = { type = "adjacency", nodeType = CardTypes.TECHNOLOGY, count = 1 },
-            effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 2 } }
+            effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } }
       }
-      -- Description: "Owner gains 2 Material. If adjacent to 1+ Technology node(s): Owner gains 2 Energy."
+      -- Description: "You gain 2 Material. If adjacent to 1+ Technology node(s): You gain 2 Energy."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = { { effect = "addResourceToBoth", options = { resource = ResourceType.MATERIAL, amount = 1 } } }

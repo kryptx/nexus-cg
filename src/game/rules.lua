@@ -8,8 +8,8 @@ Rules.__index = Rules
 local Card = require('src.game.card')
 
 -- Constants - these could be adjusted for balance
-Rules.DEFAULT_HAND_LIMIT = 5
-Rules.MIN_HAND_SIZE = 3
+Rules.DEFAULT_HAND_LIMIT = 20
+Rules.MIN_HAND_SIZE = 10
 Rules.VICTORY_POINT_TARGET = 25
 
 -- Constructor

@@ -37,7 +37,7 @@ NODE_KNOW_017,Educational Network,KNOWLEDGE,,1,1,0,All players gain 1 Data. If 3
 NODE_KNOW_018,Centralized Knowledge Bank,KNOWLEDGE,,1,1,1,If you pay 3 Data: Gain 1 VP. If 3+ Knowledge nodes activated this chain: Draw 2 cards.,Gain 1 Data. Draw 1 card. If 3+ nodes activated this chain: Gain 2 Data.,No,No,No,No,Yes,Yes,Yes,No
 NODE_KNOW_019,Geological Data Analysis,KNOWLEDGE,,1,1,0,If you pay 1 Data: Gain 1 Material. If 1+ Resource nodes activated this chain: Draw 1 card.,Gain 1 Data. If adjacent to 1+ Resource nodes: Owner gains 1 Material; Gain 1 Data.,No,No,No,No,Yes,Yes,No,Yes
 NODE_KNOW_020,Logistics Coordination AI,KNOWLEDGE,,3,3,0,Gain 1 Data. If 3+ nodes activated this chain: Gain 1 Material per Resource node in your network.,Gain 1 Material. Owner gains 1 Data. If 2+ links attached: Owner draws 1 card.,No,No,No,No,Yes,No,Yes,Yes
-NODE_RES_001,Materials Depot,RESOURCE,,7,0,0,Gain 2 Material. If adjacent to 1+ Technology nodes: Gain 2 Energy.,Owner and activator gain 1 Material.,No,No,Yes,No,No,No,Yes,Yes
+NODE_RES_001,Materials Depot,RESOURCE,,6,0,0,Gain 2 Material. If adjacent to 1+ Technology nodes: Gain 2 Material.,Owner and activator gain 1 Material.,No,No,Yes,No,No,No,Yes,Yes
 NODE_RES_002,Automated Drill Site,RESOURCE,,3,1,1,Gain 1 Material. If you pay 1 Energy: Draw 1 card.,Gain 1 Material.,No,No,Yes,No,Yes,No,Yes,Yes
 NODE_RES_003,Monument Construction Site,RESOURCE,,7,0,2,Gain 1 Material. If 2+ Culture nodes activated this chain: Gain 1 VP.,Gain 1 VP. Owner gains 1 Material.,No,Yes,Yes,No,Yes,No,Yes,Yes
 NODE_RES_004,Reclamation Art Project,RESOURCE,,2,1,1,Gain 1 Material. If adjacent to 1+ Culture nodes: Draw 1 card.,Gain 1 VP. Owner gains 1 Material.,Yes,Yes,No,No,No,No,Yes,Yes
