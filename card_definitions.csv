@@ -20,7 +20,7 @@ NODE_CULT_018,Cultural Archive,CULTURE,,1,3,1,Draw 2 cards.,Gain 1 Data.,Yes,Yes
 NODE_GENESIS_CULT_001,Nascent Meme,CULTURE,true,2,0,0,Gain 1 Material.,Gain 1 Data.,Yes,Yes,Yes,No,No,Yes,No,Yes
 NODE_GENESIS_KNOW_001,Seed Thought,KNOWLEDGE,true,2,0,0,Gain 1 Material.,Draw 1 card.,Yes,Yes,No,No,Yes,Yes,Yes,No
 NODE_GENESIS_RES_001,First Spark,RESOURCE,true,2,0,0,Gain 1 Material.,Gain 1 Material.,No,No,Yes,Yes,Yes,No,Yes,Yes
-NODE_GENESIS_TECH_001,Initial Circuit,TECHNOLOGY,true,2,0,0,Gain 1 Material.,Gain 1 Data.,Yes,Yes,No,Yes,No,Yes,No,Yes
+NODE_GENESIS_TECH_001,Initial Circuit,TECHNOLOGY,true,2,0,0,Gain 1 Material.,Gain 1 Data.,Yes,Yes,No,Yes,Yes,Yes,No,No
 NODE_KNOW_001,Data Relay,KNOWLEDGE,,1,1,0,Gain 1 Data.,Gain 1 Data. If 2+ nodes activated this chain: Draw 1 card.,No,No,No,No,Yes,Yes,Yes,No
 NODE_KNOW_002,Materials Analysis Lab,KNOWLEDGE,,1,1,1,Gain 1 Data. If 2+ inputs connected: Draw 1 card.,Gain 1 Data. If adjacent to 1+ Resource: Gain 1 Data per Knowledge in the owner's network.,No,No,Yes,Yes,Yes,No,Yes,Yes
 NODE_KNOW_003,Historical Archive,KNOWLEDGE,,3,0,1,Discard 1 random card. If you pay 1 Data: Draw 2 cards.,Gain 2 Data. Owner gains 1 VP.,Yes,Yes,No,No,Yes,Yes,Yes,No

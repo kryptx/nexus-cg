@@ -57,7 +57,7 @@ definitions["NODE_GENESIS_TECH_001"] = {
       [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output (Reactor Edge)
       [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output (Top Edge)
       [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output (Left Edge)
-      [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output (Right Edge)
+      [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input (Right Edge)
   },
   art = nil,
   flavorText = "The first connection flickers to life.",
