@@ -195,13 +195,13 @@ local function calculateActionContribution(action, isActivationEffect, convergen
         -- Dynamic per-node resource effect: static ME cost based on resource type
         local dynamicAmount = amount or 1
         if resource == ResourceType.MATERIAL then
-            baseME = 2.0 * dynamicAmount
-        elseif resource == ResourceType.DATA then
             baseME = 4.0 * dynamicAmount
+        elseif resource == ResourceType.DATA then
+            baseME = 8.0 * dynamicAmount
         elseif resource == ResourceType.ENERGY or resource == "vp" then
-            baseME = 6.0 * dynamicAmount
+            baseME = 12.0 * dynamicAmount
         else
-            baseME = 6.0 * dynamicAmount -- fallback for unexpected resource types
+            baseME = 12.0 * dynamicAmount -- fallback for unexpected resource types
         end
         -- set target context for dynamic effect
         target = (effectType == "gainResourcePerNodeOwner") and "owner" or "activator"
