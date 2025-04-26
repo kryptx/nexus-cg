@@ -448,7 +448,14 @@ function Renderer:drawCardPorts(card, sx, sy, alphaOverride, activeLinks)
     alphaOverride = alphaOverride or 1.0
     activeLinks = activeLinks or {}
     if not card then return end
-
+    -- Determine static vs dynamic overlay mode
+    local isDynamic = (#activeLinks > 0)
+    local sf = self.canvasRenderScaleFactor or 1
+    local invSf = 1 / sf
+    local coordScale = isDynamic and invSf or 1
+    -- Scale port radius accordingly
+    local r = self.PORT_RADIUS * coordScale
+    -- Build a map of active link IDs
     local linkMap = {}
     for _, link in ipairs(activeLinks) do
         linkMap[link.linkId] = link
@@ -456,17 +463,16 @@ function Renderer:drawCardPorts(card, sx, sy, alphaOverride, activeLinks)
 
     local originalFont = love.graphics.getFont()
     local originalColor = {love.graphics.getColor()}
-    local r = self.PORT_RADIUS -- Use instance variable
 
     for portIndex = 1, 8 do
         local info = getPortInfo(portIndex)
         if info then
-            local portX = sx + info.x_offset
-            local portY = sy + info.y_offset
+            local portX = sx + info.x_offset * coordScale
+            local portY = sy + info.y_offset * coordScale
             local isOutput = info.is_output
             local isDefined = card:isPortDefined(portIndex)
             local occupyingLinkId = card:getOccupyingLinkId(portIndex)
-            local isOccupied = occupyingLinkId ~= nil
+            local isOccupied = occupyingLinkId ~= nil and linkMap[occupyingLinkId] ~= nil
 
             local orientation
             if portIndex == Card.Ports.TOP_LEFT or portIndex == Card.Ports.TOP_RIGHT then orientation = "top"
@@ -476,8 +482,10 @@ function Renderer:drawCardPorts(card, sx, sy, alphaOverride, activeLinks)
             end
 
             if isOccupied then
-                -- 1. Draw original shape underneath (dimmed)
-                self:_drawSinglePortShape(portIndex, portX, portY, r, alphaOverride * 0.4)
+                -- In static mode skip overlay; in dynamic only draw tab over baked ports
+                if not isDynamic then
+                    self:_drawSinglePortShape(portIndex, portX, portY, r, alphaOverride * 0.4)
+                end
 
                 -- 2. Draw the larger tab centered on the visual center
                 local linkDetails = linkMap[occupyingLinkId]
@@ -535,9 +543,9 @@ function Renderer:drawCardPorts(card, sx, sy, alphaOverride, activeLinks)
                 love.graphics.print(text, 0, 0)
                 love.graphics.pop()
 
-            elseif isDefined then
-                -- Draw normal present port using the helper
-                 self:_drawSinglePortShape(portIndex, portX, portY, r, alphaOverride)
+            elseif not isDynamic and isDefined then
+                -- Draw static ports only in static mode
+                self:_drawSinglePortShape(portIndex, portX, portY, r, alphaOverride)
 
             end
         end
@@ -886,8 +894,6 @@ function Renderer:_drawCardInternal(card, x, y, context)
     self:_drawTextScaled(convergenceText, x + margin + effectPadding, convergenceTextY, effectsLimit, "left", convergenceStyleName, effectBaseFontSize, targetScale_effect, alphaOverride)
 
     love.graphics.setColor(originalColor) -- Restore original color after drawing text blocks
-    -- Draw Connection Ports
-    self:drawCardPorts(card, x, y, alphaOverride, context.activeLinks)
 end
 
 -- Internal utility function to draw a single card in the world
@@ -927,6 +933,12 @@ function Renderer:_drawSingleCardInWorld(card, wx, wy, activeLinks, alphaOverrid
         -- Position at bottom-left inside card
         love.graphics.print("Tokens: " .. card.tokens, wx + 5, wy + self.CARD_HEIGHT - 15)
         love.graphics.setFont(fontOld)
+    end
+
+    -- Draw convergence link indicators on each connected port
+    if activeLinks and #activeLinks > 0 then
+        -- Pass content origin directly for world-based port drawing
+        self:drawCardPorts(card, wx, wy, alphaOverride, activeLinks)
     end
 
     -- Restore original color state
@@ -1081,48 +1093,43 @@ function Renderer:drawHand(player, selectedIndex, animatingCardIds)
 
     -- Draw selected card last (raised and highlighted)
     if selectedIndex then
-        local card = player.hand[selectedIndex]
-        if card and not animatingCardIds[card.instanceId] then
-            local i = selectedIndex
-            local sx = HAND_START_X + (i-1) * (HAND_CARD_WIDTH + HAND_SPACING)
-            local sy = handStartY - SELECTED_CARD_RAISE -- Raised position
-            local boundsFound = false
-            for k, b in ipairs(handBounds) do
-                if b.index == i then
-                    -- Update existing bounds y to original position for click detection
-                    b.y = handStartY
-                    boundsFound = true
-                    break
-                end
+        local i = selectedIndex
+        local card = player.hand[i]
+        local sx = HAND_START_X + (i-1) * (HAND_CARD_WIDTH + HAND_SPACING)
+        -- Update or insert bounds for selected card at original position
+        local boundsFound = false
+        for k, b in ipairs(handBounds) do
+            if b.index == i then
+                b.y = handStartY
+                boundsFound = true
+                break
             end
-            if not boundsFound then
-                -- Insert bounds at original y if it wasn't drawn in the first loop (shouldn't happen)
-                table.insert(handBounds, { index = i, x = sx, y = handStartY, w = HAND_CARD_WIDTH, h = HAND_CARD_HEIGHT })
-            end
+        end
+        if not boundsFound then
+            table.insert(handBounds, { index = i, x = sx, y = handStartY, w = HAND_CARD_WIDTH, h = HAND_CARD_HEIGHT })
+        end
 
-            -- Draw selected card canvas scaled and raised
-            local canvas = self:_generateCardCanvas(card)
-            local borderPadding = self.PORT_RADIUS -- Original units
-            local drawScale = HAND_CARD_SCALE * invSf
+        -- Only draw selected card if not currently animating
+        if card and not animatingCardIds[card.instanceId] then
             local raisedY = handStartY - SELECTED_CARD_RAISE
+            local canvas = self:_generateCardCanvas(card)
+            local borderPadding = self.PORT_RADIUS
+            local drawScale = HAND_CARD_SCALE * invSf
             local drawPosX = sx - borderPadding * drawScale
             local drawPosY = raisedY - borderPadding * drawScale
             love.graphics.setColor(1, 1, 1, 1)
             love.graphics.draw(canvas, drawPosX, drawPosY, 0, drawScale, drawScale)
 
             -- Draw highlight border
-            -- Corrected Highlight Border Calculation:
-            -- Get the actual dimensions of the drawn canvas image
             local canvasDrawW = canvas:getWidth() * drawScale
             local canvasDrawH = canvas:getHeight() * drawScale
-            local cornerRadius = 2 * drawScale -- Keep scaled corner radius
-
+            local cornerRadius = 2 * drawScale
             love.graphics.setLineWidth(3 * drawScale)
-            love.graphics.setColor(0, 0, 0, 1) -- Black color
+            love.graphics.setColor(0, 0, 0, 1)
             love.graphics.rectangle("line",
-                drawPosX, drawPosY, -- Use the actual canvas draw position (top-left corner)
-                canvasDrawW,      -- Use the actual canvas draw width
-                canvasDrawH,      -- Use the actual canvas draw height
+                drawPosX, drawPosY,
+                canvasDrawW,
+                canvasDrawH,
                 cornerRadius, cornerRadius)
         end
     end

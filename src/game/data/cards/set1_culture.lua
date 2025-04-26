@@ -225,7 +225,7 @@ definitions["NODE_CULT_006"] = {
           { effect = "drawCardsForOwner", options = { amount = 2 } },
           { 
               condition = { type = "activationChainLength", count = 2 },
-              effect = "forceDiscardCardsOwner", 
+              effect = "forceDiscardRandomCardsOwner", 
               options = { amount = 1 }
           }
       }
@@ -236,7 +236,7 @@ definitions["NODE_CULT_006"] = {
            { effect = "drawCardsForActivator", options = { amount = 1 } },
            { 
                condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.DATA, amount = 1 },
-               effect = "forceDiscardCardsOwner", 
+               effect = "forceDiscardRandomCardsOwner", 
                options = { amount = 1 }
            },
            { 
@@ -364,9 +364,10 @@ definitions["NODE_CULT_010"] = {
   resourceRatio = { material = 2, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = { 
-          { effect = "stealResource", options = { resource = ResourceType.MATERIAL, amount = 1 } }
+          { condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.DATA, amount = 1 },
+            effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } }
       }
-      -- Description: "Activator steals 1 Material from the owner."
+      -- Description: "If Owner pays 1 Data: Owner gains 2 Material."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
@@ -421,7 +422,7 @@ definitions["NODE_CULT_012"] = {
       actions = {
           {
             condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.DATA, amount = 2 },
-            effect = "forceDiscardCardsActivator", 
+            effect = "forceDiscardRandomCardsActivator", 
             options = { amount = 2 } 
           },
           { 
@@ -437,7 +438,7 @@ definitions["NODE_CULT_012"] = {
            { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
            { 
                condition = { type = "convergenceLinks", count = 1 },
-               effect = "forceDiscardCardsOwner", 
+               effect = "forceDiscardRandomCardsOwner", 
                options = { amount = 1 }
            }
       }
@@ -483,15 +484,15 @@ definitions["NODE_CULT_014"] = {
   id = "NODE_CULT_014", title = "Cultural Artifact Factory", type = CardTypes.CULTURE,
   resourceRatio = { material = 3, data = 2 },
   activationEffect = CardEffects.createActivationEffect({
-      actions = { 
+      actions = {
           { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
-          { 
-              condition = { type = "satisfiedInputs", count = 2 },
-              effect = "gainResourcePerNodeOwner", 
-              options = { resource = ResourceType.MATERIAL, nodeType = CardTypes.CULTURE, amount = 1 }
+          {
+              condition = { type = "adjacency", nodeType = CardTypes.CULTURE, count = 2 },
+              effect = "drawCardsForOwner",
+              options = { amount = 1 }
           }
       }
-      -- Description: "Owner gains 1 Material. If 2+ input ports are connected: Owner gains 1 Material per Culture node in their network."
+      -- Description: "Owner gains 1 Material. If adjacent to 2+ Culture nodes: Owner draws 1 card."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {

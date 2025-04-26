@@ -24,11 +24,7 @@ local function generateResourceDescription(actionEffect, resource, amount, conte
     -- For convergence effects, only activator uses imperative
     if context then
         if context.effectType == "activation" then
-            if actionEffect:find("Owner") or actionEffect:find("Activator") then
-                isImperative = true
-            end
-        elseif context.effectType == "convergence" then
-            if actionEffect:find("Activator") then
+            if actionEffect:find("Owner") then
                 isImperative = true
             end
         end
@@ -41,11 +37,7 @@ local function generateResourceDescription(actionEffect, resource, amount, conte
             return string.format("Owner gains %d %s", amount, resourceName)
         end
     elseif actionEffect == "addResourceToActivator" then
-        if isImperative then
-            return string.format("Gain %d %s", amount, resourceName)
-        else
-            return string.format("Activator gains %d %s", amount, resourceName)
-        end
+        return string.format("Gain %d %s", amount, resourceName)
     elseif actionEffect == "addResourceToBoth" then
         if isImperative then
             return string.format("You and the %s gain %d %s", 
@@ -65,18 +57,9 @@ local function generateResourceDescription(actionEffect, resource, amount, conte
          end
     elseif actionEffect == "gainResourcePerNodeActivator" then
          local nodeType = "Any" -- Placeholder
-         if isImperative then
-             return string.format("Gain %d %s per %s node...", amount, resourceName, nodeType)
-         else
-             return string.format("Activator gains %d %s per %s node...", amount, resourceName, nodeType)
-         end
+         return string.format("Gain %d %s per %s node...", amount, resourceName, nodeType)
     elseif actionEffect == "stealResource" then
-        if isImperative then
-            return string.format("Steal %d %s from the %s", 
-                amount, resourceName, context.effectType == "activation" and "activator" or "owner")
-        else
-            return string.format("Activator steals %d %s from the owner.", amount, resourceName)
-        end
+        return string.format("Steal %d %s from the owner", amount, resourceName)
     end
     
     -- Return a generic description if no match, let generateOtherDescription handle specifics
@@ -92,22 +75,14 @@ local function generateOtherDescription(actionEffect, options, context)
     -- For convergence effects, only activator uses imperative
     if context then
         if context.effectType == "activation" then
-            if actionEffect:find("Owner") or actionEffect:find("Activator") then
-                isImperative = true
-            end
-        elseif context.effectType == "convergence" then
-            if actionEffect:find("Activator") then
+            if actionEffect:find("Owner") then
                 isImperative = true
             end
         end
     end
 
     if actionEffect == "drawCardsForActivator" then
-        if isImperative then
             return string.format("Draw %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
-        else
-            return string.format("Activator draws %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
-        end
     elseif actionEffect == "drawCardsForOwner" then
         if isImperative and context and context.effectType == "activation" then
             return string.format("Draw %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
@@ -117,11 +92,7 @@ local function generateOtherDescription(actionEffect, options, context)
     elseif actionEffect == "drawCardsForAllPlayers" then
         return string.format("All players draw %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
     elseif actionEffect == "gainVPForActivator" then
-        if isImperative and context and context.effectType == "convergence" then
-            return string.format("Gain %d VP", options.amount or 1)
-        else
-            return string.format("Activator gains %d VP", options.amount or 1)
-        end
+        return string.format("Gain %d VP", options.amount or 1)
     elseif actionEffect == "gainVPForOwner" then
         if isImperative and context and context.effectType == "activation" then
             return string.format("Gain %d VP", options.amount or 1)
@@ -129,38 +100,21 @@ local function generateOtherDescription(actionEffect, options, context)
             return string.format("Owner gains %d VP", options.amount or 1)
         end
     elseif actionEffect == "gainVPForBoth" then
-        if isImperative then
-            return string.format("You and the %s gain %d VP", 
-                context.effectType == "activation" and "activator" or "owner",
-                options.amount or 1)
-        else
-            return string.format("Owner and Activator gain %d VP", options.amount or 1)
-        end
-    elseif actionEffect == "forceDiscardCardsOwner" then
+        return string.format("You and the owner gain %d VP", options.amount or 1)
+    elseif actionEffect == "forceDiscardRandomCardsOwner" then
         if isImperative and context and context.effectType == "activation" then
-            return string.format("Discard %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
+            return string.format("Discard %d random card%s", options.amount or 1, options.amount == 1 and "" or "s")
         else
-            return string.format("Owner discards %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
+            return string.format("Owner discards %d random card%s", options.amount or 1, options.amount == 1 and "" or "s")
         end
-    elseif actionEffect == "forceDiscardCardsActivator" then
-        if isImperative and context and context.effectType == "convergence" then
-            return string.format("Discard %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
-        else
-            return string.format("Activator discards %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
-        end
+    elseif actionEffect == "forceDiscardRandomCardsActivator" then
+        return string.format("Discard %d random card%s", options.amount or 1, options.amount == 1 and "" or "s")
     elseif actionEffect == "destroyRandomLinkOnNode" then
         return "Destroy a random convergence link on this node"
     -- === Refined Resource Descriptions handled here now ===
     elseif actionEffect == "stealResource" then
         local resourceName = options.resource:sub(1, 1):upper() .. options.resource:sub(2)
-        if isImperative then
-            return string.format("Steal %d %s from the %s", 
-                options.amount or 1, 
-                resourceName, 
-                context.effectType == "activation" and "activator" or "owner")
-        else
-            return string.format("Activator steals %d %s from the owner", options.amount or 1, resourceName)
-        end
+        return string.format("Steal %d %s from the owner", options.amount or 1, resourceName)
     elseif actionEffect == "gainResourcePerNodeOwner" then
          local resourceName = options.resource:sub(1, 1):upper() .. options.resource:sub(2)
          local nodeType = options.nodeType or "Any" 
@@ -172,20 +126,12 @@ local function generateOtherDescription(actionEffect, options, context)
     elseif actionEffect == "gainResourcePerNodeActivator" then
          local resourceName = options.resource:sub(1, 1):upper() .. options.resource:sub(2)
          local nodeType = options.nodeType or "Any"
-         if isImperative and context and context.effectType == "convergence" then
-             return string.format("Gain %d %s per %s node in the owner's network", options.amount or 1, resourceName, nodeType)
-         else
-             return string.format("Activator gains %d %s per %s node in the owner's network", options.amount or 1, resourceName, nodeType)
-         end
+         return string.format("Gain %d %s per %s node in the owner's network", options.amount or 1, resourceName, nodeType)
     -- === NEW EFFECT DESCRIPTIONS ===
     elseif actionEffect == "activatorStealResourceFromChainOwners" then
          local resourceName = options.resource and (options.resource:sub(1, 1):upper() .. options.resource:sub(2)) or "Resource"
          local amount = options.amount or 1
-         if isImperative and context and context.effectType == "convergence" then
-             return string.format("Steal %d %s from each owner of nodes activated this chain", amount, resourceName)
-         else
-             return string.format("Activator steals %d %s from each owner of nodes activated this chain", amount, resourceName)
-         end
+         return string.format("Steal %d %s from each owner of nodes activated this chain", amount, resourceName)
     elseif actionEffect == "ownerStealResourceFromChainOwners" then
          local resourceName = options.resource and (options.resource:sub(1, 1):upper() .. options.resource:sub(2)) or "Resource"
          local amount = options.amount or 1
@@ -623,10 +569,10 @@ function CardEffects._executeSingleAction(effectType, options, gameService, acti
         local amount = options.amount or 1
         if activatingPlayer and gameService.awardVP then gameService:awardVP(activatingPlayer, amount) else print("Warning: gameService:awardVP not found or activatingPlayer missing!") end
         if owner and gameService.awardVP then gameService:awardVP(owner, amount) else print("Warning: gameService:awardVP not found or owner missing!") end
-    elseif effectType == "forceDiscardCardsOwner" then
+    elseif effectType == "forceDiscardRandomCardsOwner" then
         local amount = options.amount or 1
         if owner and gameService.forcePlayerDiscard then gameService:forcePlayerDiscard(owner, amount) else print("Warning: gameService:forcePlayerDiscard not found or owner missing!") end
-    elseif effectType == "forceDiscardCardsActivator" then
+    elseif effectType == "forceDiscardRandomCardsActivator" then
         local amount = options.amount or 1
         if activatingPlayer and gameService.forcePlayerDiscard then gameService:forcePlayerDiscard(activatingPlayer, amount) else print("Warning: gameService:forcePlayerDiscard not found or activatingPlayer missing!") end
     elseif effectType == "destroyRandomLinkOnNode" then

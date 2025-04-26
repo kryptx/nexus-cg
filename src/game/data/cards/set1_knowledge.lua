@@ -78,7 +78,7 @@ definitions["NODE_KNOW_003"] = {
   resourceRatio = { material = 1, data = 0 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
-          { effect = "forceDiscardCardsOwner", options = { amount = 1 } },
+          { effect = "forceDiscardRandomCardsOwner", options = { amount = 1 } },
           { condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.DATA, amount = 1 },
             effect = "drawCardsForOwner", options = { amount = 2 } }
       }
@@ -157,7 +157,7 @@ definitions["NODE_KNOW_005"] = {
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
            { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
-           { effect = "forceDiscardCardsActivator", options = { amount = 1 } },
+           { effect = "forceDiscardRandomCardsActivator", options = { amount = 1 } },
            { condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.DATA, amount = 1 },
              effect = "drawCardsForActivator", options = { amount = 2 } }
       }
@@ -196,7 +196,7 @@ definitions["NODE_KNOW_006"] = {
            { effect = "gainVPForActivator", options = { amount = 1 } },
            { 
              condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.DATA, amount = 1 },
-             effect = "forceDiscardCardsOwner", options = { amount = 1 } 
+             effect = "forceDiscardRandomCardsOwner", options = { amount = 1 } 
            }
       }
       -- Description: "Activator gains 1 VP. If Activator pays 1 Data: Owner discards 1 card."
@@ -345,7 +345,7 @@ definitions["NODE_KNOW_010"] = {
           },
           { 
             condition = { type = "activationChainLength", count = 3 },
-            effect = "forceDiscardCardsActivator", options = { amount = 1 } 
+            effect = "forceDiscardRandomCardsActivator", options = { amount = 1 } 
           }
       }
       -- Description: "If Owner pays 1 Data: Owner draws 1 card. If 3+ card(s) were activated in this chain: Activator discards 1 card."
@@ -355,7 +355,7 @@ definitions["NODE_KNOW_010"] = {
         { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
         { 
           condition = { type = "convergenceLinks", count = 1 },
-          effect = "forceDiscardCardsOwner", options = { amount = 1 } 
+          effect = "forceDiscardRandomCardsOwner", options = { amount = 1 } 
         }
       }
       -- Description: "Activator gains 1 Data. If 1+ convergence link(s) attached: Owner discards 1 card."
@@ -504,7 +504,7 @@ definitions["NODE_KNOW_015"] = {
   resourceRatio = { material = 1, data = 2 },
   activationEffect = CardEffects.createActivationEffect({
       actions = { 
-        { effect = "forceDiscardCardsOwner", options = { amount = 1 } },
+        { effect = "forceDiscardRandomCardsOwner", options = { amount = 1 } },
         { 
           condition = { type = "adjacency", nodeType = CardTypes.CULTURE, count = 1 },
           effect = "drawCardsForOwner", options = { amount = 2 } 

@@ -181,11 +181,9 @@ definitions["NODE_TECH_006"] = {
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { 
             { condition = { type = "activatedCardType", cardType = CardTypes.CULTURE, count = 1 },
-              effect = "drawCardsForActivator", options = { amount = 2 } },
-            { condition = { type = "activatedCardType", cardType = CardTypes.CULTURE, count = 0 },
-              effect = "drawCardsForActivator", options = { amount = 1 } }
+              effect = "drawCardsForActivator", options = { amount = 2 } }
         }
-        -- Description: "If 1+ Culture card(s) were activated in this chain: Activator draws 2 cards. If 0+ Culture card(s) were activated in this chain: Activator draws 1 card."
+        -- Description: "If 1+ Culture card(s) were activated in this chain: Draw 2 cards."
     }),
     vpValue = 0,
     imagePath = "assets/images/digital-art-synthesizer.png",
@@ -322,7 +320,7 @@ definitions["NODE_TECH_010"] = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
              { effect = "stealResource", options = { resource = ResourceType.ENERGY, amount = 1 } },
              { condition = { type = "convergenceLinks", count = 1 },
-               effect = "forceDiscardCardsOwner", options = { amount = 1 } }
+               effect = "forceDiscardRandomCardsOwner", options = { amount = 1 } }
         }
         -- Description: "Activator gains 1 Data. Activator steals 1 Energy from the owner. If 1+ convergence link(s) attached: Owner discards 1 card."
     }),
@@ -369,7 +367,7 @@ definitions["NODE_TECH_012"] = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
             {
                 condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.DATA, amount = 2 },
-                effect = "forceDiscardCardsActivator", options = { amount = 1 }
+                effect = "forceDiscardRandomCardsActivator", options = { amount = 1 }
             }
         }
         -- Description: "Owner gains 1 Data. If Owner pays 2 Data: Activator discards 1 card."
@@ -379,7 +377,7 @@ definitions["NODE_TECH_012"] = {
             { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
             {
                 condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.DATA, amount = 1 },
-                effect = "forceDiscardCardsOwner", options = { amount = 1 }
+                effect = "forceDiscardRandomCardsOwner", options = { amount = 1 }
             }
         }
         -- Description: "Activator gains 1 Data. If Activator pays 1 Data: Owner discards 1 card."

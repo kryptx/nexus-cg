@@ -953,5 +953,25 @@ function GameService:destroyRandomLinkOnNode(sourceNode)
     return true
 end
 
+-- Force a player to discard a number of random cards from their hand
+function GameService:forcePlayerDiscard(player, amount)
+    if not player or type(player.hand) ~= 'table' then
+        print("Warning: forcePlayerDiscard called with invalid player or hand")
+        return
+    end
+    local discardCount = amount or 1
+    for i = 1, discardCount do
+        if #player.hand == 0 then
+            print(string.format("%s has no cards to discard.", player.name or 'Player'))
+            break
+        end
+        local idx = math.random(1, #player.hand)
+        local card = table.remove(player.hand, idx)
+        if card then
+            print(string.format("%s discards random card '%s'.", player.name or 'Player', card.title or card.id or 'Unknown'))
+        end
+    end
+end
+
 return { GameService = GameService, TurnPhase = TurnPhase } 
 

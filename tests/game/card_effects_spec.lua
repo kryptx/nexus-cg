@@ -240,7 +240,7 @@ describe("CardEffects.generateEffectDescription", function()
                         resource = CardEffects.ResourceType.DATA, 
                         amount = 2 
                     },
-                    effect = "forceDiscardCardsActivator", 
+                    effect = "forceDiscardRandomCardsActivator", 
                     options = { amount = 2 }
                 },
                 {
@@ -256,7 +256,7 @@ describe("CardEffects.generateEffectDescription", function()
             }
         }
         -- Both actions share the same payment condition, should be joined by semicolon.
-        local expected = "If Owner pays 2 Data: Activator discards 2 cards; Owner gains 1 VP."
+        local expected = "If Owner pays 2 Data: Activator discards 2 random cards; Owner gains 1 VP."
         assert.are.equal(expected, CardEffects.generateEffectDescription(config))
     end)
 

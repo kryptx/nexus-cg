@@ -148,10 +148,10 @@ local function calculateActionContribution(action, isActivationEffect)
     elseif effectType == "gainVPForBoth" then
         baseME = getMEValue("vp", amount) 
         target = "both"
-    elseif effectType == "forceDiscardCardsOwner" then
+    elseif effectType == "forceDiscardRandomCardsOwner" then
         baseME = -getMEValue("draw", amount) 
         target = "owner"
-    elseif effectType == "forceDiscardCardsActivator" then
+    elseif effectType == "forceDiscardRandomCardsActivator" then
         baseME = -getMEValue("draw", amount) 
         target = "activator"
     elseif effectType == "destroyRandomLinkOnNode" then
