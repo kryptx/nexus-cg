@@ -385,7 +385,7 @@ local function generateConditionDescription(conditionConfig, context)
         local cardType = conditionConfig.cardType or "Unknown"
         return string.format("If %d+ %s nodes activated this chain: ", count, cardType)
     elseif type == "adjacentEmptyCells" then
-        return string.format("If adjacent to %d+ empty cell(s): ", count)
+        return string.format("If adjacent to %d+ empty cells: ", count)
     elseif type == "hasTokens" then
         return string.format("If %d+ tokens on this node: ", count)
     elseif type == "paymentOffer" then

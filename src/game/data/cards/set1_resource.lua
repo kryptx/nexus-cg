@@ -271,7 +271,7 @@ definitions["NODE_RES_009"] = {
             effect = "gainVPForOwner", options = { amount = 1 }
           }
       }
-      -- Description: "Owner gains 1 Material. If adjacent to 1+ Culture node(s): Owner gains 1 VP."
+      -- Description: "You gain 1 Material. If adjacent to 1+ Culture node(s): You gain 1 VP."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } } }
@@ -293,14 +293,14 @@ definitions["NODE_RES_010"] = {
              options = { resource = ResourceType.MATERIAL, amount = 2 }
           }
       }
-      -- Description: "Owner gains 1 Material. If Owner pays 1 Energy: Owner gains 2 Material."
+      -- Description: "You gain 1 Material. If you pay 1 Energy: You gain 2 Material."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
           { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 1 } },
           { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
       }
-      -- Description: "Activator gains 1 Material. Owner gains 1 Material."
+      -- Description: "You gain 1 Material. Owner gains 1 Material."
   }),
   vpValue = 0, imagePath = "assets/images/automated-refinery.png", flavorText = "Turning raw ore into usable components.",
   definedPorts = { [CardPorts.LEFT_BOTTOM] = true, [CardPorts.RIGHT_BOTTOM] = true },
@@ -316,7 +316,7 @@ definitions["NODE_RES_011"] = {
             effect = "drawCardsForOwner", options = { amount = 1 }
           }
       }
-      -- Description: "Owner gains 1 Material. If adjacent to 1+ Knowledge node(s): Owner draws 1 card."
+      -- Description: "You gain 1 Material. If adjacent to 1+ Knowledge node(s): You draw 1 card."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
@@ -326,7 +326,7 @@ definitions["NODE_RES_011"] = {
             options = { amount = 1 }
           }
       }
-      -- Description: "If Activator pays 1 Data: Activator draws 1 card."
+      -- Description: "If you pay 1 Data: You draw 1 card."
   }),
   vpValue = 0, imagePath = "assets/images/prospector-drone-control.png", flavorText = "Seeking out the veins of wealth.",
   definedPorts = { [CardPorts.RIGHT_TOP] = true, [CardPorts.RIGHT_BOTTOM] = true },

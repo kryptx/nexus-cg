@@ -157,8 +157,7 @@ function Renderer:new()
         local successTitle, titleFontOrErr = pcall(love.graphics.newFont, titleFontPath)
         if successTitle and titleFontOrErr then
             titleFont = titleFontOrErr
-            -- Use nearest filtering for crisp pixel look
-            titleFont:setFilter('nearest', 'nearest')
+            titleFont:setFilter('linear', 'linear')
             print("Successfully loaded title BMFont: " .. titleFontPath)
             
             -- Assign to the worldTitleSemiBold slot specifically for card titles
@@ -175,7 +174,7 @@ function Renderer:new()
         if success and bmFontOrErr then
             local bmFont = bmFontOrErr
             -- Use nearest filtering for crisp pixel look
-            bmFont:setFilter('nearest', 'nearest')
+            bmFont:setFilter('linear', 'linear')
 
             -- Replace world and preview font entries with the bitmap font
             instance.fonts.worldStandard = bmFont
@@ -198,7 +197,7 @@ function Renderer:new()
                 local successWhite, bmFontWhiteOrErr = pcall(love.graphics.newFont, bmFontWhitePath)
                 if successWhite and bmFontWhiteOrErr then
                     local bmFontWhite = bmFontWhiteOrErr
-                    bmFontWhite:setFilter('nearest', 'nearest')
+                    bmFontWhite:setFilter('linear', 'linear')
                     instance.fonts.worldConvergence = bmFontWhite
                     print("Successfully loaded white BMFont: " .. bmFontWhitePath)
                 else
@@ -779,7 +778,7 @@ function Renderer:_drawCardInternal(card, x, y, context)
             -- Semi-transparent black box covering bottom third of the artwork
             local flavorBoxHeight = areaH / 3
             local flavorBoxY = imageY + areaH - flavorBoxHeight
-            love.graphics.setColor(0, 0, 0, 0.5 * alphaOverride) -- Semi-transparent black
+            love.graphics.setColor(0, 0, 0, 0.7 * alphaOverride) -- Semi-transparent black
             love.graphics.rectangle("fill", x + margin, flavorBoxY, areaW, flavorBoxHeight)
             
             -- Draw flavor text using the white font style similar to convergence text
@@ -790,7 +789,7 @@ function Renderer:_drawCardInternal(card, x, y, context)
                                  "CARD_EFFECT_CONVERGENCE", -- Use the white font style 
                                  context.baseFontSizes.effect, 
                                  context.targetScales.effect, 
-                                 0.75 * alphaOverride)
+                                 0.9 * alphaOverride)
         end
     else
         love.graphics.setColor(0.6, 0.6, 0.6, 1.0 * alphaOverride)

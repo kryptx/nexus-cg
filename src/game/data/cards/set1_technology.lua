@@ -357,7 +357,7 @@ definitions["NODE_TECH_011"] = {
     }),
     vpValue = 0, imagePath = "assets/images/orbital-comm-relay.png", 
     flavorText = "Broadcasting across the void, strengthening technological networks.",
-    definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.TOP_RIGHT] = true },
+    definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.TOP_RIGHT] = true, [CardPorts.BOTTOM_RIGHT] = true },
 }
 definitions["NODE_TECH_012"] = {
     id = "NODE_TECH_012", title = "High-Frequency Trading Hub", type = CardTypes.TECHNOLOGY,
