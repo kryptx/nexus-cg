@@ -18,7 +18,6 @@ definitions["REACTOR_BASE"] = {
     title = "Reactor Core",
     type = CardTypes.REACTOR,
     buildCost = { material = 0, data = 0 }, -- No build cost
-    
     vpValue = 0,
     imagePath = "assets/images/reactor-core.png",
     -- GDD 4.1: Reactor has all 8 ports present initially
@@ -42,7 +41,7 @@ definitions["GENESIS_TECH_001"] = {
     title = "Initial Circuit",
     type = CardTypes.TECHNOLOGY,
     isGenesis = true, -- Mark as a Genesis card
-    buildCost = { material = 1, data = 0 },
+    resourceRatio = { material = 1, data = 0 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } }
         -- Description: "Grants 1 Data to the owner."
@@ -69,7 +68,7 @@ definitions["GENESIS_RES_001"] = {
     title = "First Spark",
     type = CardTypes.RESOURCE,
     isGenesis = true,
-    buildCost = { material = 1, data = 0 },
+    resourceRatio = { material = 1, data = 0 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } } }
         -- Description: "Grants 1 Material to the owner."
@@ -96,7 +95,7 @@ definitions["GENESIS_KNOW_001"] = {
     title = "Seed Thought",
     type = CardTypes.KNOWLEDGE,
     isGenesis = true,
-    buildCost = { material = 1, data = 0 },
+    resourceRatio = { material = 1, data = 0 },
      activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } }
         -- Description: "Grants 1 Data to the owner."
@@ -123,7 +122,7 @@ definitions["GENESIS_CULT_001"] = {
     title = "Nascent Meme",
     type = CardTypes.CULTURE,
     isGenesis = true,
-    buildCost = { material = 1, data = 0 },
+    resourceRatio = { material = 1, data = 0 },
      activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } }
         -- Description: "Grants 1 Data to the owner."
@@ -145,13 +144,11 @@ definitions["GENESIS_CULT_001"] = {
     flavorText = "An idea begins to spread.",
 }
 
--- === Core Node Cards ===
-
 definitions["NODE_TECH_001"] = {
     id = "NODE_TECH_001",
     title = "Basic Processing Unit",
     type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 1, data = 0 },
+    resourceRatio = { material = 1, data = 0 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } }
         -- Description: "Grants 1 Data to the owner."
@@ -175,7 +172,7 @@ definitions["NODE_CULT_001"] = {
     id = "NODE_CULT_001",
     title = "Community Forum",
     type = CardTypes.CULTURE,
-    buildCost = { material = 1, data = 1 },
+    resourceRatio = { material = 1, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "drawCardsForOwner", options = { amount = 1 } },
@@ -207,7 +204,7 @@ definitions["NODE_TECH_002"] = {
     id = "NODE_TECH_002",
     title = "Advanced Processing Unit",
     type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 3, data = 1 }, 
+    resourceRatio = { material = 3, data = 1 }, 
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } } }
         -- Description: "Grants 2 Data to the owner."
@@ -231,7 +228,7 @@ definitions["NODE_CULT_002"] = {
     id = "NODE_CULT_002",
     title = "Cultural Exchange",
     type = CardTypes.CULTURE,
-    buildCost = { material = 2, data = 2 },
+    resourceRatio = { material = 1, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -257,7 +254,7 @@ definitions["NODE_KNOW_001"] = {
     id = "NODE_KNOW_001",
     title = "Data Relay",
     type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 1, data = 1 },
+    resourceRatio = { material = 1, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } }
         -- Description: "Grants 1 Data to the owner."
@@ -281,7 +278,7 @@ definitions["NODE_RES_001"] = {
     id = "NODE_RES_001",
     title = "Materials Depot",
     type = CardTypes.RESOURCE,
-    buildCost = { material = 2, data = 0 },
+    resourceRatio = { material = 1, data = 0 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { 
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } },
@@ -311,7 +308,7 @@ definitions["NODE_CULT_004"] = {
     id = "NODE_CULT_004",
     title = "Synaptic Media Hub",
     type = CardTypes.CULTURE,
-    buildCost = { material = 3, data = 2 },
+    resourceRatio = { material = 3, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "drawCardsForOwner", options = { amount = 1 } },
@@ -347,7 +344,7 @@ definitions["NODE_TECH_003"] = {
     id = "NODE_TECH_003",
     title = "Applied Arts Workshop",
     type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 3, data = 1 },
+    resourceRatio = { material = 3, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
@@ -380,7 +377,7 @@ definitions["NODE_RES_002"] = {
     id = "NODE_RES_002",
     title = "Automated Drill Site",
     type = CardTypes.RESOURCE,
-    buildCost = { material = 4, data = 1 },
+    resourceRatio = { material = 4, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
                    { effect = "drawCardsForOwner", options = { amount = 1 } } }
@@ -409,7 +406,7 @@ definitions["NODE_KNOW_002"] = {
     id = "NODE_KNOW_002",
     title = "Materials Analysis Lab",
     type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 2, data = 3 },
+    resourceRatio = { material = 2, data = 3 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -443,7 +440,7 @@ definitions["NODE_KNOW_003"] = {
     id = "NODE_KNOW_003",
     title = "Historical Archive",
     type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 2, data = 0 },
+    resourceRatio = { material = 1, data = 0 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
@@ -474,7 +471,7 @@ definitions["NODE_CULT_005"] = {
     id = "NODE_CULT_005",
     title = "Holographic Theater",
     type = CardTypes.CULTURE,
-    buildCost = { material = 3, data = 3 },
+    resourceRatio = { material = 1, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             {
@@ -514,7 +511,7 @@ definitions["NODE_RES_003"] = {
     id = "NODE_RES_003",
     title = "Monument Construction Site",
     type = CardTypes.RESOURCE,
-    buildCost = { material = 4 },
+    resourceRatio = { material = 1, data = 0 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
@@ -543,13 +540,11 @@ definitions["NODE_RES_003"] = {
     flavorText = "Building legacies that echo through time.",
 }
 
--- === Advanced Nodes ===
-
 definitions["NODE_KNOW_004"] = {
     id = "NODE_KNOW_004",
     title = "AI Research Center",
     type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 2, data = 4 },
+    resourceRatio = { material = 1, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } },
@@ -582,7 +577,7 @@ definitions["NODE_TECH_004"] = {
     id = "NODE_TECH_004",
     title = "Automated Fabricator",
     type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 4, data = 2 },
+    resourceRatio = { material = 2, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } },
@@ -613,7 +608,7 @@ definitions["NODE_KNOW_005"] = {
     id = "NODE_KNOW_005",
     title = "Bio-Research Lab",
     type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 3, data = 3 },
+    resourceRatio = { material = 1, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } } }
         -- Description: "Grants 2 Data to the owner."
@@ -642,7 +637,7 @@ definitions["NODE_TECH_RES_001"] = {
     id = "NODE_TECH_RES_001",
     title = "Geothermal Tap",
     type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 3, data = 2 },
+    resourceRatio = { material = 3, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
@@ -666,13 +661,11 @@ definitions["NODE_TECH_RES_001"] = {
     flavorText = "Harnessing the planet's inner fire.",
 }
 
--- === Bridge Nodes (Combining Types/Functions) ===
-
 definitions["NODE_TECH_CULT_001"] = {
     id = "NODE_TECH_CULT_001",
     title = "Digital Art Synthesizer",
     type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 2, data = 3 },
+    resourceRatio = { material = 2, data = 3 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "drawCardsForOwner", options = { amount = 1 } },
@@ -701,7 +694,7 @@ definitions["NODE_TECH_KNOW_001"] = {
     id = "NODE_TECH_KNOW_001",
     title = "Quantum Simulation Lab",
     type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 6, data = 2 },
+    resourceRatio = { material = 3, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "offerPaymentOwner", options = { resource = ResourceType.DATA, amount = 2, consequence = { { effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 2 } } } } }
@@ -731,7 +724,7 @@ definitions["NODE_CULT_TECH_001"] = {
     id = "NODE_CULT_TECH_001",
     title = "Applied Aesthetics Studio",
     type = CardTypes.CULTURE,
-    buildCost = { material = 3, data = 2 },
+    resourceRatio = { material = 3, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -763,7 +756,7 @@ definitions["NODE_CULT_KNOW_001"] = {
     id = "NODE_CULT_KNOW_001",
     title = "Ethnographic Database",
     type = CardTypes.CULTURE,
-    buildCost = { material = 2, data = 4 },
+    resourceRatio = { material = 1, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "drawCardsForOwner", options = { amount = 1 } },
@@ -794,7 +787,7 @@ definitions["NODE_CULT_RES_001"] = {
     id = "NODE_CULT_RES_001",
     title = "Artisan Guild Workshop",
     type = CardTypes.CULTURE,
-    buildCost = { material = 4, data = 2 },
+    resourceRatio = { material = 2, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } },
@@ -825,7 +818,7 @@ definitions["NODE_RES_CULT_001"] = {
     id = "NODE_RES_CULT_001",
     title = "Reclamation Art Project",
     type = CardTypes.RESOURCE,
-    buildCost = { material = 3, data = 1 },
+    resourceRatio = { material = 3, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "gainVPForOwner", options = { amount = 1 } },
@@ -856,7 +849,7 @@ definitions["NODE_RES_TECH_001"] = {
     id = "NODE_RES_TECH_001",
     title = "Materials Science R&D",
     type = CardTypes.RESOURCE,
-    buildCost = { material = 4, data = 2 },
+    resourceRatio = { material = 2, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -887,7 +880,7 @@ definitions["NODE_RES_KNOW_001"] = {
     id = "NODE_RES_KNOW_001",
     title = "Geological Survey Outpost",
     type = CardTypes.RESOURCE,
-    buildCost = { material = 3, data = 2 },
+    resourceRatio = { material = 3, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } }
         -- Description: "Owner gains 1 Data."
@@ -915,7 +908,7 @@ definitions["NODE_KNOW_CULT_001"] = {
     id = "NODE_KNOW_CULT_001",
     title = "Historical Simulation Center",
     type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 2, data = 4 },
+    resourceRatio = { material = 1, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "gainVPForOwner", options = { amount = 1 } },
@@ -946,7 +939,7 @@ definitions["NODE_KNOW_TECH_001"] = {
     id = "NODE_KNOW_TECH_001",
     title = "Advanced Algorithm Design",
     type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 2, data = 5 },
+    resourceRatio = { material = 2, data = 5 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } },
@@ -976,7 +969,7 @@ definitions["NODE_KNOW_RES_001"] = {
     id = "NODE_KNOW_RES_001",
     title = "Resource Optimization AI",
     type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 3, data = 5 },
+    resourceRatio = { material = 3, data = 5 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } },
@@ -1004,13 +997,11 @@ definitions["NODE_KNOW_RES_001"] = {
     flavorText = "Efficiency unlocked through understanding.",
 }
 
--- === NEW CARDS ===
-
 definitions["NODE_RES_004"] = {
     id = "NODE_RES_004",
     title = "Solar Collector Array",
     type = CardTypes.RESOURCE,
-    buildCost = { material = 5, data = 1 },
+    resourceRatio = { material = 5, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 1 } } }
         -- Description: "Grants 1 Energy to the owner."
@@ -1034,7 +1025,7 @@ definitions["NODE_TECH_005"] = {
     id = "NODE_TECH_005",
     title = "Fusion Reactor Prototype",
     type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 5, data = 4 },
+    resourceRatio = { material = 5, data = 4 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 2 } },
@@ -1066,7 +1057,7 @@ definitions["NODE_KNOW_006"] = {
     id = "NODE_KNOW_006",
     title = "Information Brokerage",
     type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 2, data = 3 },
+    resourceRatio = { material = 2, data = 3 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "drawCardsForOwner", options = { amount = 1 } },
@@ -1109,7 +1100,7 @@ definitions["NODE_TECH_006"] = {
     id = "NODE_TECH_006",
     title = "Network Hub",
     type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 3, data = 3 },
+    resourceRatio = { material = 1, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -1142,7 +1133,7 @@ definitions["NODE_TECH_007"] = {
     id = "NODE_TECH_007",
     title = "Sabotage Drone Bay",
     type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 3, data = 2 },
+    resourceRatio = { material = 3, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             {
@@ -1182,6 +1173,71 @@ end
 
 for k, v in pairs(definitions_set2b) do
     definitions[k] = v
+end
+
+-- === Calculate and Add Derived Costs ===
+print("Calculating derived costs for all card definitions...")
+local CostCalculator = require('src.utils.cost_calculator') -- Make sure path is correct
+io.stderr:write("Debug: Attempted to require CostCalculator.\n")
+
+if CostCalculator then
+    io.stderr:write("Debug: CostCalculator module loaded successfully.\n")
+    local count = 0
+    for _ in pairs(definitions) do count = count + 1 end
+    io.stderr:write("Debug: Found " .. count .. " definitions to process.\n")
+    for id, def in pairs(definitions) do
+        if def.buildCost then
+            io.stderr:write("Debug: Skipping definition ID: " .. (id or "NIL_ID") .. " because it has a buildCost.\n")
+            goto continue
+        end
+
+        io.stderr:write("Debug: Processing definition ID: " .. (id or "NIL_ID") .. "\n") -- Check if loop is entered
+        local originalCost = def.resourceRatio or { material = 0, data = 0 }
+        local derivedRatio = nil
+
+        local M = originalCost.material or 0
+        local D = originalCost.data or 0
+
+        if M > 0 and D > 0 then
+            derivedRatio = { material = M, data = D }
+        elseif M > 0 and D <= 0 then
+            derivedRatio = { material = 1, data = 0 } -- Strong Material preference
+        elseif M <= 0 and D > 0 then
+            derivedRatio = { material = 0, data = 1 } -- Strong Data preference
+        else -- Both M and D are 0 or less, use default split logic
+            derivedRatio = nil
+        end
+
+        io.stderr:write("Debug: About to call CostCalculator.calculateDerivedCost for ID: " .. (id or "NIL_ID") .. "\n")
+        -- Suppress the calculator's own print statements during this phase
+        local originalPrint = print
+        _G.print = function() end -- Temporarily disable print
+
+        local calculatedCost, totalME = CostCalculator.calculateDerivedCost(def, derivedRatio)
+
+        _G.print = originalPrint -- Restore print
+        io.stderr:write("Debug: Finished call for ID: " .. (id or "NIL_ID") .. ". Result was " .. (calculatedCost and "OK" or "NIL") .. "\n")
+
+        if calculatedCost then
+             -- print(string.format("  [%s] Original: %dM %dD -> Ratio: %s -> Derived: %dM %dD (%.2f ME)",
+             --    id, M, D,
+             --    derivedRatio and string.format("{M=%d, D=%d}", derivedRatio.material, derivedRatio.data) or "Default",
+             --    calculatedCost.material, calculatedCost.data, totalME))
+             def.buildCost = calculatedCost
+        else
+             -- print(string.format("  [%s] Could not calculate derived cost.", id))
+             def.buildCost = { material = -1, data = -1 } -- Mark as failed
+        end
+        ::continue::
+    end
+    print("Finished calculating derived costs.")
+else
+    io.stderr:write("Debug: CostCalculator module FAILED to load (CostCalculator is nil).\n")
+    print("Warning: CostCalculator module not found. Derived costs not calculated.")
+    -- Optionally add placeholder derivedCost to all definitions if calculator fails
+    for id, def in pairs(definitions) do
+        def.buildCost = { material = -1, data = -1 }
+    end
 end
 
 return definitions 

@@ -429,7 +429,8 @@ function CardEffects.createActivationEffect(config)
 
     return {
         description = fullDescription,
-        activate = activateFunction
+        activate = activateFunction,
+        config = config -- Return the original config too
     }
 end
 

@@ -21,7 +21,7 @@ local placeholderConvergence = CardEffects.createConvergenceEffect({
 
 definitions["SET2_001"] = {
     id = "SET2_001", title = "Orbital Comm Relay", type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 2, data = 1 },
+    resourceRatio = { material = 2, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -41,7 +41,7 @@ definitions["SET2_001"] = {
 }
 definitions["SET2_002"] = {
     id = "SET2_002", title = "Historical Archive Access", type = CardTypes.CULTURE,
-    buildCost = { material = 1, data = 2 },
+    resourceRatio = { material = 1, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "drawCardsForOwner", options = { amount = 1 } } }
         -- Description: "Owner draws 1 card."
@@ -64,7 +64,7 @@ definitions["SET2_002"] = {
 }
 definitions["SET2_003"] = {
     id = "SET2_003", title = "Artisan Collective", type = CardTypes.CULTURE,
-    buildCost = { material = 2, data = 1 },
+    resourceRatio = { material = 2, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
@@ -84,7 +84,7 @@ definitions["SET2_003"] = {
 }
 definitions["SET2_004"] = {
     id = "SET2_004", title = "Xeno-Linguistics Lab", type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 1, data = 3 },
+    resourceRatio = { material = 1, data = 3 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -104,7 +104,7 @@ definitions["SET2_004"] = {
 }
 definitions["SET2_005"] = {
     id = "SET2_005", title = "High-Frequency Trading Hub", type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 2, data = 2 },
+    resourceRatio = { material = 1, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -133,7 +133,7 @@ definitions["SET2_005"] = {
 }
 definitions["SET2_006"] = {
     id = "SET2_006", title = "Planetary Defense Sensor", type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 2, data = 2 },
+    resourceRatio = { material = 1, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } }
         -- Description: "Owner gains 1 Data."
@@ -158,7 +158,7 @@ definitions["SET2_006"] = {
 }
 definitions["SET2_007"] = {
     id = "SET2_007", title = "Asteroid Mining Claim", type = CardTypes.RESOURCE,
-    buildCost = { material = 3, data = 0 },
+    resourceRatio = { material = 3, data = 0 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
@@ -178,7 +178,7 @@ definitions["SET2_007"] = {
 }
 definitions["SET2_008"] = {
     id = "SET2_008", title = "Tunnel Bore Control", type = CardTypes.TECHNOLOGY,
-    buildCost = { material = 4, data = 1 },
+    resourceRatio = { material = 4, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
@@ -198,7 +198,7 @@ definitions["SET2_008"] = {
 }
 definitions["SET2_009"] = {
     id = "SET2_009", title = "Philosopher's Conclave", type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 1, data = 3 },
+    resourceRatio = { material = 1, data = 3 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -224,7 +224,7 @@ definitions["SET2_009"] = {
 }
 definitions["SET2_010"] = {
     id = "SET2_010", title = "Smuggler's Den", type = CardTypes.CULTURE,
-    buildCost = { material = 2, data = 1 },
+    resourceRatio = { material = 2, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } } }
         -- Description: "Owner gains 1 Material."
@@ -249,7 +249,7 @@ definitions["SET2_010"] = {
 }
 definitions["SET2_011"] = {
     id = "SET2_011", title = "Hydroponics Bay", type = CardTypes.RESOURCE,
-    buildCost = { material = 2, data = 1 },
+    resourceRatio = { material = 2, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
@@ -269,7 +269,7 @@ definitions["SET2_011"] = {
 }
 definitions["SET2_012"] = {
     id = "SET2_012", title = "AI Ethics Committee", type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 1, data = 4 },
+    resourceRatio = { material = 1, data = 4 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -295,7 +295,7 @@ definitions["SET2_012"] = {
 }
 definitions["SET2_013"] = {
     id = "SET2_013", title = "Deep Space Observatory", type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 2, data = 2 },
+    resourceRatio = { material = 1, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } } }
         -- Description: "Owner gains 1 Data."
@@ -318,7 +318,7 @@ definitions["SET2_013"] = {
 }
 definitions["SET2_014"] = {
     id = "SET2_014", title = "Quantum Entanglement Comms", type = CardTypes.KNOWLEDGE,
-    buildCost = { material = 2, data = 4 },
+    resourceRatio = { material = 1, data = 2 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } } }
         -- Description: "Owner gains 2 Data."
@@ -335,7 +335,7 @@ definitions["SET2_014"] = {
 }
 definitions["SET2_015"] = {
     id = "SET2_015", title = "Automated Refinery", type = CardTypes.RESOURCE,
-    buildCost = { material = 4, data = 1 },
+    resourceRatio = { material = 4, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = { { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } } }
         -- Description: "Owner gains 2 Material."
@@ -352,7 +352,7 @@ definitions["SET2_015"] = {
 }
 definitions["SET2_016"] = {
     id = "SET2_016", title = "Prospector Drone Control", type = CardTypes.RESOURCE,
-    buildCost = { material = 3, data = 1 },
+    resourceRatio = { material = 3, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
