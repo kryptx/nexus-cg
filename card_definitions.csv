@@ -1,7 +1,7 @@
 id,title,type,isGenesis,buildCostMaterial,buildCostData,vpValue,activationEffectDescription,convergenceEffectDescription,C_IN,C_OUT,T_IN,T_OUT,K_IN,K_OUT,R_IN,R_OUT
 NODE_CULT_001,Community Forum,CULTURE,,2,2,0,Draw 1 card. If 1+ Knowledge nodes activated this chain: Draw 1 card.,Draw 1 card. Owner draws 1 card.,Yes,Yes,No,No,Yes,No,No,No
 NODE_CULT_002,Cultural Exchange,CULTURE,,1,1,1,If you pay 1 Data: Draw 2 cards.,Owner and activator gain 1 Data. If adjacent to 1+ Culture nodes: Gain 1 VP.,Yes,Yes,No,No,No,No,No,Yes
-NODE_CULT_003,Synaptic Media Hub,CULTURE,,1,1,1,Gain 1 Data per Knowledge node in your network. If 2+ inputs connected: Draw 1 card.,Draw 1 card. If 3+ nodes activated this chain: Gain 1 VP.,Yes,Yes,Yes,Yes,Yes,No,No,No
+NODE_CULT_003,Synaptic Media Hub,CULTURE,,3,2,1,Gain 1 Data per Knowledge node in your network. If 2+ inputs connected: Draw 1 card.,Draw 1 card. If 3+ nodes activated this chain: Gain 1 VP.,Yes,Yes,Yes,Yes,Yes,No,No,No
 NODE_CULT_004,Holographic Theater,CULTURE,,1,1,1,If you pay 1 Material: Gain 2 VP.,Gain 1 VP. If adjacent to 2+ empty cell(s): Gain 1 VP.,Yes,Yes,Yes,Yes,Yes,No,No,No
 NODE_CULT_005,Applied Aesthetics Studio,CULTURE,,2,1,1,If adjacent to 1+ Technology nodes: Gain 1 Data. If adjacent to 2+ Technology nodes: Gain 2 VP.,If you pay 1 Energy: Gain 2 VP; Owner gains 1 VP.,Yes,Yes,Yes,Yes,No,No,No,No
 NODE_CULT_006,Ethnographic Database,CULTURE,,1,1,1,Draw 2 cards. If 2+ nodes activated this chain: Discard 1 random card.,Draw 1 card. If you pay 1 Data: Owner discards 1 random card; Gain 1 VP.,Yes,Yes,No,No,Yes,Yes,No,No
@@ -12,7 +12,7 @@ NODE_CULT_010,Smuggler's Den,CULTURE,,1,1,0,If you pay 1 Data: Gain 2 Material.,
 NODE_CULT_011,Public Forum Interface,CULTURE,,1,2,0,Draw 1 card. If adjacent to 1+ Technology nodes: All players draw 1 card.,Draw 1 card. If 3+ nodes activated this chain: You and the owner gain 1 VP.,Yes,Yes,Yes,No,No,No,No,No
 NODE_CULT_012,Propaganda Broadcaster,CULTURE,,1,1,0,If you pay 2 Data: Discard 2 random cards; Gain 1 VP.,Gain 1 Data. If 1+ links attached: Owner discards 1 random card.,No,Yes,Yes,No,Yes,No,No,No
 NODE_CULT_013,Subterranean Market,CULTURE,,1,1,0,Gain 1 Material. If 1+ links attached: Gain 1 Material.,If you pay 1 Energy: Gain 2 Material; Owner gains 1 Data.,Yes,Yes,No,No,No,No,Yes,No
-NODE_CULT_014,Cultural Artifact Factory,CULTURE,,1,1,1,Gain 1 Material. If 2+ inputs connected: Gain 1 Material per Culture node in your network.,Gain 1 Material. If adjacent to 1+ Resource nodes: Gain 1 VP.,Yes,No,No,Yes,No,No,No,Yes
+NODE_CULT_014,Cultural Artifact Factory,CULTURE,,1,1,1,Gain 1 Material. If adjacent to 2+ Culture nodes: Draw 1 card.,Gain 1 Material. If adjacent to 1+ Resource nodes: Gain 1 VP.,Yes,No,No,Yes,No,No,No,Yes
 NODE_GENESIS_CULT_001,Nascent Meme,CULTURE,true,2,0,0,Gain 1 Data.,Gain 1 Data.,Yes,Yes,Yes,No,No,Yes,No,Yes
 NODE_GENESIS_KNOW_001,Seed Thought,KNOWLEDGE,true,2,0,0,Gain 1 Data.,Gain 1 Data.,Yes,Yes,No,No,Yes,Yes,Yes,No
 NODE_GENESIS_RES_001,First Spark,RESOURCE,true,2,0,0,Gain 1 Material.,Gain 1 Material.,No,No,Yes,Yes,Yes,No,Yes,Yes
@@ -52,15 +52,15 @@ NODE_RES_012,Bio-Printer Feedstock,RESOURCE,,2,1,0,Gain 1 Material. If adjacent 
 NODE_RES_013,Resource Distribution Hub,RESOURCE,,2,1,0,Gain 1 Material. If 1+ links attached: Gain 1 Energy.,Gain 1 Material.,Yes,No,No,No,No,Yes,No,Yes
 NODE_TECH_001,Basic Processing Unit,TECHNOLOGY,,4,0,0,Gain 1 Data. If 2+ nodes activated this chain: Gain 1 Energy.,Gain 1 Data.,No,No,Yes,Yes,No,No,Yes,No
 NODE_TECH_002,Advanced Processing Unit,TECHNOLOGY,,3,1,1,Gain 1 Data. If you pay 1 Energy: Gain 2 Data.,Owner and activator gain 1 Data.,No,No,Yes,Yes,No,Yes,No,No
-NODE_TECH_003,Applied Arts Workshop,TECHNOLOGY,,2,1,1,Gain 1 Material. If 2+ inputs connected: Gain 1 Data per Culture node in your network.,Gain 1 Data. Owner gains 1 Material.,Yes,Yes,No,Yes,No,Yes,Yes,No
+NODE_TECH_003,Applied Arts Workshop,TECHNOLOGY,,4,1,1,Gain 1 Material. If 2+ inputs connected: Gain 1 Data per Culture node in your network.,Gain 1 Data. Owner gains 1 Material.,Yes,Yes,No,Yes,No,Yes,Yes,No
 NODE_TECH_004,Automated Fabricator,TECHNOLOGY,,3,1,1,Gain 1 Material. If adjacent to 2+ empty cell(s): Gain 2 Material.,Gain 1 Material. If 2+ links attached: Owner gains 1 Energy.,No,No,Yes,Yes,Yes,No,Yes,Yes
-NODE_TECH_005,Geothermal Tap,TECHNOLOGY,,2,1,1,Gain 1 Energy. If adjacent to 1+ Resource nodes: Gain 1 Energy per Resource node in your network.,Gain 1 Energy. If 3+ nodes activated this chain: Owner gains 1 VP.,No,No,Yes,No,No,No,Yes,Yes
+NODE_TECH_005,Geothermal Tap,TECHNOLOGY,,3,2,1,Gain 1 Energy. If adjacent to 1+ Resource nodes: Gain 1 Energy per Resource node in your network.,Gain 1 Energy. If 3+ nodes activated this chain: Owner gains 1 VP.,No,No,Yes,No,No,No,Yes,Yes
 NODE_TECH_006,Digital Art Synthesizer,TECHNOLOGY,,1,2,0,Draw 1 card. If adjacent to 1+ Culture nodes: Gain 1 VP.,If 1+ Culture nodes activated this chain: Draw 2 cards.,Yes,Yes,Yes,Yes,No,No,No,No
 NODE_TECH_007,Quantum Simulation Lab,TECHNOLOGY,,1,1,1,If you pay 2 Data: Draw 2 cards.,Gain 1 Data. If 1+ inputs connected: Owner gains 1 VP.,No,No,Yes,Yes,Yes,Yes,No,No
-NODE_TECH_008,Fusion Reactor Prototype,TECHNOLOGY,,2,2,2,Gain 2 Energy. If adjacent to 2+ Technology nodes: Gain 1 Energy per Technology node in your network.,Gain 1 Energy. If you pay 1 Energy: You and the owner gain 1 VP.,No,No,Yes,Yes,No,No,Yes,Yes
+NODE_TECH_008,Fusion Reactor Prototype,TECHNOLOGY,,3,3,2,Gain 2 Energy. If adjacent to 2+ Technology nodes: Gain 1 Energy per Technology node in your network.,Gain 1 Energy. If you pay 1 Energy: You and the owner gain 1 VP.,No,No,Yes,Yes,No,No,Yes,Yes
 NODE_TECH_009,Network Hub,TECHNOLOGY,,2,2,1,If 1+ inputs connected: Gain 1 Data. If 3+ inputs connected: Gain 2 VP.,Gain 1 Data. If 1+ links attached: Gain 1 Data.,Yes,No,Yes,Yes,Yes,No,Yes,No
 NODE_TECH_010,Sabotage Drone Bay,TECHNOLOGY,,1,1,0,If you pay 1 Energy: Steal 1 Material from each owner of nodes activated this chain.,Gain 1 Data. Steal 1 Energy from the owner. If 1+ links attached: Owner discards 1 random card.,No,No,Yes,Yes,No,No,No,Yes
-NODE_TECH_011,Orbital Comm Relay,TECHNOLOGY,,1,1,0,Gain 1 Data. If adjacent to 1+ Technology nodes: Gain 1 Data per Technology node in your network.,Gain 1 Data. If 3+ nodes activated this chain: Draw 1 card.,No,Yes,Yes,No,No,No,No,No
+NODE_TECH_011,Orbital Comm Relay,TECHNOLOGY,,2,1,0,Gain 1 Data. If adjacent to 1+ Technology nodes: Gain 1 Data per Technology node in your network.,Gain 1 Data. If 3+ nodes activated this chain: Draw 1 card.,No,Yes,Yes,No,No,No,No,No
 NODE_TECH_012,High-Frequency Trading Hub,TECHNOLOGY,,1,1,0,Gain 1 Data. If you pay 2 Data: Discard 1 random card.,Gain 1 Data. If you pay 1 Data: Owner discards 1 random card.,No,No,Yes,Yes,No,No,No,No
 NODE_TECH_013,Planetary Defense Sensor,TECHNOLOGY,,1,1,0,Gain 1 Data. If adjacent to 2+ empty cell(s): Gain 1 VP.,If you pay 1 Data: Steal 1 Data from the owner.,No,No,Yes,No,No,Yes,No,No
 NODE_TECH_014,Tunnel Bore Control,TECHNOLOGY,,2,1,0,Gain 1 Material. If adjacent to 2+ empty cell(s): Gain 2 Material.,Gain 1 Material. If 1+ Resource nodes activated this chain: Gain 1 Material.,Yes,No,No,Yes,No,No,No,No

@@ -169,8 +169,19 @@ local function calculateActionContribution(action, isActivationEffect)
         target = "owner" -- The owner is the beneficiary
     -- Dynamic effects - ignore for now
     elseif effectType == "gainResourcePerNodeOwner" or effectType == "gainResourcePerNodeActivator" then
-        print(string.format("Warning: Cannot calculate cost for dynamic effect '%s'. Ignoring.", effectType))
-        target = "dynamic"
+        -- Dynamic per-node resource effect: static ME cost based on resource type
+        local dynamicAmount = amount or 1
+        if resource == ResourceType.MATERIAL then
+            baseME = 2.0 * dynamicAmount
+        elseif resource == ResourceType.DATA then
+            baseME = 4.0 * dynamicAmount
+        elseif resource == ResourceType.ENERGY or resource == "vp" then
+            baseME = 6.0 * dynamicAmount
+        else
+            baseME = 6.0 * dynamicAmount -- fallback for unexpected resource types
+        end
+        -- set target context for dynamic effect
+        target = (effectType == "gainResourcePerNodeOwner") and "owner" or "activator"
     else
         print(string.format("Warning: Unknown effect type '%s' for cost calculation.", effectType))
     end

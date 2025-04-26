@@ -903,8 +903,9 @@ function Renderer:_drawSingleCardInWorld(card, wx, wy, activeLinks, alphaOverrid
     local sf = self.canvasRenderScaleFactor or 1 -- Use new scale factor
     local invSf = 1 / sf
     local borderPadding = self.PORT_RADIUS -- Original units
-    local drawX = wx - borderPadding * invSf
-    local drawY = wy - borderPadding * invSf
+    -- draw the high-res canvas aligned so the inner content origin matches wx/wy
+    local drawX = wx - borderPadding
+    local drawY = wy - borderPadding
     love.graphics.setColor(1, 1, 1, alphaOverride)
     love.graphics.draw(canvas, drawX, drawY, 0, invSf, invSf)
 
@@ -929,7 +930,88 @@ function Renderer:_drawSingleCardInWorld(card, wx, wy, activeLinks, alphaOverrid
         love.graphics.setFont(fontOld)
     end
 
+    -- Draw convergence link tabs for world view
+    self:_drawCardConvergenceTabs(card, wx, wy, alphaOverride, activeLinks)
+
     -- Restore original color state
+    love.graphics.setColor(originalColor)
+end
+
+-- Extracted method to draw convergence link tabs for world view
+function Renderer:_drawCardConvergenceTabs(card, sx, sy, alphaOverride, activeLinks)
+    alphaOverride = alphaOverride or 1.0
+    activeLinks = activeLinks or {}
+    local linkMap = {}
+    for _, link in ipairs(activeLinks) do linkMap[link.linkId] = link end
+    local originalFont = love.graphics.getFont()
+    local originalColor = {love.graphics.getColor()}
+    -- use the card radius as offset inside canvas content
+    local r = self.PORT_RADIUS
+    for portIndex = 1, 8 do
+        local info = getPortInfo(portIndex)
+        if info then
+            -- align to content origin on world canvas
+            local portX = sx + info.x_offset
+            local portY = sy + info.y_offset
+            local isOutput = info.is_output
+            local occupyingLinkId = card:getOccupyingLinkId(portIndex)
+            if occupyingLinkId then
+                -- Draw the base port shape dimmed
+                self:_drawSinglePortShape(portIndex, portX, portY, r, alphaOverride * 0.4)
+                -- Draw the convergence tab
+                local linkDetails = linkMap[occupyingLinkId]
+                local playerNumber = linkDetails and linkDetails.initiatingPlayerIndex or "?"
+                local tabSize = r * 3.5
+                local fixedOffset = r
+                local orientation
+                if portIndex == Card.Ports.TOP_LEFT or portIndex == Card.Ports.TOP_RIGHT then orientation = "top"
+                elseif portIndex == Card.Ports.BOTTOM_LEFT or portIndex == Card.Ports.BOTTOM_RIGHT then orientation = "bottom"
+                elseif portIndex == Card.Ports.LEFT_TOP or portIndex == Card.Ports.LEFT_BOTTOM then orientation = "left"
+                elseif portIndex == Card.Ports.RIGHT_TOP or portIndex == Card.Ports.RIGHT_BOTTOM then orientation = "right"
+                end
+                local tabX, tabY
+                if orientation == "top" then
+                    tabX = portX - tabSize / 2
+                    tabY = portY - fixedOffset - tabSize
+                elseif orientation == "bottom" then
+                    tabX = portX - tabSize / 2
+                    tabY = portY + fixedOffset
+                elseif orientation == "left" then
+                    tabX = portX - fixedOffset - tabSize
+                    tabY = portY - tabSize / 2
+                elseif orientation == "right" then
+                    tabX = portX + fixedOffset
+                    tabY = portY - tabSize / 2
+                else
+                    local centerX, centerY = portX, portY
+                    if isOutput then
+                        if portIndex == Card.Ports.TOP_LEFT or portIndex == Card.Ports.TOP_RIGHT then centerY = portY - r / 2
+                        elseif portIndex == Card.Ports.BOTTOM_LEFT or portIndex == Card.Ports.BOTTOM_RIGHT then centerY = portY + r / 2
+                        elseif portIndex == Card.Ports.LEFT_TOP or portIndex == Card.Ports.LEFT_BOTTOM then centerX = portX - r / 2
+                        elseif portIndex == Card.Ports.RIGHT_TOP or portIndex == Card.Ports.RIGHT_BOTTOM then centerX = portX + r / 2 end
+                    end
+                    tabX = centerX - tabSize / 2
+                    tabY = centerY - tabSize / 2
+                end
+                love.graphics.setColor(0.9, 0.9, 0.9, alphaOverride * 0.7)
+                love.graphics.rectangle("fill", tabX, tabY, tabSize, tabSize)
+                love.graphics.setColor(0, 0, 0, alphaOverride)
+                love.graphics.rectangle("line", tabX, tabY, tabSize, tabSize)
+                love.graphics.setFont(self.fonts.worldSmall or originalFont)
+                love.graphics.setColor(0, 0, 0, alphaOverride)
+                local text = tostring(playerNumber)
+                local textScale = 0.45 / self.worldFontMultiplier
+                local nativeW = love.graphics.getFont():getWidth(text)
+                local nativeH = love.graphics.getFont():getHeight()
+                love.graphics.push()
+                love.graphics.translate(tabX + (tabSize - nativeW * textScale) / 2, tabY + (tabSize - nativeH * textScale) / 2)
+                love.graphics.scale(textScale, textScale)
+                love.graphics.print(text, 0, 0)
+                love.graphics.pop()
+            end
+        end
+    end
+    love.graphics.setFont(originalFont)
     love.graphics.setColor(originalColor)
 end
 

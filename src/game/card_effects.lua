@@ -51,13 +51,13 @@ local function generateResourceDescription(actionEffect, resource, amount, conte
     elseif actionEffect == "gainResourcePerNodeOwner" then
          local nodeType = "Any" -- Placeholder, actual type depends on options
          if isImperative then
-             return string.format("Gain %d %s per %s node...", amount, resourceName, nodeType)
+             return string.format("Gain %d %s per %s node in this network", amount, resourceName, nodeType)
          else
-             return string.format("Owner gains %d %s per %s node...", amount, resourceName, nodeType)
+             return string.format("Owner gains %d %s per %s node in this network", amount, resourceName, nodeType)
          end
     elseif actionEffect == "gainResourcePerNodeActivator" then
          local nodeType = "Any" -- Placeholder
-         return string.format("Gain %d %s per %s node...", amount, resourceName, nodeType)
+         return string.format("Gain %d %s per %s node in this network", amount, resourceName, nodeType)
     elseif actionEffect == "stealResource" then
         return string.format("Steal %d %s from the owner", amount, resourceName)
     end
