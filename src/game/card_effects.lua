@@ -51,13 +51,13 @@ local function generateResourceDescription(actionEffect, resource, amount, conte
     elseif actionEffect == "gainResourcePerNodeOwner" then
          local nodeType = "Any" -- Placeholder, actual type depends on options
          if isImperative then
-             return string.format("Gain %d %s per %s node in this network", amount, resourceName, nodeType)
+             return string.format("Gain %d %s per %s in this network", amount, resourceName, nodeType)
          else
-             return string.format("Owner gains %d %s per %s node in this network", amount, resourceName, nodeType)
+             return string.format("Owner gains %d %s per %s in this network", amount, resourceName, nodeType)
          end
     elseif actionEffect == "gainResourcePerNodeActivator" then
          local nodeType = "Any" -- Placeholder
-         return string.format("Gain %d %s per %s node in this network", amount, resourceName, nodeType)
+         return string.format("Gain %d %s per %s in this network", amount, resourceName, nodeType)
     elseif actionEffect == "stealResource" then
         return string.format("Steal %d %s from the owner", amount, resourceName)
     end
@@ -119,14 +119,14 @@ local function generateOtherDescription(actionEffect, options, context)
          local resourceName = options.resource:sub(1, 1):upper() .. options.resource:sub(2)
          local nodeType = options.nodeType or "Any" 
          if isImperative and context and context.effectType == "activation" then
-             return string.format("Gain %d %s per %s node in your network", options.amount or 1, resourceName, nodeType)
+             return string.format("Gain %d %s per %s in your network", options.amount or 1, resourceName, nodeType)
          else
-             return string.format("Owner gains %d %s per %s node in their network", options.amount or 1, resourceName, nodeType)
+             return string.format("Owner gains %d %s per %s in their network", options.amount or 1, resourceName, nodeType)
          end
     elseif actionEffect == "gainResourcePerNodeActivator" then
          local resourceName = options.resource:sub(1, 1):upper() .. options.resource:sub(2)
          local nodeType = options.nodeType or "Any"
-         return string.format("Gain %d %s per %s node in the owner's network", options.amount or 1, resourceName, nodeType)
+         return string.format("Gain %d %s per %s in the owner's network", options.amount or 1, resourceName, nodeType)
     -- === NEW EFFECT DESCRIPTIONS ===
     elseif actionEffect == "activatorStealResourceFromChainOwners" then
          local resourceName = options.resource and (options.resource:sub(1, 1):upper() .. options.resource:sub(2)) or "Resource"
@@ -165,7 +165,7 @@ local function evaluateAdjacencyCondition(conditionConfig, gameService, activati
             count = count + 1
         end
     end
-    print(string.format("Evaluated adjacency condition: %d/%d %s nodes found adjacent to %s", count, requiredCount, requiredType, sourceNode.position))
+    print(string.format("Evaluated adjacency condition: %d/%d %s found adjacent to %s", count, requiredCount, requiredType, sourceNode.position))
     return count >= requiredCount
 end
 
@@ -374,7 +374,7 @@ local function generateConditionDescription(conditionConfig, context)
     
     if type == "adjacency" then
         local nodeType = conditionConfig.nodeType or "Any"
-        return string.format("If adjacent to %d+ %s nodes: ", count, nodeType)
+        return string.format("If adjacent to %d+ %s: ", count, nodeType)
     elseif type == "convergenceLinks" then
         return string.format("If %d+ links attached: ", count)
     elseif type == "satisfiedInputs" then
@@ -383,7 +383,7 @@ local function generateConditionDescription(conditionConfig, context)
         return string.format("If %d+ nodes activated this chain: ", count)
     elseif type == "activatedCardType" then
         local cardType = conditionConfig.cardType or "Unknown"
-        return string.format("If %d+ %s nodes activated this chain: ", count, cardType)
+        return string.format("If %d+ %s activated this chain: ", count, cardType)
     elseif type == "adjacentEmptyCells" then
         return string.format("If adjacent to %d+ empty cells: ", count)
     elseif type == "hasTokens" then
