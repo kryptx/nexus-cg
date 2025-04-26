@@ -53,7 +53,7 @@ describe("CardEffects.generateEffectDescription", function()
                 }
             }
         }
-        assert.are.equal("If 1+ convergence link(s) attached: Activator gains 1 VP.", CardEffects.generateEffectDescription(config))
+        assert.are.equal("If 1+ links attached: Activator gains 1 VP.", CardEffects.generateEffectDescription(config))
     end)
 
     it("should group multiple actions with the same condition using semicolons", function()
@@ -71,7 +71,7 @@ describe("CardEffects.generateEffectDescription", function()
                 }
             }
         }
-        assert.are.equal("If 1+ convergence link(s) attached: Activator gains 1 VP; Activator draws 2 cards.", CardEffects.generateEffectDescription(config))
+        assert.are.equal("If 1+ links attached: Activator gains 1 VP; Activator draws 2 cards.", CardEffects.generateEffectDescription(config))
     end)
     
     it("should handle multiple actions with different conditions", function()
@@ -89,7 +89,7 @@ describe("CardEffects.generateEffectDescription", function()
                 }
             }
         }
-        assert.are.equal("If 1+ convergence link(s) attached: Activator gains 1 VP. If adjacent to 2+ Data node(s): Activator draws 2 cards.", CardEffects.generateEffectDescription(config))
+        assert.are.equal("If 1+ links attached: Activator gains 1 VP. If adjacent to 2+ Data nodes: Activator draws 2 cards.", CardEffects.generateEffectDescription(config))
     end)
 
     it("should correctly format mixed conditional and non-conditional actions", function()
@@ -120,7 +120,7 @@ describe("CardEffects.generateEffectDescription", function()
                 }
             }
         }
-        local expected = "If 1+ convergence link(s) attached: Activator gains 1 VP; Owner draws 1 card. Owner and activator gain 5 Energy. If adjacent to 1+ Factory node(s): Activator draws 2 cards. Owner gains 10 VP."
+        local expected = "If 1+ links attached: Activator gains 1 VP; Owner draws 1 card. Owner and activator gain 5 Energy. If adjacent to 1+ Factory nodes: Activator draws 2 cards. Owner gains 10 VP."
         assert.are.equal(expected, CardEffects.generateEffectDescription(config))
     end)
     

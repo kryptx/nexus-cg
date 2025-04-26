@@ -296,11 +296,17 @@ definitions["NODE_KNOW_009"] = {
       actions = {
           { effect = "drawCardsForOwner", options = { amount = 1 } },
           { 
-            condition = { type = "activatedCardType", count = 2, cardType = CardTypes.KNOWLEDGE },
-            effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } 
+            condition = { 
+                type = "paymentOffer", 
+                payer = "Owner", 
+                resource = ResourceType.MATERIAL, 
+                amount = 2 
+            },
+            effect = "ownerStealResourceFromChainOwners", 
+            options = { resource = ResourceType.DATA, amount = 1 } 
           }
       }
-      -- Description: "Owner draws 1 card. If 2+ Knowledge card(s) were activated in this chain: Owner gains 2 Data."
+      -- New Description: "Owner draws 1 card. If Owner pays 2 Material: Owner steals 1 Data from each owner of nodes activated this chain."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
@@ -386,7 +392,7 @@ definitions["NODE_KNOW_011"] = {
       -- Description: "Activator gains 1 Data. If Activator pays 1 Data: Activator draws 1 card."
   }),
   vpValue = 0, 
-  imagePath = "assets/images/philosopher's-conclave.png", 
+  imagePath = "assets/images/philosophers-conclave.png", 
   flavorText = "Debating the nature of existence, lightyears from home.",
   definedPorts = { [CardPorts.BOTTOM_LEFT] = true, [CardPorts.LEFT_TOP] = true },
 }
@@ -441,16 +447,20 @@ definitions["NODE_KNOW_013"] = {
       actions = {
           { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
           { 
-            condition = { type = "satisfiedInputs", count = 1 },
+            condition = { type = "convergenceLinks", count = 1 },
             effect = "gainResourcePerNodeActivator", options = { resource = ResourceType.DATA, amount = 1, nodeType = CardTypes.KNOWLEDGE } 
           }
       }
-      -- Description: "Activator gains 1 Data. If 1+ input port(s) are connected: Activator gains 1 Data per Knowledge node in the owner's network."
+      -- Description: "Activator gains 1 Data. If 1+ convergence links attached: Activator gains 1 Data per Knowledge node in the owner's network."
   }),
   vpValue = 0, 
   imagePath = "assets/images/deep-space-observatory.png", 
   flavorText = "Mapping the unknown cosmos.",
-  definedPorts = { [CardPorts.LEFT_TOP] = true, [CardPorts.LEFT_BOTTOM] = true },
+  definedPorts = { 
+    [CardPorts.LEFT_TOP] = true, -- Knowledge Output
+    [CardPorts.LEFT_BOTTOM] = true, -- Resource Input
+    [CardPorts.TOP_RIGHT] = true    -- Technology Input
+  },
 }
 
 definitions["NODE_KNOW_014"] = {
@@ -606,16 +616,13 @@ definitions["NODE_KNOW_018"] = {
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
           { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
-          { 
-            condition = { type = "satisfiedInputs", count = 2 },
-            effect = "drawCardsForActivator", options = { amount = 1 } 
-          },
+          { effect = "drawCardsForActivator", options = { amount = 1 } },
           { 
             condition = { type = "activationChainLength", count = 3 },
             effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 2 } 
           }
       }
-      -- Description: "Activator gains 1 Data. If 2+ input port(s) are connected: Activator draws 1 card. If 3+ card(s) were activated in this chain: Activator gains 2 Data."
+      -- Description: "Activator gains 1 Data. Activator draws 1 card. If 3+ card(s) were activated in this chain: Activator gains 2 Data."
   }),
   vpValue = 1, 
   imagePath = "assets/images/centralized-knowledge-bank.png", 

@@ -220,45 +220,6 @@ function ActivationService:attemptActivationGlobal(activatingPlayerIndex, target
     return status, msg
 end
 
--- Internal helper to process a path, potentially pausing for input
-function ActivationService:_processActivationPath(path, activatingPlayer, isConvergenceStart, activationMessages)
-    local gs = self.gameService
-    for i, elem in ipairs(path) do
-        local cardNode, owner = elem.card, elem.owner
-        if cardNode.type == Card.Type.REACTOR then goto continue end
-
-        table.insert(self.currentActivationChainCards, cardNode.type)
-        if elem.traversedLinkType then
-            table.insert(self.currentActivationChainLinks, elem.traversedLinkType)
-        end
-
-        local effectType, status = 'standard', nil
-        if i == 1 and isConvergenceStart or owner ~= activatingPlayer then
-            effectType = 'convergence'
-            status = cardNode:activateConvergence(gs, activatingPlayer, owner.network, cardNode)
-        else
-            status = cardNode:activateEffect(gs, activatingPlayer, owner.network, cardNode)
-        end
-        table.insert(activationMessages, string.format("  - %s activated (%s)!", cardNode.title, effectType))
-
-        if status == 'waiting' then
-            -- Pause remaining
-            local remaining = {}
-            for j = i+1, #path do table.insert(remaining, path[j]) end
-            if #remaining > 0 then
-                self.pausedActivationPath = remaining
-                self.pausedActivationContext = { activatingPlayer = activatingPlayer, isConvergenceStart = isConvergenceStart }
-            end
-            return true, table.concat(activationMessages, '\n') .. '\nActivation paused, waiting for input...'
-        end
-        ::continue::
-    end
-
-    -- Completed
-    self.pausedActivationPath = nil; self.pausedActivationContext = nil
-    return true, table.concat(activationMessages, '\n')
-end
-
 -- Resume a paused activation
 function ActivationService:resumeActivation()
     if not self.pausedActivationPath or not self.pausedActivationContext then
@@ -276,9 +237,80 @@ end
 
 -- Get info about current activation chain
 function ActivationService:getActivationChainInfo()
-    return { length = #self.currentActivationChainCards,
-             cards = self.currentActivationChainCards,
-             links = self.currentActivationChainLinks }
+    -- We need to return the list of nodes { card=..., owner=... } as well for the new effect
+    local nodesInChain = {}
+    if self.currentActivationChainPath then -- Use the full path if stored
+        for _, pathElement in ipairs(self.currentActivationChainPath) do
+            -- Ensure we don't add the reactor
+            if pathElement.card and pathElement.card.type ~= Card.Type.REACTOR then
+                table.insert(nodesInChain, { card = pathElement.card, owner = pathElement.owner })
+            end
+        end
+    else
+        -- Fallback or warning if full path isn't stored (this might need adjustment depending on where path info is finalized)
+        print("Warning: ActivationService:getActivationChainInfo called but currentActivationChainPath is not set.")
+    end
+    
+    return { 
+        length = #self.currentActivationChainCards,
+        cards = self.currentActivationChainCards, -- List of card types
+        links = self.currentActivationChainLinks, -- List of link types traversed
+        nodes = nodesInChain -- List of {card=..., owner=...} excluding reactor
+    }
+end
+
+-- Internal helper to process a path, potentially pausing for input
+function ActivationService:_processActivationPath(path, activatingPlayer, isConvergenceStart, activationMessages)
+    local gs = self.gameService
+    self.currentActivationChainPath = path -- Store the full path being processed
+    
+    for i, elem in ipairs(path) do
+        local cardNode, owner = elem.card, elem.owner
+        if cardNode.type == Card.Type.REACTOR then goto continue end
+
+        table.insert(self.currentActivationChainCards, cardNode.type)
+        if elem.traversedLinkType then
+            table.insert(self.currentActivationChainLinks, elem.traversedLinkType)
+        end
+
+        local effectType, status = 'standard', nil
+        -- Determine if it's a convergence effect based on ownership OR if it's the start of a convergence path
+        if owner ~= activatingPlayer or (i == 1 and isConvergenceStart) then
+            effectType = 'convergence'
+            -- Pass activatingPlayer, sourceNetwork (owner's), sourceNode (card's), and initiatingNode (from path? TBD)
+            -- The 4th arg to activateConvergence is initiatingNode - we might need this in the path elem
+            -- For now, passing nil as the initiating node, might need refinement based on effect needs
+            status = cardNode:activateConvergence(gs, activatingPlayer, nil)
+        else
+            effectType = 'standard'
+            -- Pass activatingPlayer, sourceNetwork (owner's), sourceNode (card's), and targetNode (original target?)
+            -- The 4th arg to activateEffect is originalTargetNode - how do we get this here? Maybe pass only needed context?
+            -- Sticking to original call signature for now, might need update:
+            status = cardNode:activateEffect(gs, activatingPlayer, cardNode.owner.network, cardNode) 
+        end
+        table.insert(activationMessages, string.format("  - %s activated (%s)!", cardNode.title, effectType))
+
+        if status == 'waiting' then
+            -- Pause remaining path
+            local remaining = {}
+            for j = i+1, #path do table.insert(remaining, path[j]) end
+            if #remaining > 0 then
+                self.pausedActivationPath = remaining
+                self.pausedActivationContext = { activatingPlayer = activatingPlayer, isConvergenceStart = isConvergenceStart }
+            else 
+                -- If waiting on the very last node, clear paused path
+                self.pausedActivationPath = nil
+                self.pausedActivationContext = nil
+            end
+            return true, table.concat(activationMessages, '\n') .. '\nActivation paused, waiting for input...'
+        end
+        ::continue::
+    end
+
+    -- Completed - Clear full path as well
+    self.pausedActivationPath = nil; self.pausedActivationContext = nil
+    self.currentActivationChainPath = nil 
+    return true, table.concat(activationMessages, '\n')
 end
 
 return ActivationService 

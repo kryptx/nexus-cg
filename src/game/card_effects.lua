@@ -52,6 +52,8 @@ local function generateOtherDescription(actionEffect, options)
         return string.format("Activator gains %d VP", options.amount or 1)
     elseif actionEffect == "gainVPForOwner" then
         return string.format("Owner gains %d VP", options.amount or 1)
+    elseif actionEffect == "gainVPForBoth" then
+        return string.format("Owner and Activator gain %d VP", options.amount or 1)
     elseif actionEffect == "forceDiscardCardsOwner" then
         return string.format("Owner discards %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
     elseif actionEffect == "forceDiscardCardsActivator" then
@@ -70,6 +72,15 @@ local function generateOtherDescription(actionEffect, options)
          local resourceName = options.resource:sub(1, 1):upper() .. options.resource:sub(2)
          local nodeType = options.nodeType or "Any"
          return string.format("Activator gains %d %s per %s node in the owner's network", options.amount or 1, resourceName, nodeType)
+    -- === NEW EFFECT DESCRIPTIONS ===
+    elseif actionEffect == "activatorStealResourceFromChainOwners" then
+         local resourceName = options.resource and (options.resource:sub(1, 1):upper() .. options.resource:sub(2)) or "Resource"
+         local amount = options.amount or 1
+         return string.format("Activator steals %d %s from each owner of nodes activated this chain", amount, resourceName)
+    elseif actionEffect == "ownerStealResourceFromChainOwners" then
+         local resourceName = options.resource and (options.resource:sub(1, 1):upper() .. options.resource:sub(2)) or "Resource"
+         local amount = options.amount or 1
+         return string.format("Owner steals %d %s from each owner of nodes activated this chain", amount, resourceName)
     -- =====================================================
     end
     return "Unknown other effect" -- Note: No trailing period here either
@@ -264,16 +275,16 @@ local function generateConditionDescription(conditionConfig)
     local count = conditionConfig.count or 1
     if type == "adjacency" then
         local nodeType = conditionConfig.nodeType or "Any"
-        return string.format("If adjacent to %d+ %s node(s): ", count, nodeType)
+        return string.format("If adjacent to %d+ %s nodes: ", count, nodeType)
     elseif type == "convergenceLinks" then
-        return string.format("If %d+ convergence link(s) attached: ", count)
+        return string.format("If %d+ links attached: ", count)
     elseif type == "satisfiedInputs" then
-        return string.format("If %d+ input port(s) are connected: ", count)
+        return string.format("If %d+ inputs connected: ", count)
     elseif type == "activationChainLength" then
-        return string.format("If %d+ card(s) were activated in this chain: ", count)
+        return string.format("If %d+ nodes activated this chain: ", count)
     elseif type == "activatedCardType" then
         local cardType = conditionConfig.cardType or "Unknown"
-        return string.format("If %d+ %s card(s) were activated in this chain: ", count, cardType)
+        return string.format("If %d+ %s nodes activated this chain: ", count, cardType)
     elseif type == "adjacentEmptyCells" then -- Add description for new condition
         return string.format("If adjacent to %d+ empty cell(s): ", count)
     elseif type == "paymentOffer" then -- Add description for payment offer
@@ -364,6 +375,57 @@ local function _requestPaymentAndExecute(playerToAsk, costResource, costAmount, 
     -- Removed the 'cannot afford' else block as it's checked by evaluatePaymentOfferCondition now
 end
 
+-- === NEW INTERNAL HELPER for Chain Steal ===
+-- beneficiary: The player object who receives the stolen resources
+-- resource, amount: The type and quantity to steal from each owner
+-- gameService: Reference to the game service
+local function _executeChainSteal(beneficiary, resource, amount, gameService)
+    if not beneficiary then print("Warning: _executeChainSteal called without a beneficiary."); return end
+    if not resource then print("Warning: _executeChainSteal missing 'resource'."); return end
+    amount = amount or 1
+    if not gameService or not gameService.getActivationChainInfo then 
+        print("Warning: _executeChainSteal requires gameService:getActivationChainInfo()."); 
+        return 
+    end
+    if not gameService.transferResource then
+        print("Warning: _executeChainSteal requires gameService:transferResource()."); 
+        return
+    end
+    
+    local chainInfo = gameService:getActivationChainInfo()
+    -- Ensure chainInfo and chainInfo.nodes are valid tables
+    if not chainInfo or type(chainInfo.nodes) ~= 'table' then 
+        print("Warning: _executeChainSteal received invalid chain info (not a table or nil)."); 
+        return
+    end
+    -- Handle empty chain case gracefully
+    if #chainInfo.nodes == 0 then
+        print("Executing ChainSteal: No nodes found in chain.")
+        return
+    end
+
+    local uniqueOwners = {}
+    local allOwnersInChain = {}
+    for _, nodeInfo in ipairs(chainInfo.nodes) do
+        if nodeInfo.owner then
+            if not uniqueOwners[nodeInfo.owner.id] then
+                uniqueOwners[nodeInfo.owner.id] = true
+                table.insert(allOwnersInChain, nodeInfo.owner)
+            end
+        end
+    end
+
+    if #allOwnersInChain > 0 then
+        print(string.format("Executing ChainSteal for Player %d: Targeting %d unique owners.", beneficiary.id, #allOwnersInChain))
+        for _, ownerToStealFrom in ipairs(allOwnersInChain) do
+            print(string.format("  - Attempting to steal %d %s from Player %d (-> to Player %d)", amount, resource, ownerToStealFrom.id, beneficiary.id))
+            gameService:transferResource(ownerToStealFrom, beneficiary, resource, amount)
+        end
+    else
+         print("Executing ChainSteal: No valid owners found in chain.")
+    end
+end
+
 -- === NEW HELPER: Direct Single Action Execution ===
 -- This avoids recursion issues with createActivationEffect inside the payment callback.
 function CardEffects._executeSingleAction(effectType, options, gameService, activatingPlayer, sourceNetwork, sourceNode)
@@ -399,6 +461,10 @@ function CardEffects._executeSingleAction(effectType, options, gameService, acti
     elseif effectType == "gainVPForOwner" then
         local amount = options.amount or 1
         if owner and gameService.awardVP then gameService:awardVP(owner, amount) else print("Warning: gameService:awardVP not found or owner missing!") end
+    elseif effectType == "gainVPForBoth" then
+        local amount = options.amount or 1
+        if activatingPlayer and gameService.awardVP then gameService:awardVP(activatingPlayer, amount) else print("Warning: gameService:awardVP not found or activatingPlayer missing!") end
+        if owner and gameService.awardVP then gameService:awardVP(owner, amount) else print("Warning: gameService:awardVP not found or owner missing!") end
     elseif effectType == "forceDiscardCardsOwner" then
         local amount = options.amount or 1
         if owner and gameService.forcePlayerDiscard then gameService:forcePlayerDiscard(owner, amount) else print("Warning: gameService:forcePlayerDiscard not found or owner missing!") end
@@ -422,7 +488,12 @@ function CardEffects._executeSingleAction(effectType, options, gameService, acti
             local count = owner.network:countNodesByType(nodeType); local totalAmount = count * amountPerNode
             if totalAmount > 0 then activatingPlayer:addResource(resource, totalAmount) end
         else print("Warning: Could not execute gainResourcePerNodeActivator.") end
-    -- NOTE: No offerPayment... cases needed here anymore!
+    -- === Refactored Chain Steal Effects ===
+    elseif effectType == "activatorStealResourceFromChainOwners" then
+        _executeChainSteal(activatingPlayer, options.resource, options.amount, gameService)
+    elseif effectType == "ownerStealResourceFromChainOwners" then
+        _executeChainSteal(owner, options.resource, options.amount, gameService)
+    -- ================================
     else
         print(string.format("Warning: Unknown effect type '%s' encountered during direct execution.", effectType))
     end

@@ -76,19 +76,46 @@ local function calculatePortsCost(definedPorts)
 end
 
 -- Calculate the ME contribution of a single action within an effect
--- Returns: { benefitME = number, costME = number, isConditional = boolean }
+-- Returns the net ME contribution to the card's calculated cost.
 local function calculateActionContribution(action, isActivationEffect)
     local effectType = action.effect
     local options = action.options or {}
     local conditionConfig = action.condition
-    local contribution = { benefitME = 0, costME = 0, isConditional = (conditionConfig ~= nil) }
+    local isConditional = (conditionConfig ~= nil)
+    local contributionME = 0 -- This will be the final value added/subtracted from the card's cost ME
 
     local resource = options.resource
     local amount = options.amount or 1
 
-    -- Determine Base Benefit/Harm ME (Ignoring player cost for now)
+    -- Handle Payment Offer Condition separately first
+    if conditionConfig and conditionConfig.type == "paymentOffer" then
+        local payerType = conditionConfig.payer -- Owner or Activator
+        local paymentResource = conditionConfig.resource
+        local paymentAmount = conditionConfig.amount or 1
+        
+        if not paymentResource then
+            print(string.format("Warning: paymentOffer condition for effect '%s' missing resource. Cannot calculate cost reduction.", effectType))
+            -- Proceed to calculate base benefit of the effect itself, but apply conditional multiplier
+            isConditional = true -- Ensure multiplier is applied even if payment cost fails
+        else
+            local paymentCostME = getMEValue(paymentResource, paymentAmount)
+            
+            -- The cost of the payment *reduces* the card's build cost, 
+            -- because the player pays it *later* during play, not upfront.
+            -- This cost reduction is itself conditional on the player choosing to pay.
+            local paymentCostReduction = -paymentCostME * CONDITIONAL_EFFECT_MULTIPLIER 
+            contributionME = contributionME + paymentCostReduction
+            -- print(string.format("  PaymentOffer Cost: Payer=%s, Res=%s, Amt=%d -> CostME=%.2f, Reduction=%.2f", payerType, paymentResource, paymentAmount, paymentCostME, paymentCostReduction))
+            
+            -- Now, calculate the benefit of the *actual* effect this payment enables
+            -- The benefit calculation proceeds below, but it's subject to the conditionality
+            isConditional = true -- The effect only happens if payment is made
+        end
+    end
+
+    -- Determine Base Benefit/Harm ME of the core effect (Ignoring player payment costs handled above)
     local baseME = 0
-    local target = "unknown" -- owner, activator, both, all, self (for node effects)
+    local target = "unknown" -- owner, activator, both, all, self, steal
 
     if effectType == "addResourceToOwner" then
         baseME = getMEValue(resource, amount)
@@ -97,10 +124,10 @@ local function calculateActionContribution(action, isActivationEffect)
         baseME = getMEValue(resource, amount)
         target = "activator"
     elseif effectType == "addResourceToBoth" then
-        baseME = getMEValue(resource, amount) -- Value of one player's gain
+        baseME = getMEValue(resource, amount) 
         target = "both"
     elseif effectType == "addResourceToAllPlayers" then
-        baseME = getMEValue(resource, amount) -- Value of one player's gain
+        baseME = getMEValue(resource, amount) 
         target = "all"
     elseif effectType == "drawCardsForOwner" then
         baseME = getMEValue("draw", amount)
@@ -109,7 +136,7 @@ local function calculateActionContribution(action, isActivationEffect)
         baseME = getMEValue("draw", amount)
         target = "activator"
     elseif effectType == "drawCardsForAllPlayers" then
-         baseME = getMEValue("draw", amount) -- Value of one player's gain
+         baseME = getMEValue("draw", amount)
          target = "all"
     elseif effectType == "gainVPForOwner" then
         baseME = getMEValue("vp", amount)
@@ -117,99 +144,66 @@ local function calculateActionContribution(action, isActivationEffect)
     elseif effectType == "gainVPForActivator" then
         baseME = getMEValue("vp", amount)
         target = "activator"
+    elseif effectType == "gainVPForBoth" then
+        baseME = getMEValue("vp", amount) 
+        target = "both"
     elseif effectType == "forceDiscardCardsOwner" then
-        baseME = -getMEValue("draw", amount) -- Harm = negative benefit of drawing
+        baseME = -getMEValue("draw", amount) 
         target = "owner"
     elseif effectType == "forceDiscardCardsActivator" then
-        baseME = -getMEValue("draw", amount) -- Harm (considered negative benefit for activator)
+        baseME = -getMEValue("draw", amount) 
         target = "activator"
     elseif effectType == "destroyRandomLinkOnNode" then
-         baseME = -2.0 -- Tentative harm value
-         target = "self" -- Node itself
+         baseME = -2.0 
+         target = "self" 
     elseif effectType == "stealResource" then
         baseME = getMEValue(resource, amount) -- Benefit for activator, harm for owner
         target = "steal"
-    elseif effectType == "gainResourcePerNodeOwner" then
-        -- Hard to evaluate without game state. Assume average benefit?
-        -- Or ignore for now? Let's ignore dynamic effects for v1.
+    -- New Chain Steal Effects
+    elseif effectType == "activatorStealResourceFromChainOwners" then
+        baseME = getMEValue(resource, 1.5) -- Estimated avg benefit: steal 1 resource (value based on type) from 1.5 owners
+        target = "activator" -- The activator is the beneficiary
+    elseif effectType == "ownerStealResourceFromChainOwners" then
+        baseME = getMEValue(resource, 1.5) -- Estimated avg benefit
+        target = "owner" -- The owner is the beneficiary
+    -- Dynamic effects - ignore for now
+    elseif effectType == "gainResourcePerNodeOwner" or effectType == "gainResourcePerNodeActivator" then
         print(string.format("Warning: Cannot calculate cost for dynamic effect '%s'. Ignoring.", effectType))
-        target = "owner_dynamic"
-    elseif effectType == "gainResourcePerNodeActivator" then
-        print(string.format("Warning: Cannot calculate cost for dynamic effect '%s'. Ignoring.", effectType))
-        target = "activator_dynamic"
-    elseif effectType == "offerPaymentOwner" or effectType == "offerPaymentActivator" then
-        -- Handled specially below
-        target = (effectType == "offerPaymentOwner") and "offer_owner" or "offer_activator"
+        target = "dynamic"
     else
         print(string.format("Warning: Unknown effect type '%s' for cost calculation.", effectType))
-        target = "unknown"
     end
 
-    -- Handle Offer Payment specifically
-    if target == "offer_owner" or target == "offer_activator" then
-        local paymentCostME = getMEValue(resource, amount)
-        local consequenceBenefitME = 0
-        if options.consequence then
-            for _, consAction in ipairs(options.consequence) do
-                -- Recursively calculate contribution of consequence actions
-                -- Assume consequences follow same activation/convergence context for multiplier? Yes.
-                local consContrib = calculateActionContribution(consAction, isActivationEffect)
-                -- Net benefit = benefit - cost. Cost part is ignored here as it's part of the offer.
-                consequenceBenefitME = consequenceBenefitME + consContrib.benefitME
-            end
+    -- Calculate ME contribution from the base effect based on target and context
+    local effectME = 0
+    if isActivationEffect then -- Effect occurs during Owner's activation
+        if target == "owner" then effectME = baseME -- Benefit/Harm to owner directly impacts cost
+        elseif target == "steal" then effectME = -baseME -- Steal (benefit activator) harms owner, reduces cost
+        elseif target == "self" and baseME < 0 then effectME = baseME -- Self-harm reduces cost
+        -- Effects targeting activator/both/all in activation context have 0 cost contribution by default
         end
-        -- Net ME = Consequence Benefit - Payment Cost
-        baseME = consequenceBenefitME - paymentCostME
-        -- The 'target' for cost calculation is implicitly the payer, but the *benefit* rule depends on the consequence target.
-        -- This is complex. Let's simplify: the net ME contributes directly to cost, adjusted by multipliers later.
-        target = "offer_net" -- Special target type for applying multipliers
-    end
-
-    -- Apply Rules based on Target and Effect Context (Activation vs Convergence)
-    local finalME = 0
-    if isActivationEffect then
-        if target == "owner" and baseME > 0 and target ~= "offer_net" then -- Free benefit for owner adds cost
-             finalME = baseME
-        elseif target == "owner" and baseME < 0 then -- Harm to owner reduces cost
-             finalME = baseME
-        elseif target == "steal" then -- Steal harms owner, reduces cost
-            finalME = -baseME -- Subtract the value stolen
-        elseif target == "self" and baseME < 0 then -- Harm to self (destroy link) reduces cost
-             finalME = baseME
-        elseif target == "offer_net" then -- Net cost/benefit from paid effects
-            finalME = baseME
-        -- Effects benefiting activator, both, all in activation have 0 direct cost contribution based on rules
-        end
-    else -- Convergence Effect
+    else -- Effect occurs during Convergence (Activator is opponent)
         local multiplier = CONVERGENCE_EFFECT_MULTIPLIER
-        if target == "activator" and baseME > 0 then -- Benefit to activator reduces cost
-             finalME = -baseME * multiplier
-        elseif target == "steal" then -- Steal benefits activator, reduces cost
-             finalME = -baseME * multiplier
-        elseif target == "activator" and baseME < 0 then -- Harm to activator (discard) - does this add cost? Let's say yes.
-             finalME = -baseME * multiplier -- Add cost = -(negative value) * mult
-        elseif target == "owner" and baseME > 0 then -- Benefit to owner adds cost (reduced)
-             finalME = baseME * multiplier
-         elseif target == "offer_net" then -- Paid effects apply multiplier to net value
-             finalME = baseME * multiplier
-        -- Harm to owner, benefit/harm to both/all in convergence - need clearer rules.
-        -- Tentative: Harm to owner reduces cost by mult*harm. Benefit Both/All adds mult*benefit.
-        elseif target == "owner" and baseME < 0 then
-             finalME = baseME * multiplier
-        elseif (target == "both" or target == "all") and baseME ~= 0 then
-             finalME = baseME * multiplier -- Assume benefit adds cost (reduced)
+        if target == "activator" then effectME = -baseME * multiplier -- Benefit to activator reduces cost; Harm adds cost
+        elseif target == "steal" then effectME = -baseME * multiplier -- Steal benefits activator, reduces cost
+        elseif target == "owner" then effectME = baseME * multiplier -- Benefit/Harm to owner impacts cost (reduced)
+        elseif target == "both" or target == "all" then effectME = baseME * multiplier -- Assume benefit adds cost (reduced), harm reduces cost (reduced)
+        elseif target == "self" and baseME < 0 then effectME = baseME * multiplier -- Self-harm reduces cost (reduced)
         end
     end
 
-    -- Apply Conditional Multiplier if applicable
-    if contribution.isConditional then
-        finalME = finalME * CONDITIONAL_EFFECT_MULTIPLIER
+    -- Apply Conditional Multiplier to the *effect's* contribution (payment cost reduction already handled)
+    if isConditional then
+        effectME = effectME * CONDITIONAL_EFFECT_MULTIPLIER
     end
 
-    contribution.benefitME = finalME -- Use benefitME field to store the final calculated contribution
-    -- print(string.format("Action '%s' (Activation: %s): BaseME=%.2f, Target=%s -> FinalME=%.2f (Conditional: %s)", effectType, tostring(isActivationEffect), baseME, target, finalME, tostring(contribution.isConditional)))
+    -- Add the effect's contribution to the total contribution for this action
+    contributionME = contributionME + effectME
 
-    return contribution
+    -- print(string.format("Action '%s' (Activation: %s): BaseME=%.2f, Target=%s -> EffectME=%.2f (Conditional: %s) -> TotalContribME=%.2f", 
+    --    effectType, tostring(isActivationEffect), baseME, target, effectME, tostring(isConditional), contributionME))
+
+    return contributionME
 end
 
 
@@ -218,18 +212,16 @@ local function calculateEffectsCost(activationEffect, convergenceEffect)
     local totalEffectsME = 0
 
     -- Process Activation Effects
-    if activationEffect and activationEffect.config and activationEffect.config.actions then -- Look inside .config
+    if activationEffect and activationEffect.config and activationEffect.config.actions then
         for _, action in ipairs(activationEffect.config.actions) do
-            local contribution = calculateActionContribution(action, true)
-            totalEffectsME = totalEffectsME + contribution.benefitME
+            totalEffectsME = totalEffectsME + calculateActionContribution(action, true)
         end
     end
 
     -- Process Convergence Effects
-    if convergenceEffect and convergenceEffect.config and convergenceEffect.config.actions then -- Look inside .config
+    if convergenceEffect and convergenceEffect.config and convergenceEffect.config.actions then
          for _, action in ipairs(convergenceEffect.config.actions) do
-            local contribution = calculateActionContribution(action, false)
-            totalEffectsME = totalEffectsME + contribution.benefitME
+            totalEffectsME = totalEffectsME + calculateActionContribution(action, false)
         end
     end
 

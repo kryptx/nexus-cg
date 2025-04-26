@@ -310,21 +310,21 @@ definitions["NODE_TECH_010"] = {
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             {
-                condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.ENERGY, amount = 1 },
-                effect = "destroyRandomLinkOnNode",
-                options = {} 
+                condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.ENERGY, amount = 1 }, 
+                effect = "activatorStealResourceFromChainOwners",
+                options = { resource = ResourceType.MATERIAL, amount = 1 } 
             }
         }
-        -- Description: "If Owner pays 1 Energy: Destroy a random convergence link on this node."
+        -- Description: "If Owner pays 1 Energy: Activator steals 1 Material from each owner of nodes activated this chain."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
              { effect = "stealResource", options = { resource = ResourceType.ENERGY, amount = 1 } },
-             { condition = { type = "convergenceLinks", count = 3 },
+             { condition = { type = "convergenceLinks", count = 1 },
                effect = "forceDiscardCardsOwner", options = { amount = 1 } }
         }
-        -- Description: "Activator gains 1 Data. Activator steals 1 Energy from the owner. If 3+ convergence link(s) attached: Owner discards 1 card."
+        -- Description: "Activator gains 1 Data. Activator steals 1 Energy from the owner. If 1+ convergence link(s) attached: Owner discards 1 card."
     }),
     vpValue = 0,
     imagePath = "assets/images/sabotage-drone-bay.png",
