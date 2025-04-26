@@ -104,9 +104,9 @@ function GameService:initializeGame(playerCount)
         })
         
         -- Set starting resources
-        player:addResource('energy', 10)
-        player:addResource('data', 20)
-        player:addResource('material', 20)
+        player:addResource('energy', 3)
+        player:addResource('data', 3)
+        player:addResource('material', 5)
         
         -- Create reactor card first using Card constructor with reactor definition
         local reactorData = CardDefinitions["REACTOR_BASE"]

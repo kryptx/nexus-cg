@@ -20,6 +20,7 @@ local PORT_COST_ME = 0.5
 local CONVERGENCE_EFFECT_MULTIPLIER = 0.5
 local CONDITIONAL_EFFECT_MULTIPLIER = 0.5
 local MINIMUM_COST_ME = 1.0
+local GENESIS_COST_MULTIPLIER = 0.5 -- Halve the cost for genesis cards
 
 -- === Helper Functions ===
 
@@ -323,6 +324,11 @@ function CostCalculator.calculateDerivedCost(cardDefinition, thematicRatio) -- A
     local effectsME = calculateEffectsCost(cardDefinition.activationEffect, cardDefinition.convergenceEffect)
 
     local totalME = portsME + effectsME
+    
+    -- Apply genesis card cost reduction if applicable
+    if cardDefinition.isGenesis then
+        totalME = totalME * GENESIS_COST_MULTIPLIER
+    end
 
     -- Apply minimum cost floor (in ME) before converting
     if totalME < MINIMUM_COST_ME then

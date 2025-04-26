@@ -13,10 +13,10 @@ NODE_CULT_011,Public Forum Interface,CULTURE,,1,2,0,Owner draws 1 card. If adjac
 NODE_CULT_012,Propaganda Broadcaster,CULTURE,,1,1,0,If Owner pays 2 Data: Activator discards 2 cards; Owner gains 1 VP.,Activator gains 1 Data. If 1+ links attached: Owner discards 1 card.,No,Yes,Yes,No,Yes,No,No,No
 NODE_CULT_013,Subterranean Market,CULTURE,,1,1,0,Owner gains 1 Material. If 1+ links attached: Unknown other effect.,If Activator pays 1 Energy: Activator gains 2 Material; Owner gains 1 Data.,Yes,Yes,No,No,No,No,Yes,No
 NODE_CULT_014,Cultural Artifact Factory,CULTURE,,1,1,1,Owner gains 1 Material. If 2+ inputs connected: Owner gains 1 Material per Culture node in their network.,Activator gains 1 Material. If adjacent to 1+ Resource nodes: Activator gains 1 VP.,Yes,No,No,Yes,No,No,No,Yes
-NODE_GENESIS_CULT_001,Nascent Meme,CULTURE,true,4,0,0,Owner gains 1 Data.,Activator gains 1 Data.,Yes,Yes,Yes,No,No,Yes,No,Yes
-NODE_GENESIS_KNOW_001,Seed Thought,KNOWLEDGE,true,4,0,0,Owner gains 1 Data.,Activator gains 1 Data.,Yes,Yes,No,No,Yes,Yes,Yes,No
-NODE_GENESIS_RES_001,First Spark,RESOURCE,true,4,0,0,Owner gains 1 Material.,Activator gains 1 Material.,No,No,Yes,Yes,Yes,No,Yes,Yes
-NODE_GENESIS_TECH_001,Initial Circuit,TECHNOLOGY,true,4,0,0,Owner gains 1 Data.,Activator gains 1 Data.,Yes,Yes,No,Yes,No,Yes,No,Yes
+NODE_GENESIS_CULT_001,Nascent Meme,CULTURE,true,2,0,0,Owner gains 1 Data.,Activator gains 1 Data.,Yes,Yes,Yes,No,No,Yes,No,Yes
+NODE_GENESIS_KNOW_001,Seed Thought,KNOWLEDGE,true,2,0,0,Owner gains 1 Data.,Activator gains 1 Data.,Yes,Yes,No,No,Yes,Yes,Yes,No
+NODE_GENESIS_RES_001,First Spark,RESOURCE,true,2,0,0,Owner gains 1 Material.,Activator gains 1 Material.,No,No,Yes,Yes,Yes,No,Yes,Yes
+NODE_GENESIS_TECH_001,Initial Circuit,TECHNOLOGY,true,2,0,0,Owner gains 1 Data.,Activator gains 1 Data.,Yes,Yes,No,Yes,No,Yes,No,Yes
 NODE_KNOW_001,Data Relay,KNOWLEDGE,,1,1,0,Owner gains 1 Data.,Activator gains 1 Data. If 2+ nodes activated this chain: Activator draws 1 card.,No,No,No,No,Yes,Yes,Yes,No
 NODE_KNOW_002,Materials Analysis Lab,KNOWLEDGE,,1,2,1,Owner gains 1 Data. If 2+ inputs connected: Owner draws 1 card.,Activator gains 1 Data. If adjacent to 1+ Resource nodes: Activator gains 1 Data per Knowledge node in the owner's network.,No,No,Yes,No,Yes,Yes,Yes,Yes
 NODE_KNOW_003,Historical Archive,KNOWLEDGE,,2,0,1,Owner discards 1 card. If Owner pays 1 Data: Owner draws 2 cards.,Activator gains 2 Data. Owner gains 1 VP.,Yes,Yes,No,No,Yes,Yes,Yes,No
