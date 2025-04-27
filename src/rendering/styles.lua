@@ -1,6 +1,8 @@
 -- src/rendering/styles.lua
 -- Centralized text style definitions for the game UI.
 
+local Card = require('src.game.card') -- Required for PORT_COLORS keys
+
 local StyleGuide = {
     -- Font names correspond to keys in Renderer.fonts table
     CARD_TITLE =      { fontName = 'worldStandard',      color = {0, 0, 0, 1} },       -- Black (Original - maybe for hand view?)
@@ -28,6 +30,16 @@ local StyleGuide = {
     HELP_BOX_BACKGROUND_COLOR = {0.1, 0.1, 0.15, 0.85}, -- Gray with 50% opacity
     HELP_BOX_BORDER_COLOR = {0.8, 0.8, 0.8, 0.9},
     HELP_BOX_TEXT_COLOR = {1, 1, 1, 1}, -- White
+
+    -- NEW: Port Colors moved from renderer.lua
+    PORT_COLORS = {
+        [Card.Type.TECHNOLOGY] = { 0.2, 1, 0.2, 1 }, -- Electric Green
+        [Card.Type.CULTURE]    = { 1, 0.8, 0, 1 },   -- Warm Yellow/Orange
+        [Card.Type.RESOURCE]   = { 0.6, 0.4, 0.2, 1 }, -- Earthy Brown/Bronze
+        [Card.Type.KNOWLEDGE]  = { 0.6, 0.2, 1, 1 },   -- Deep Purple/Indigo
+    },
+    ABSENT_PORT_COLOR = { 0.3, 0.3, 0.3, 1 }, -- Dim Gray (For ports that are not defined)
+    PORT_BORDER_COLOR = { 0, 0, 0, 1 }, -- Black
 }
 
 -- You could add baseSize here too if needed for complex calculations,

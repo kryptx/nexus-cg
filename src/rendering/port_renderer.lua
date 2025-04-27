@@ -3,15 +3,7 @@ local Card = require('src.game.card')
 
 local PortRenderer = {}
 
--- Add port rendering color constants and drawing functions
-local PORT_COLORS = {
-    [Card.Type.TECHNOLOGY] = { 0.2, 1,   0.2, 1 },
-    [Card.Type.CULTURE]    = { 1,   0.8, 0,   1 },
-    [Card.Type.RESOURCE]   = { 0.6, 0.4, 0.2, 1 },
-    [Card.Type.KNOWLEDGE]  = { 0.6, 0.2, 1,   1 },
-}
-local ABSENT_PORT_COLOR = { 0.3, 0.3, 0.3, 1 }
-local PORT_BORDER_COLOR  = { 0,   0,   0,   1 }
+-- Port colors now defined in styles.lua
 
 function PortRenderer.getPortInfo(renderer, portIndex)
     local props = Card:getPortProperties(portIndex)
@@ -102,7 +94,7 @@ function PortRenderer.drawPortShape(renderer, portIndex, portX, portY, radius, a
     end
 
     -- Base color for port fill
-    local color = PORT_COLORS[portType] or ABSENT_PORT_COLOR
+    local color = renderer.styleGuide.PORT_COLORS[portType] or renderer.styleGuide.ABSENT_PORT_COLOR
     love.graphics.setColor(color[1], color[2], color[3], (color[4] or 1) * alpha)
 
     -- Compute vertices for filled shape
@@ -142,11 +134,13 @@ function PortRenderer.drawPortShape(renderer, portIndex, portX, portY, radius, a
     love.graphics.setLineWidth(0.5)
     if vertices then
         love.graphics.polygon("fill", vertices)
-        love.graphics.setColor(PORT_BORDER_COLOR[1], PORT_BORDER_COLOR[2], PORT_BORDER_COLOR[3], (PORT_BORDER_COLOR[4] or 1) * alpha)
+        local borderColor = renderer.styleGuide.PORT_BORDER_COLOR
+        love.graphics.setColor(borderColor[1], borderColor[2], borderColor[3], (borderColor[4] or 1) * alpha)
         love.graphics.polygon("line", vertices)
     else
         love.graphics.circle("fill", portX, portY, r)
-        love.graphics.setColor(PORT_BORDER_COLOR[1], PORT_BORDER_COLOR[2], PORT_BORDER_COLOR[3], (PORT_BORDER_COLOR[4] or 1) * alpha)
+        local borderColor = renderer.styleGuide.PORT_BORDER_COLOR
+        love.graphics.setColor(borderColor[1], borderColor[2], borderColor[3], (borderColor[4] or 1) * alpha)
         love.graphics.circle("line", portX, portY, r)
     end
 end

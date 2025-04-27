@@ -14,6 +14,7 @@ love.filesystem.getInfo = love.filesystem.getInfo or function() return false end
 local Card = require('src.game.card') -- Needed for Card.Ports constants
 local StyleGuide = require('src.rendering.styles') -- Load the styles
 local PortRenderer = require('src.rendering.port_renderer') -- After loading StyleGuide, require the new PortRenderer
+local CardRenderer = require('src.rendering.card_renderer') -- Extracted card drawing logic
 
 local Renderer = {}
 Renderer.__index = Renderer
@@ -35,16 +36,6 @@ local SELECTED_CARD_RAISE = 15 -- How much to raise the selected card
 local UI_ICON_SIZE = 18      -- Size for UI resource icons
 local CARD_COST_ICON_SIZE = 9 -- Size for card cost icons
 
--- Port Type Colors (Approximate, adjust as needed)
-local PORT_COLORS = {
-    [Card.Type.TECHNOLOGY] = { 0.2, 1, 0.2, 1 }, -- Electric Green
-    [Card.Type.CULTURE] = { 1, 0.8, 0, 1 }, -- Warm Yellow/Orange
-    [Card.Type.RESOURCE] = { 0.6, 0.4, 0.2, 1 }, -- Earthy Brown/Bronze
-    [Card.Type.KNOWLEDGE] = { 0.6, 0.2, 1, 1 }, -- Deep Purple/Indigo
-}
-local ABSENT_PORT_COLOR = { 0.3, 0.3, 0.3, 1 } -- Dim Gray (For ports that are not defined)
-local PORT_BORDER_COLOR = { 0, 0, 0, 1 } -- Black
-
 function Renderer:new()
     local instance = setmetatable({}, Renderer)
     print("Renderer initialized.")
@@ -65,6 +56,13 @@ function Renderer:new()
     -- Store default offsets
     instance.defaultOffsetX = NETWORK_OFFSET_X
     instance.defaultOffsetY = NETWORK_OFFSET_Y
+    -- Expose card/hand constants for CardRenderer
+    instance.HAND_CARD_SCALE = HAND_CARD_SCALE
+    instance.HAND_SPACING = HAND_SPACING
+    instance.HAND_START_X = HAND_START_X
+    instance.BOTTOM_BUTTON_AREA_HEIGHT = BOTTOM_BUTTON_AREA_HEIGHT
+    instance.SELECTED_CARD_RAISE = SELECTED_CARD_RAISE
+    instance.CARD_COST_ICON_SIZE = CARD_COST_ICON_SIZE
 
     -- Font creation (unchanged from previous version)
     local baseStandardSize = 24
@@ -154,6 +152,7 @@ function Renderer:new()
 
     -- Prepare canvas cache for fully-rendered cards at world scale
     instance.cardCache = {}
+    instance.cardRenderer = CardRenderer:new(instance)
 
     -- Attempt to load BMFont (image font) for in-card text rendering
     -- We load three different bitmap fonts:
@@ -379,396 +378,6 @@ function Renderer:drawCardPorts(card, sx, sy, alphaOverride, activeLinks)
     PortRenderer.drawCardPorts(self, card, sx, sy, alphaOverride, activeLinks)
 end
 
--- Internal core function to draw a card's elements based on context
-function Renderer:_drawCardInternal(card, x, y, context)
-    if not card or type(card) ~= 'table' then
-        print("Warning: _drawCardInternal received invalid card data.")
-        return
-    end
-
-    local originalColor = {love.graphics.getColor()}
-    local alphaOverride = context.alpha or 1.0
-    local useInvalidBorder = context.borderType == "invalid"
-
-    -- Draw Outer Border FIRST
-    local originalLineWidth = love.graphics.getLineWidth()
-    love.graphics.setLineWidth(self.PORT_RADIUS * 2)
-    love.graphics.setColor(0.15, 0.15, 0.15, 1.0 * alphaOverride) -- Always black
-    local cornerRadius = 2 -- Adjust as needed
-    love.graphics.rectangle("line", x, y, CARD_WIDTH, CARD_HEIGHT, cornerRadius, cornerRadius)
-    love.graphics.setLineWidth(originalLineWidth) -- Restore line width before drawing content
-    love.graphics.setColor(originalColor) -- Restore original color
-
-    -- Base background (drawn over the border outline)
-    local baseR, baseG, baseB = 0.8, 0.8, 0.8
-    if card.type == Card.Type.REACTOR then baseR, baseG, baseB = 1, 1, 0.5 end
-    love.graphics.setColor(baseR, baseG, baseB, 1.0 * alphaOverride)
-    love.graphics.rectangle("fill", x, y, CARD_WIDTH, CARD_HEIGHT)
-
-    local margin = 5
-    local headerH = 20
-    local costAreaW = 17
-    local iconSize = 15
-    local imageY = y + headerH + margin
-    -- Calculate area width first
-    local areaW = CARD_WIDTH - (2 * margin)
-    -- Calculate height based on width and desired aspect ratio (1024/720)
-    local aspectRatio = 1024 / 720
-    local imageH = areaW / aspectRatio -- Use the calculated height
-    -- Calculate effects height based on remaining space
-    local effectsH = CARD_HEIGHT - headerH - imageH - (2 * margin)
-    -- Adjust effects Y position to be directly below the art box
-    local effectsY = imageY + imageH -- Place effects box below the art box, no margin
-
-    -- 1. Draw Header Area
-    local baseTypeColor = PORT_COLORS[card.type] or {0.5, 0.5, 0.5, 1} -- Use PORT_COLORS
-    local headerIconX = x + margin
-    local headerIconY = y + margin
-    love.graphics.setColor(baseTypeColor[1], baseTypeColor[2], baseTypeColor[3], (baseTypeColor[4] or 1) * alphaOverride)
-    love.graphics.rectangle("fill", headerIconX, headerIconY, iconSize, iconSize)
-
-    -- Draws the actual type icon image (e.g., technology-black.png) over the background
-    local typeIcon = self.icons[card.type]
-    if typeIcon then
-        local typeIconScaleFactor = 0.8
-        local targetDrawSize = iconSize * typeIconScaleFactor
-        local iconDrawScale = targetDrawSize / typeIcon:getWidth()
-        local offset = (iconSize - targetDrawSize) / 2
-        local drawX = headerIconX + offset
-        local drawY = headerIconY + offset
-        love.graphics.setColor(1, 1, 1, alphaOverride)
-        love.graphics.draw(typeIcon, drawX, drawY, 0, iconDrawScale, iconDrawScale)
-    end
-
-    love.graphics.setColor(originalColor)
-    local titleX = x + margin + iconSize + margin - 3
-    local titleY = y + margin - 2
-    
-    -- Adjust title position when using the special title font
-    if self.titleFontMultiplier and self.fonts.worldTitleSemiBold then
-        -- Add a bit more vertical space for the title font
-        titleY = y + margin
-    end
-    
-    local titleLimit = CARD_WIDTH - (2*margin + iconSize + costAreaW)
-    local titleStyle = context.stylePrefix .. "_TITLE_NW"
-    self:_drawTextScaled(card.title or "Untitled", titleX, titleY, titleLimit, "left", titleStyle, context.baseFontSizes.title, context.targetScales.title, alphaOverride)
-
-    love.graphics.setColor(originalColor)
-    local costYBase = y + margin - 2
-    local costIconSize = CARD_COST_ICON_SIZE
-    local costInnerSpacing = 2
-    local costLineHeight = 12
-    local artworkRightEdge = x + CARD_WIDTH - margin
-    local matCost = card.buildCost and card.buildCost.material or 0
-    local dataCost = card.buildCost and card.buildCost.data or 0
-    local matIcon = self.icons.material
-    local dataIcon = self.icons.data
-    local costBaseFontSize = context.baseFontSizes.cost
-    local targetScale_cost = context.targetScales.cost
-    local costStyleName = context.stylePrefix .. "_COST"
-    local costFont = self.fonts[self.styleGuide[costStyleName].fontName] or love.graphics.getFont()
-    local costFontMultiplier = 1
-    if string.find(self.styleGuide[costStyleName].fontName, "world") then
-        costFontMultiplier = self.worldFontMultiplier
-    elseif string.find(self.styleGuide[costStyleName].fontName, "preview") then
-        costFontMultiplier = self.uiFontMultiplier
-    end
-
-    if matIcon then
-        local text = tostring(matCost)
-        local textWidth = costFont:getWidth(text) / costFontMultiplier * targetScale_cost
-        local totalWidth = costIconSize + costInnerSpacing + textWidth
-        local overallStartX = artworkRightEdge - totalWidth
-        local iconX = overallStartX
-        local textX = iconX + costIconSize + costInnerSpacing
-        local iconScale = costIconSize / matIcon:getWidth()
-        love.graphics.setColor(1, 1, 1, alphaOverride)
-        love.graphics.draw(matIcon, iconX, costYBase, 0, iconScale, iconScale)
-        love.graphics.setColor(originalColor)
-        self:_drawTextScaled(text, textX, costYBase, CARD_WIDTH, "left", costStyleName, costBaseFontSize, targetScale_cost, alphaOverride)
-    else
-        love.graphics.setColor(originalColor)
-        self:_drawTextScaled(string.format("M:%d", matCost), x + margin, costYBase, CARD_WIDTH - 2*margin, "right", costStyleName, costBaseFontSize, targetScale_cost, alphaOverride)
-    end
-
-    local dataY = costYBase + costLineHeight - 2
-    if dataIcon then
-        local text = tostring(dataCost)
-        local textWidth = costFont:getWidth(text) / costFontMultiplier * targetScale_cost
-        local totalWidth = costIconSize + costInnerSpacing + textWidth
-        local overallStartX = artworkRightEdge - totalWidth
-        local iconX = overallStartX
-        local textX = iconX + costIconSize + costInnerSpacing
-        local iconScale = costIconSize / dataIcon:getWidth()
-        love.graphics.setColor(1, 1, 1, alphaOverride)
-        love.graphics.draw(dataIcon, iconX, dataY, 0, iconScale, iconScale)
-        love.graphics.setColor(originalColor)
-        self:_drawTextScaled(text, textX, dataY, CARD_WIDTH, "left", costStyleName, costBaseFontSize, targetScale_cost, alphaOverride)
-    else
-        love.graphics.setColor(originalColor)
-        self:_drawTextScaled(string.format("D:%d", dataCost), x + margin, dataY, CARD_WIDTH - 2*margin, "right", costStyleName, costBaseFontSize, targetScale_cost, alphaOverride)
-    end
-
-    -- 2. Draw Image Placeholder Area OR Card Art
-    local image = self:_loadImage(card.imagePath)
-    if image then
-        local areaW = CARD_WIDTH - (2 * margin)
-        local areaH = imageH
-        local imgW, imgH = image:getDimensions()
-        local scaleX = areaW / imgW
-        local scaleY = areaH / imgH
-        local scale = math.min(scaleX, scaleY)
-        local drawW = imgW * scale
-        local drawH = imgH * scale
-        local drawX = x + margin + (areaW - drawW) / 2
-        local drawY = imageY + (areaH - drawH) / 2
-        love.graphics.setColor(1, 1, 1, 1.0 * alphaOverride)
-        love.graphics.draw(image, drawX, drawY, 0, scale, scale)
-        love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride)
-        love.graphics.rectangle("line", x + margin, imageY, areaW, areaH)
-        
-        -- Draw flavor text box if the card has flavor text
-        if card.flavorText and card.flavorText ~= "" then
-            -- Semi-transparent black box covering bottom third of the artwork
-            local flavorBoxHeight = areaH / 3
-            local flavorBoxY = imageY + areaH - flavorBoxHeight
-            love.graphics.setColor(0, 0, 0, 0.7 * alphaOverride) -- Semi-transparent black
-            love.graphics.rectangle("fill", x + margin, flavorBoxY, areaW, flavorBoxHeight)
-            
-            -- Draw flavor text using the white font style similar to convergence text
-            local flavorTextY = flavorBoxY + 1 -- Small padding from top of flavor box
-            local flavorTextLimit = areaW - 2 -- Small padding on left and right
-            love.graphics.setColor(originalColor) -- Restore original color for _drawTextScaled
-            self:_drawTextScaled(card.flavorText, x + margin + 2, flavorTextY, flavorTextLimit, "left", 
-                                 "CARD_EFFECT_CONVERGENCE", -- Use the white font style 
-                                 context.baseFontSizes.effect, 
-                                 context.targetScales.effect, 
-                                 0.9 * alphaOverride)
-        end
-    else
-        love.graphics.setColor(0.6, 0.6, 0.6, 1.0 * alphaOverride)
-        -- Use areaW and imageH for the placeholder rectangle
-        love.graphics.rectangle("fill", x + margin, imageY, areaW, imageH)
-        love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride)
-        love.graphics.rectangle("line", x + margin, imageY, areaW, imageH)
-        local artLimit = areaW -- Use areaW for limit
-        local artStyleName = context.stylePrefix .. "_ART_LABEL"
-        love.graphics.setColor(originalColor)
-        -- Center text within the new area dimensions
-        self:_drawTextScaled("ART", x + margin + areaW / 2, imageY + imageH / 2, artLimit, "center", artStyleName, context.baseFontSizes.artLabel, context.targetScales.artLabel, alphaOverride)
-    end
-
-    -- 3. Draw Effects Box Area
-    local effectBaseFontSize = context.baseFontSizes.effect
-    local targetScale_effect = context.targetScales.effect
-    local effectStyleName = context.stylePrefix .. "_EFFECT"
-    local effectFont = self.fonts[self.styleGuide[effectStyleName].fontName] or love.graphics.getFont()
-    local fontMultiplier = 1
-    if string.find(self.styleGuide[effectStyleName].fontName, "world") then
-        fontMultiplier = self.worldFontMultiplier
-    elseif string.find(self.styleGuide[effectStyleName].fontName, "preview") then
-        fontMultiplier = self.uiFontMultiplier
-    end
-    local effectLineHeight = effectFont:getHeight() / fontMultiplier * targetScale_effect
-    local effectPadding = 2
-    local totalEffectAreaH = CARD_HEIGHT - headerH - imageH - (2 * margin)
-    local convergenceBoxH = totalEffectAreaH * 0.5 -- Convergence gets 50% of the space
-    local activationBoxH = totalEffectAreaH - convergenceBoxH -- Activation gets the rest
-    local convergenceBoxY = effectsY + activationBoxH
-
-    -- Activation Box (Light Background)
-    love.graphics.setColor(0.9, 0.9, 0.9, 1.0 * alphaOverride)
-    love.graphics.rectangle("fill", x + margin, effectsY, areaW, activationBoxH)
-    love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride)
-    love.graphics.rectangle("line", x + margin, effectsY, areaW, activationBoxH)
-
-    -- Convergence Box (Dark Background)
-    love.graphics.setColor(0.2, 0.2, 0.2, 1.0 * alphaOverride) -- Dark gray
-    love.graphics.rectangle("fill", x + margin, convergenceBoxY, areaW, convergenceBoxH)
-    love.graphics.setColor(0, 0, 0, 1.0 * alphaOverride) -- Black border
-    love.graphics.rectangle("line", x + margin, convergenceBoxY, areaW, convergenceBoxH)
-
-    -- Fetch Effect Texts (without labels)
-    local activationText = card:getActivationDescription() or "No effect"
-    local convergenceText = card:getConvergenceDescription() or "No effect"
-
-    -- NEW: Helper to replace keywords with icons using frontier patterns
-    local function replace_keywords_with_icons(text, map)
-      if not text then return "" end
-      local modified_text = text
-      for keyword, icon in pairs(map) do
-          -- Escape potential magic characters in the keyword
-          local escaped_keyword = string.gsub(keyword, "[%%^$%(%)%%%%%%%[%]%*%+%-%?]", "%%%1")
-          -- Use frontier patterns to match whole words only
-          -- %f[%a] = frontier between non-alpha and alpha (start of word)
-          -- %f[%A] = frontier between alpha and non-alpha (end of word)
-          modified_text = string.gsub(modified_text, "%f[%a]" .. escaped_keyword .. "%f[%A]", icon)
-      end
-      return modified_text
-    end
-
-    -- NEW: Map keywords to icons
-    local icon_map = {
-        -- Card Types
-        ["Culture"] = "%%",    ["culture"] = "%%",
-        ["Technology"] = "}", ["technology"] = "}",
-        ["Resource"] = "~",   ["resource"] = "~",
-        ["Knowledge"] = "{",  ["knowledge"] = "{",
-        -- Resources
-        ["Materials"] = "@",  ["materials"] = "@",
-        ["Material"] = "@",   ["material"] = "@",
-        ["Data"] = "#",       ["data"] = "#",
-        ["Energy"] = "\\",     ["energy"] = "\\"
-    }
-
-    -- NEW: Apply the substitutions
-    activationText = replace_keywords_with_icons(activationText, icon_map)
-    convergenceText = replace_keywords_with_icons(convergenceText, icon_map)
-
-    local effectsLimit = areaW - (2 * effectPadding)
-
-    -- Draw Activation Text (Light background -> use BMFont color handled in _drawTextScaled)
-    love.graphics.setColor(originalColor) -- Restore original color before drawing (handled by _drawTextScaled)
-    local activationTextY = effectsY + effectPadding
-    self:_drawTextScaled(activationText, x + margin + effectPadding, activationTextY, effectsLimit, "left", effectStyleName, effectBaseFontSize, targetScale_effect, alphaOverride)
-
-    -- Draw Convergence Text (Dark background -> use BMFont color handled in _drawTextScaled)
-    -- No explicit setColor needed here, _drawTextScaled handles tint based on font type
-    local convergenceStyleName = "CARD_EFFECT_CONVERGENCE" -- Use the new style for white font
-    local convergenceTextY = convergenceBoxY + effectPadding
-    self:_drawTextScaled(convergenceText, x + margin + effectPadding, convergenceTextY, effectsLimit, "left", convergenceStyleName, effectBaseFontSize, targetScale_effect, alphaOverride)
-
-    love.graphics.setColor(originalColor) -- Restore original color after drawing text blocks
-    -- Draw Connection Ports
-    self:drawCardPorts(card, x, y, alphaOverride, context.activeLinks)
-end
-
--- Internal utility function to draw a single card in the world
-function Renderer:_drawSingleCardInWorld(card, wx, wy, activeLinks, alphaOverride, useInvalidBorder)
-    alphaOverride = alphaOverride or 1.0
-    useInvalidBorder = useInvalidBorder or false
-
-    -- Save original color state
-    local originalColor = { love.graphics.getColor() }
-
-    -- Draw the pre-rendered card base from cache
-    local canvas = self:_generateCardCanvas(card)
-    local sf = self.canvasRenderScaleFactor or 1 -- Use new scale factor
-    local invSf = 1 / sf
-    local borderPadding = self.PORT_RADIUS -- Original units
-    -- draw the high-res canvas aligned so the inner content origin matches wx/wy
-    local drawX = wx - borderPadding
-    local drawY = wy - borderPadding
-    love.graphics.setColor(1, 1, 1, alphaOverride)
-    love.graphics.draw(canvas, drawX, drawY, 0, invSf, invSf)
-
-    -- Draw invalid border highlight if needed
-    if useInvalidBorder then
-        local lineWidth = self.PORT_RADIUS * 2
-        love.graphics.setLineWidth(lineWidth) -- Use base line width
-        love.graphics.setColor(1, 0, 0, alphaOverride)
-        -- Draw border relative to the card content box (wx, wy)
-        love.graphics.rectangle("line", wx, wy, self.CARD_WIDTH, self.CARD_HEIGHT, 2, 2) -- Use base dimensions
-    end
-
-    -- Dynamic: Draw token count on card in world view if > 0
-    if card.tokens and card.tokens > 0 then
-        love.graphics.setColor(0, 0, 0, alphaOverride)
-        -- Use a small UI font for token count
-        local fontOld = love.graphics.getFont()
-        local tokenFont = self.fonts.uiSmall or fontOld
-        love.graphics.setFont(tokenFont)
-        -- Position at bottom-left inside card
-        love.graphics.print("Tokens: " .. card.tokens, wx + 5, wy + self.CARD_HEIGHT - 15)
-        love.graphics.setFont(fontOld)
-    end
-
-    -- Draw convergence link tabs for world view
-    self:_drawCardConvergenceTabs(card, wx, wy, alphaOverride, activeLinks)
-
-    -- Restore original color state
-    love.graphics.setColor(originalColor)
-end
-
--- Extracted method to draw convergence link tabs for world view
-function Renderer:_drawCardConvergenceTabs(card, sx, sy, alphaOverride, activeLinks)
-    alphaOverride = alphaOverride or 1.0
-    activeLinks = activeLinks or {}
-    local linkMap = {}
-    for _, link in ipairs(activeLinks) do linkMap[link.linkId] = link end
-    local originalFont = love.graphics.getFont()
-    local originalColor = {love.graphics.getColor()}
-    -- use the card radius as offset inside canvas content
-    local r = self.PORT_RADIUS
-    for portIndex = 1, 8 do
-        local info = PortRenderer.getPortInfo(self, portIndex)
-        if info then
-            -- align to content origin on world canvas
-            local portX = sx + info.x_offset
-            local portY = sy + info.y_offset
-            local isOutput = info.is_output
-            local occupyingLinkId = card:getOccupyingLinkId(portIndex)
-            if occupyingLinkId then
-                -- Draw the base port shape dimmed
-                PortRenderer.drawPortShape(self, portIndex, portX, portY, r, alphaOverride * 0.4)
-                -- Draw the convergence tab
-                local linkDetails = linkMap[occupyingLinkId]
-                local playerNumber = linkDetails and linkDetails.initiatingPlayerIndex or "?"
-                local tabSize = r * 3.5
-                local fixedOffset = r
-                local orientation
-                if portIndex == Card.Ports.TOP_LEFT or portIndex == Card.Ports.TOP_RIGHT then orientation = "top"
-                elseif portIndex == Card.Ports.BOTTOM_LEFT or portIndex == Card.Ports.BOTTOM_RIGHT then orientation = "bottom"
-                elseif portIndex == Card.Ports.LEFT_TOP or portIndex == Card.Ports.LEFT_BOTTOM then orientation = "left"
-                elseif portIndex == Card.Ports.RIGHT_TOP or portIndex == Card.Ports.RIGHT_BOTTOM then orientation = "right"
-                end
-                local tabX, tabY
-                if orientation == "top" then
-                    tabX = portX - tabSize / 2
-                    tabY = portY - fixedOffset - tabSize
-                elseif orientation == "bottom" then
-                    tabX = portX - tabSize / 2
-                    tabY = portY + fixedOffset
-                elseif orientation == "left" then
-                    tabX = portX - fixedOffset - tabSize
-                    tabY = portY - tabSize / 2
-                elseif orientation == "right" then
-                    tabX = portX + fixedOffset
-                    tabY = portY - tabSize / 2
-                else
-                    local centerX, centerY = portX, portY
-                    if isOutput then
-                        if portIndex == Card.Ports.TOP_LEFT or portIndex == Card.Ports.TOP_RIGHT then centerY = portY - r / 2
-                        elseif portIndex == Card.Ports.BOTTOM_LEFT or portIndex == Card.Ports.BOTTOM_RIGHT then centerY = portY + r / 2
-                        elseif portIndex == Card.Ports.LEFT_TOP or portIndex == Card.Ports.LEFT_BOTTOM then centerX = portX - r / 2
-                        elseif portIndex == Card.Ports.RIGHT_TOP or portIndex == Card.Ports.RIGHT_BOTTOM then centerX = portX + r / 2 end
-                    end
-                    tabX = centerX - tabSize / 2
-                    tabY = centerY - tabSize / 2
-                end
-                love.graphics.setColor(0.9, 0.9, 0.9, alphaOverride * 0.7)
-                love.graphics.rectangle("fill", tabX, tabY, tabSize, tabSize)
-                love.graphics.setColor(0, 0, 0, alphaOverride)
-                love.graphics.rectangle("line", tabX, tabY, tabSize, tabSize)
-                love.graphics.setFont(self.fonts.worldSmall or originalFont)
-                love.graphics.setColor(0, 0, 0, alphaOverride)
-                local text = tostring(playerNumber)
-                local textScale = 0.45 / self.worldFontMultiplier
-                local nativeW = love.graphics.getFont():getWidth(text)
-                local nativeH = love.graphics.getFont():getHeight()
-                love.graphics.push()
-                love.graphics.translate(tabX + (tabSize - nativeW * textScale) / 2, tabY + (tabSize - nativeH * textScale) / 2)
-                love.graphics.scale(textScale, textScale)
-                love.graphics.print(text, 0, 0)
-                love.graphics.pop()
-            end
-        end
-    end
-    love.graphics.setFont(originalFont)
-    love.graphics.setColor(originalColor)
-end
-
 -- Draws the player's network grid
 function Renderer:drawNetwork(network, originX, originY, activeLinks, animatingCardIds)
     if not network then
@@ -788,18 +397,6 @@ function Renderer:drawNetwork(network, originX, originY, activeLinks, animatingC
     love.graphics.push()
     love.graphics.translate(originX, originY)
 
-    -- Apply camera transformations if needed within drawNetwork (consider if this is still needed)
-    --[[  REMOVED - Camera is now handled globally before drawTable
-    love.graphics.push()
-    love.graphics.translate(-cameraX * cameraZoom, -cameraY * cameraZoom)
-    love.graphics.scale(cameraZoom, cameraZoom)
-    ]]
-
-    -- Set line width adjusted for zoom for grid lines
-    -- love.graphics.setLineWidth(1 / cameraZoom)
-    -- Draw grid lines (optional - can be visually noisy)
-    -- self:drawGrid(originX, originY, cameraX, cameraY, cameraZoom)
-
     -- Draw cards within the network
     if network.cards then
         for _, card in pairs(network.cards) do
@@ -811,7 +408,7 @@ function Renderer:drawNetwork(network, originX, originY, activeLinks, animatingC
             end
             
             if cardShouldRender then
-                self:drawCard(card, originX, originY, activeLinks)
+                self.cardRenderer:drawCard(card, originX, originY, activeLinks)
             end
         end
     end
@@ -830,262 +427,47 @@ function Renderer:drawNetwork(network, originX, originY, activeLinks, animatingC
 end
 
 -- Draw a single card within a network grid
-function Renderer:drawCard(card, originX, originY, activeLinks)
-    if not card then return end
-
-    local cardShouldRender = true
-    if animatingCardIds and card.id and animatingCardIds[card.id] then
-        -- Don't render cards that are part of a world-space animation (like card play)
-        -- because they will be rendered separately by the animation system.
-        cardShouldRender = false
-    end
-    
-    if cardShouldRender then
-        local sx, sy = self:gridToWorldCoords(card.position.x, card.position.y, originX, originY)
-        self:_drawSingleCardInWorld(card, sx, sy, activeLinks)
-    end
+function Renderer:drawCard(card, originX, originY, activeLinks, animatingCardIds)
+    -- Delegate to CardRenderer
+    return self.cardRenderer:drawCard(card, originX, originY, activeLinks, animatingCardIds)
 end
 
 -- Draw highlight / card preview over the hovered grid cell, or red outline if invalid
 function Renderer:drawHoverHighlight(gridX, gridY, selectedCard, isPlacementValid, originX, originY, orientation)
-    orientation = orientation or 0 -- Default to 0 if not provided
-    isPlacementValid = isPlacementValid == nil or isPlacementValid == true
-    originX = originX or 0
-    originY = originY or 0
-
-    if gridX == nil or gridY == nil then return end
-
-    if selectedCard then
-        local cardCenterX = self.CARD_WIDTH / 2
-        local cardCenterY = self.CARD_HEIGHT / 2
-
-        love.graphics.push()
-
-        -- 1. Go to player's world origin
-        love.graphics.translate(originX, originY)
-        
-        -- 2. Apply local rotation around the center of the (0,0) grid cell
-        love.graphics.translate(cardCenterX, cardCenterY)
-        love.graphics.rotate(orientation)
-        love.graphics.translate(-cardCenterX, -cardCenterY)
-        
-        -- Now the coordinate system's origin is at the player's world origin,
-        -- but its axes are rotated by 'orientation'. (0,0) corresponds to the
-        -- top-left of the (0,0) grid cell in the rotated frame.
-
-        -- 3. Calculate the top-left corner of the target grid cell *within this rotated frame*.
-        local targetRotatedX = gridX * (self.CARD_WIDTH + self.GRID_SPACING)
-        local targetRotatedY = gridY * (self.CARD_HEIGHT + self.GRID_SPACING)
-
-        -- 4. Draw the card using _drawSingleCardInWorld, passing the calculated position.
-        -- Since the coordinate system is already correctly positioned and rotated, 
-        -- drawing the card's content unrotated relative to (targetRotatedX, targetRotatedY) works.
-        local useInvalidBorder = not isPlacementValid
-        self:_drawSingleCardInWorld(selectedCard, targetRotatedX, targetRotatedY, nil, 0.5, useInvalidBorder)
-        
-        love.graphics.pop() -- Restore original transform state
-    end
+    -- Delegate to CardRenderer
+    return self.cardRenderer:drawHoverHighlight(gridX, gridY, selectedCard, isPlacementValid, originX, originY, orientation)
 end
 
 -- Function to draw a hand card preview
 function Renderer:drawHoveredHandCard(card, sx, sy, scale)
-    if not card then return end
-    scale = scale or 1.0
-
-    local originalFont = love.graphics.getFont()
-    local originalColor = { love.graphics.getColor() }
-    local originalLineWidth = love.graphics.getLineWidth()
-
-    -- Calculate adjusted position to keep preview fully on screen
-    local screenWidth = love.graphics.getWidth()
-    local screenHeight = love.graphics.getHeight()
-    local borderWidthOut = self.PORT_RADIUS * scale
-    local cardDrawWidth = CARD_WIDTH * scale
-    local cardDrawHeight = CARD_HEIGHT * scale
-    local drawX = sx
-    local drawY = sy
-    if drawX - borderWidthOut < 0 then
-        drawX = borderWidthOut
-    elseif drawX + cardDrawWidth + borderWidthOut > screenWidth then
-        drawX = screenWidth - cardDrawWidth - borderWidthOut
-    end
-    if drawY - borderWidthOut < 0 then
-        drawY = borderWidthOut
-    elseif drawY + cardDrawHeight + borderWidthOut > screenHeight then
-        drawY = screenHeight - cardDrawHeight - borderWidthOut
-    end
-
-    -- Draw the cached card canvas scaled down
-    local sf = self.canvasRenderScaleFactor or 1 -- Use new scale factor
-    local invSf = 1 / sf
-    local drawScale = scale * invSf
-    local canvas = self:_generateCardCanvas(card)
-    local borderPadding = self.PORT_RADIUS -- Original units
-    local drawPosX = drawX - borderPadding * drawScale
-    local drawPosY = drawY - borderPadding * drawScale
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.draw(canvas, drawPosX, drawPosY, 0, drawScale, drawScale)
-
-    -- Restore original state
-    love.graphics.setFont(originalFont)
-    love.graphics.setColor(originalColor)
-    love.graphics.setLineWidth(originalLineWidth)
+    -- Delegate to CardRenderer
+    return self.cardRenderer:drawHoveredHandCard(card, sx, sy, scale)
 end
 
 -- Draw a player's hand, visually indicating the selected card
 -- Returns a table of bounding boxes for click detection: { { index=i, x=sx, y=sy, w=w, h=h }, ... }
 -- cardsBeingAnimated is a table of cards that are in the process of being animated and should be hidden in the hand
 function Renderer:drawHand(player, selectedIndex, animatingCardIds)
-    if not player or not player.hand then return {} end
-    animatingCardIds = animatingCardIds or {} -- Ensure it's a table
-
-    local handStartY = love.graphics.getHeight() - BOTTOM_BUTTON_AREA_HEIGHT - HAND_CARD_HEIGHT
-    local handBounds = {}
-
-    local originalFont = love.graphics.getFont()
-    local originalColor = {love.graphics.getColor()}
-    local originalLineWidth = love.graphics.getLineWidth()
-
-    local labelStyle = self.styleGuide.UI_HAND_LABEL
-    assert(self.fonts[labelStyle.fontName], "Hand label font not found: " .. labelStyle.fontName)
-    love.graphics.setFont(self.fonts[labelStyle.fontName])
-    love.graphics.setColor(labelStyle.color)
-    love.graphics.print(string.format("%s Hand (%d):", player.name, #player.hand), HAND_START_X, handStartY - 20)
-
-    -- Adjust for cached canvas resolution (baked at canvasRenderScaleFactor)
-    local sf = self.canvasRenderScaleFactor or 1 -- Use new scale factor
-    local invSf = 1 / sf
-
-    -- Draw non-selected cards by blitting cached canvas
-    for i, card in ipairs(player.hand) do
-        if i ~= selectedIndex then
-            -- Check if this specific card instance is being animated
-            if not animatingCardIds[card.instanceId] then
-                local sx = HAND_START_X + (i-1) * (HAND_CARD_WIDTH + HAND_SPACING)
-                local sy = handStartY
-                table.insert(handBounds, { index = i, x = sx, y = sy, w = HAND_CARD_WIDTH, h = HAND_CARD_HEIGHT })
-
-                local canvas = self:_generateCardCanvas(card)
-                love.graphics.setColor(1, 1, 1, 1)
-                love.graphics.draw(canvas, sx, sy, 0, HAND_CARD_SCALE * invSf, HAND_CARD_SCALE * invSf)
-            end
-        end
-    end
-
-    -- Draw selected card last (raised and highlighted)
-    if selectedIndex then
-        local i = selectedIndex
-        local card = player.hand[i]
-        local sx = HAND_START_X + (i-1) * (HAND_CARD_WIDTH + HAND_SPACING)
-        -- Update or insert bounds for selected card at original position
-        local boundsFound = false
-        for k, b in ipairs(handBounds) do
-            if b.index == i then
-                b.y = handStartY
-                boundsFound = true
-                break
-            end
-        end
-        if not boundsFound then
-            table.insert(handBounds, { index = i, x = sx, y = handStartY, w = HAND_CARD_WIDTH, h = HAND_CARD_HEIGHT })
-        end
-
-        -- Only draw selected card if not currently animating
-        if card and not animatingCardIds[card.instanceId] then
-            local raisedY = handStartY - SELECTED_CARD_RAISE
-            local canvas = self:_generateCardCanvas(card)
-            local borderPadding = self.PORT_RADIUS
-            local drawScale = HAND_CARD_SCALE * invSf
-            local drawPosX = sx - borderPadding * drawScale
-            local drawPosY = raisedY - borderPadding * drawScale
-            love.graphics.setColor(1, 1, 1, 1)
-            love.graphics.draw(canvas, drawPosX, drawPosY, 0, drawScale, drawScale)
-
-            -- Draw highlight border
-            local canvasDrawW = canvas:getWidth() * drawScale
-            local canvasDrawH = canvas:getHeight() * drawScale
-            local cornerRadius = 2 * drawScale
-            love.graphics.setLineWidth(3 * drawScale)
-            love.graphics.setColor(0, 0, 0, 1)
-            love.graphics.rectangle("line",
-                drawPosX, drawPosY,
-                canvasDrawW,
-                canvasDrawH,
-                cornerRadius, cornerRadius)
-        end
-    end
-
-    love.graphics.setFont(originalFont)
-    love.graphics.setColor(originalColor)
-    -- No need to restore line width here, done inside/after loops
-
-    return handBounds
+    -- Delegate to CardRenderer
+    return self.cardRenderer:drawHand(player, selectedIndex, animatingCardIds)
 end
 
 -- Draw a single card that is currently animating
 function Renderer:drawCardAnimation(animation)
-    if not animation or not animation.card then return end
+    -- Delegate to CardRenderer
+    return self.cardRenderer:drawCardAnimation(animation)
+end
 
-    local card = animation.card
-    local worldX = animation.currentWorldPos.x
-    local worldY = animation.currentWorldPos.y
-    local scale = animation.currentScale
-    local alpha = animation.currentAlpha or 1.0
-    local rotation = animation.currentRotation or 0
+-- Draw a single card that is currently animating in screen space (for hand cards)
+function Renderer:drawHandCardAnimation(animation)
+    -- Delegate to CardRenderer
+    return self.cardRenderer:drawHandCardAnimation(animation)
+end
 
-    -- Get the pre-rendered canvas
-    local canvas = self:_generateCardCanvas(card)
-    if not canvas then
-        print("Warning: Canvas not found for animating card: " .. card.id)
-        return
-    end
-
-    -- Apply camera transform -- REMOVED (Handled by caller)
-    -- love.graphics.push()
-    -- love.graphics.translate(-cameraX * cameraZoom, -cameraY * cameraZoom)
-    -- love.graphics.scale(cameraZoom, cameraZoom)
-    -- love.graphics.setLineWidth(1 / cameraZoom) -- Keep line width consistent if drawing borders
-
-    -- Calculate draw parameters similar to drawHoveredHandCard/drawSingleCardInWorld
-    local sf = self.canvasRenderScaleFactor or 1
-    local invSf = 1 / sf
-    local drawScale = scale * invSf -- The final scale to draw the high-res canvas
-    local borderPadding = self.PORT_RADIUS -- Original units padding on canvas
-    local canvasW = canvas:getWidth()
-    local canvasH = canvas:getHeight()
-
-    -- Calculate the top-left draw position based on the *center* world coordinates
-    local drawW = canvasW * drawScale
-    local drawH = canvasH * drawScale
-    
-    -- Draw the canvas centered at worldX, worldY with the interpolated scale and rotation
-    local originalColor = {love.graphics.getColor()}
-    love.graphics.setColor(1, 1, 1, alpha)
-    
-    -- For rotation, we need to use the origin point (center of the card)
-    if rotation ~= 0 then
-        -- When using rotation, we need to specify the rotation origin (center of the card)
-        -- Draw with rotation around center
-        love.graphics.draw(
-            canvas,                -- The canvas to draw
-            worldX,                -- X position (center)
-            worldY,                -- Y position (center)
-            rotation,              -- Rotation in radians
-            drawScale,             -- X scale
-            drawScale,             -- Y scale
-            canvasW / 2,           -- Origin X (half canvas width - center point)
-            canvasH / 2            -- Origin Y (half canvas height - center point)
-        )
-    else
-        -- No rotation - calculate top-left corner for drawing
-        local drawPosX = worldX - (drawW / 2)
-        local drawPosY = worldY - (drawH / 2)
-        -- Draw call uses top-left corner and scale
-        love.graphics.draw(canvas, drawPosX, drawPosY, 0, drawScale, drawScale)
-    end
-    
-    love.graphics.setColor(originalColor)
-    -- love.graphics.pop() -- Restore camera transform -- REMOVED
+-- Preload canvases for all cards in a list
+function Renderer:preloadCardCanvases(cards)
+    -- Delegate to CardRenderer
+    return self.cardRenderer:preloadCardCanvases(cards)
 end
 
 -- Drawing UI elements (resources, VP, turn info)
@@ -1186,7 +568,7 @@ function Renderer:drawUI(player, hoveredLinkType, currentPhase, convergenceSelec
         local isAvailable = player:hasLinkSetAvailable(linkType)
         local isHovered = (hoveredLinkType == linkType)
         local icon = self.icons[linkType]
-        local bgColor = PORT_COLORS[linkType] or {0.5, 0.5, 0.5, 1} -- Use PORT_COLORS
+        local bgColor = self.styleGuide.PORT_COLORS[linkType] or {0.5, 0.5, 0.5, 1} -- Use PORT_COLORS from StyleGuide
         local boxSize = linkIconSize + 4
         local boxX = currentX
         local boxY = linkY - 2
@@ -1324,7 +706,7 @@ function Renderer:drawYesNoPrompt(question, displayOptions)
         local cardY = questionTextY + questionTextHeight + padding + (availableHeight - cardHeight) / 2 -- Center vertically in available space
         
         -- Get the pre-rendered canvas for the card
-        local canvas = self:_generateCardCanvas(sourceNode.card)
+        local canvas = self.cardRenderer:_generateCardCanvas(sourceNode.card)
         if canvas then
             -- Save current state
             local originalFont = love.graphics.getFont()
@@ -1390,122 +772,6 @@ function Renderer:drawYesNoPrompt(question, displayOptions)
 
     -- Return the calculated bounds for click detection
     return yesBounds, noBounds
-end
-
-function Renderer:_generateCardCanvas(card)
-    -- Create a cache key that combines the card definition ID and the instance ID
-    local cacheKey = card.id
-    
-    -- Check if we already have this card in the cache
-    if self.cardCache[cacheKey] then 
-        return self.cardCache[cacheKey]
-    end
-    
-    -- Render at higher resolution (canvasRenderScaleFactor)
-    local sf = self.canvasRenderScaleFactor or 1 -- Use new scale factor
-    -- Calculate canvas size including padding for half the border width
-    local borderPadding = self.PORT_RADIUS -- Padding needed in sf=1 units
-    local canvasPadding = borderPadding * sf
-    local baseW, baseH = self.CARD_WIDTH * sf, self.CARD_HEIGHT * sf
-    local canvasW, canvasH = baseW + 2 * canvasPadding, baseH + 2 * canvasPadding
-    local canvas = love.graphics.newCanvas(canvasW, canvasH, { mipmaps = "auto" })
-    canvas:setFilter("linear", "linear", 1) -- Use mipmapping
-
-    love.graphics.push()
-    love.graphics.origin()
-    love.graphics.setCanvas(canvas)
-    love.graphics.clear()
-    -- Translate to account for padding before scaling
-    love.graphics.translate(canvasPadding, canvasPadding)
-    -- Scale drawing so 1:1 coordinates map to sf× size on canvas
-    love.graphics.scale(sf, sf) -- Use new scale factor
-    local context = {
-        stylePrefix = "CARD",
-        baseFontSizes = {
-            title = self.baseTitleFontSize,
-            cost = self.baseSmallFontSize,
-            effect = self.baseMiniFontSize,
-            artLabel = self.baseStandardFontSize
-        },
-        targetScales = {
-            title = 0.45,
-            cost = 0.35,
-            effect = 0.25,
-            artLabel = 0.416666667
-        },
-        alpha = 1.0,
-        borderType = "normal",
-        activeLinks = {}
-    }
-    self:_drawCardInternal(card, 0, 0, context)
-    love.graphics.setCanvas()
-    love.graphics.pop()
-    self.cardCache[cacheKey] = canvas
-    return canvas
-end
-
--- Preload canvases for all cards in a list
-function Renderer:preloadCardCanvases(cards)
-    for _, card in pairs(cards) do
-        self:_generateCardCanvas(card)
-    end
-end
-
--- Draw a single card that is currently animating in screen space (for hand cards)
-function Renderer:drawHandCardAnimation(animation)
-    if not animation or not animation.card or not animation.currentScreenPos then return end
-
-    local card = animation.card
-    local screenX = animation.currentScreenPos.x
-    local screenY = animation.currentScreenPos.y
-    local scale = animation.currentScale
-    local alpha = animation.currentAlpha or 1.0
-    local rotation = animation.currentRotation or 0
-
-    -- Get the pre-rendered canvas
-    local canvas = self:_generateCardCanvas(card)
-    if not canvas then
-        print("Warning: Canvas not found for animating hand card: " .. card.id)
-        return
-    end
-
-    -- Calculate draw parameters similar to drawHoveredHandCard
-    local sf = self.canvasRenderScaleFactor or 1
-    local invSf = 1 / sf
-    local drawScale = scale * invSf -- The final scale to draw the high-res canvas
-    local borderPadding = self.PORT_RADIUS -- Original units padding on canvas
-    local canvasW = canvas:getWidth()
-    local canvasH = canvas:getHeight()
-
-    -- For rotation, we need to work with the center of the card
-    local drawW = canvasW * drawScale
-    local drawH = canvasH * drawScale
-    
-    -- Draw the canvas centered at screenX, screenY with the interpolated scale and rotation
-    local originalColor = {love.graphics.getColor()}
-    love.graphics.setColor(1, 1, 1, alpha)
-    
-    if rotation ~= 0 then
-        -- When using rotation, we need to specify the rotation origin (center of the card)
-        love.graphics.draw(
-            canvas,                -- The canvas to draw
-            screenX,               -- X position (center)
-            screenY,               -- Y position (center)
-            rotation,              -- Rotation in radians
-            drawScale,             -- X scale
-            drawScale,             -- Y scale
-            canvasW / 2,           -- Origin X (half canvas width - center point)
-            canvasH / 2            -- Origin Y (half canvas height - center point)
-        )
-    else
-        -- No rotation - calculate top-left corner for drawing
-        local drawPosX = screenX - (drawW / 2)
-        local drawPosY = screenY - (drawH / 2)
-        -- Draw call uses top-left corner and scale
-        love.graphics.draw(canvas, drawPosX, drawPosY, 0, drawScale, drawScale)
-    end
-    
-    love.graphics.setColor(originalColor)
 end
 
 -- Add a new wrapper to draw all player tables with rotation
