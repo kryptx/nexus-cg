@@ -27,6 +27,8 @@ function Player:new(config)
     instance.network = nil -- Reference to the player's Network object (set by GameService)
     instance.reactorCard = nil -- Reference to the player's Reactor card (set by GameService)
 
+    instance.orientation = 0 -- Rotation angle in radians, defaults to 0
+
     -- Convergence Links (GDD 4.1 & 4.6)
     -- Tracks whether each of the player's four link *sets* has been used.
     -- A set is consumed when initiating a link of that type.

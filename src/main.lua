@@ -39,7 +39,11 @@ function love.load()
 
     -- Set the initial state
     stateManager:changeState('menu') -- Start with the menu (assuming)
-
+    love.window.setMode(1280, 720, {
+        resizable = true,
+        vsync = true,
+        highdpi = true,
+    })
     love.window.setTitle("NEXUS: The Convergence - Main Menu") -- Initial title
     print("State Manager initialized.")
 end

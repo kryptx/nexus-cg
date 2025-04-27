@@ -14,16 +14,23 @@ local StyleGuide = require('src.rendering.styles') -- Require the styles
 local Text = require('src.ui.text') -- Need Text for wrapping
 local SequencePicker = require('src.ui.sequence_picker')
 
+-- Define port compatibility (Output Port -> Input Port)
+local COMPATIBLE_PORTS = {
+    [Card.Ports.TOP_LEFT]     = Card.Ports.BOTTOM_LEFT,  -- Culture Out -> Culture In
+    [Card.Ports.BOTTOM_RIGHT] = Card.Ports.TOP_RIGHT,    -- Technology Out -> Technology In
+    [Card.Ports.LEFT_TOP]     = Card.Ports.RIGHT_TOP,    -- Knowledge Out -> Knowledge In
+    [Card.Ports.RIGHT_BOTTOM] = Card.Ports.LEFT_BOTTOM,  -- Resource Out -> Resource In
+}
+
 local PlayState = {}
 
 -- Constants for Setup (adjust as needed)
-local NUM_PLAYERS = 2
+local NUM_PLAYERS = 3
 local STARTING_ENERGY = 5 -- Placeholder - GDD 4.1 value TBD
 local STARTING_DATA = 5     -- Placeholder - GDD 4.1 value TBD
 local STARTING_MATERIAL = 5 -- Placeholder - GDD 4.1 value TBD
 local STARTING_HAND_CARD_IDS = { "NODE_TECH_001", "NODE_CULT_001" } -- Placeholder - GDD 4.1 Seed Cards TBD
 local KEYBOARD_PAN_SPEED = 400 -- Base pixels per second at zoom 1.0
-local PLAYER_GRID_OFFSET_X = 1300 -- Estimated world space to separate player grids horizontally
 local PLAYER_GRID_OFFSET_Y = 0 -- Keep grids aligned vertically for now
 
 -- UI Constants (mirrored from Renderer for input checking)
@@ -82,6 +89,25 @@ local function getPortInfo(renderer, portIndex)
     return nil
 end
 
+-- Helper function to determine the clicked port based on local card coordinates
+-- Assumes coords are relative to the card's top-left corner (unrotated)
+local function _getClickedPort(localX, localY, renderer)
+    if not renderer then return nil end
+    local clickRadius = 10 -- Reduced radius
+    -- Check all defined ports by distance from their center
+    for _, portIndex in pairs(Card.Ports) do
+        local info = getPortInfo(renderer, portIndex)
+        if info then
+            local px, py = info[1], info[2]
+            local dx, dy = localX - px, localY - py
+            if dx*dx + dy*dy <= clickRadius*clickRadius then
+                return portIndex
+            end
+        end
+    end
+    return nil
+end
+
 function PlayState:new(animationController, gameService) -- Accept animationController and gameService
     local instance = setmetatable({}, { __index = PlayState })
     instance:init(animationController, gameService) -- Pass it to init
@@ -100,7 +126,7 @@ function PlayState:init(animationController, gameService) -- Accept animationCon
     self.statusMessage = "" -- For displaying feedback
     self.activeParadigm = nil -- Track the currently active Paradigm Shift card object
     self.currentPhase = nil -- Track the current turn phase locally
-    self.playerOrigins = {}
+    self.playerWorldOrigins = {}
     self.isPaused = false
     self.showHelpBox = true -- Enable help box by default
     self.BOTTOM_BUTTON_AREA_HEIGHT = 60 -- <<< STORE CONSTANT ON INSTANCE
@@ -108,6 +134,7 @@ function PlayState:init(animationController, gameService) -- Accept animationCon
     -- Camera State
     self.cameraX = -love.graphics.getWidth() / 2 -- Center initial view roughly
     self.cameraY = -love.graphics.getHeight() / 2
+    self.cameraRotation = 0 -- Initialize camera rotation in radians
     self.cameraZoom = 1.0
     self.minZoom = 0.2
     self.maxZoom = 3.0
@@ -126,6 +153,7 @@ function PlayState:init(animationController, gameService) -- Accept animationCon
     self.targetConvergencePortIndex = nil -- 1-8
 
     -- Hover State for Debugging
+    self.debugDrawPortHitboxes = false -- NEW: Toggle for drawing port hitboxes
     self.hoverGridX = nil
     self.hoverGridY = nil
 
@@ -137,6 +165,10 @@ function PlayState:init(animationController, gameService) -- Accept animationCon
 
     -- Initialize Game Service (using injected or create new)
     self.gameService = gameService or GameService:new() -- Use the injected gameService if provided
+    -- Ensure activationService exists for tests injecting mockGameService without activationService
+    if not self.gameService.activationService then
+        self.gameService.activationService = self.gameService
+    end
 
     -- Create UI elements (initial placeholder creation, positions set in _recalculateLayout)
     local uiFonts = self.renderer.fonts -- Get the fonts table
@@ -172,6 +204,41 @@ function PlayState:init(animationController, gameService) -- Accept animationCon
     print("Initial layout calculated using window size: " .. love.graphics.getWidth() .. "x" .. love.graphics.getHeight())
 end
 
+-- Generic camera centering and rotation helper
+function PlayState:centerCameraOnPlayer(playerIndex)
+    local origin = self.playerWorldOrigins[playerIndex] or { x = 0, y = 0 }
+    local player = self.players[playerIndex]
+    self.cameraX = origin.x
+    self.cameraY = origin.y
+    self.cameraRotation = (player and player.orientation) or 0
+end
+
+-- Add this helper function to PlayState
+function PlayState:_calculatePlayerWorldOrigins()
+    -- Example: Arrange players in a circle in world space
+    -- Radius might depend on number of players or be fixed
+    local worldRadius = 400 -- Adjust as needed
+    self.playerWorldOrigins = {} -- Ensure this table exists on self
+    local numPlayers = #self.players
+    if numPlayers == 0 then return end -- Avoid division by zero
+
+    print("[DEBUG] Calculating world origins...")
+    for i = 1, numPlayers do
+        local player = self.players[i]
+        if not player or player.orientation == nil then
+             print(string.format("Warning: Player %d or orientation is nil during layout calculation.", i))
+             -- Assign a default based on index if needed for robustness
+             player.orientation = (i-1) * (2 * math.pi / numPlayers) 
+        end
+        -- Use player.orientation directly (assuming it's radians and 0 means player's +Y points East)
+        local angle = player.orientation + math.pi/2
+        local worldX = worldRadius * math.cos(angle)
+        local worldY = worldRadius * math.sin(angle)
+        self.playerWorldOrigins[i] = { x = worldX, y = worldY }
+        print(string.format("[DEBUG] Player %d world origin set to (%f, %f) for orientation %f rad", i, worldX, worldY, angle))
+    end
+end
+
 function PlayState:enter()
     print("Entering Play State - Initializing Game...")
     
@@ -182,17 +249,11 @@ function PlayState:enter()
     self.players = self.gameService:getPlayers()
     self.activeParadigm = self.gameService:getCurrentParadigm() -- Get the active paradigm
     self.currentPhase = self.gameService:getCurrentPhase() -- Get initial phase
-    
-    -- Calculate and store player origins
-    self.playerOrigins = {}
-    for i = 1, #self.players do
-        -- Simple horizontal layout for now
-        self.playerOrigins[i] = {
-            x = (i - 1) * PLAYER_GRID_OFFSET_X,
-            y = (i - 1) * PLAYER_GRID_OFFSET_Y
-        }
-        print(string.format("Player %d origin set to: (%d, %d)", i, self.playerOrigins[i].x, self.playerOrigins[i].y))
-    end
+
+    -- Calculate fixed world origins AFTER players are initialized
+    self:_calculatePlayerWorldOrigins() 
+    -- Center camera on the current player after computing origins
+    self:centerCameraOnPlayer(self.gameService.currentPlayerIndex)
     
     -- Force layout recalculation based on current window size
     self:_recalculateLayout(love.graphics.getWidth(), love.graphics.getHeight())
@@ -226,24 +287,11 @@ function PlayState:endTurn()
         self:resetSelectionAndStatus()
         self:updateStatusMessage() -- Update status for new turn/phase
 
-        -- Center camera on the new active player's grid origin (with a slight offset)
+        -- Center camera on the new active player's grid origin and orientation
         local newPlayerIndex = self.gameService.currentPlayerIndex
-        local newOrigin = self.playerOrigins[newPlayerIndex] or {x=0, y=0}
-        local screenW = love.graphics.getWidth()
-        local screenH = love.graphics.getHeight()
-        -- Target a point slightly down-right from the origin for better initial view
-        -- Use renderer constants here
-        local cardW = self.renderer and self.renderer.CARD_WIDTH or 100 -- Fallback values
-        local cardH = self.renderer and self.renderer.CARD_HEIGHT or 140
-        local gridSpacing = self.renderer and self.renderer.GRID_SPACING or 10
-        local centerOffsetX = 2 * (cardW + gridSpacing)
-        local centerOffsetY = 2 * (cardH + gridSpacing)
-        local targetWorldX = newOrigin.x + centerOffsetX
-        local targetWorldY = newOrigin.y + centerOffsetY
+        self:centerCameraOnPlayer(newPlayerIndex)
 
-        self.cameraX = targetWorldX - (screenW / (2 * self.cameraZoom))
-        self.cameraY = targetWorldY - (screenH / (2 * self.cameraZoom))
-        print(string.format("Centering view on Player %d grid area.", newPlayerIndex))
+        print(string.format("Camera centered on Player %d for their turn.", newPlayerIndex))
 
     else
         self:updateStatusMessage(message) -- Show error message
@@ -322,18 +370,31 @@ function PlayState:update(stateManager, dt)
     end
 
     -- Keyboard Panning Logic (only if not paused and not displaying prompt)
-    local effectivePanSpeed = KEYBOARD_PAN_SPEED / self.cameraZoom
-    if love.keyboard.isDown('w') or love.keyboard.isDown('up') then
-        self.cameraY = self.cameraY - effectivePanSpeed * dt
-    end
-    if love.keyboard.isDown('s') or love.keyboard.isDown('down') then
-        self.cameraY = self.cameraY + effectivePanSpeed * dt
-    end
-    if love.keyboard.isDown('a') or love.keyboard.isDown('left') then
-        self.cameraX = self.cameraX - effectivePanSpeed * dt
-    end
-    if love.keyboard.isDown('d') or love.keyboard.isDown('right') then
-        self.cameraX = self.cameraX + effectivePanSpeed * dt
+    local dx, dy = 0, 0 -- Camera-local desired movement
+    if love.keyboard.isDown('w') or love.keyboard.isDown('up') then dy = dy - 1 end
+    if love.keyboard.isDown('s') or love.keyboard.isDown('down') then dy = dy + 1 end
+    if love.keyboard.isDown('a') or love.keyboard.isDown('left') then dx = dx - 1 end
+    if love.keyboard.isDown('d') or love.keyboard.isDown('right') then dx = dx + 1 end
+
+    if dx ~= 0 or dy ~= 0 then
+        local effectivePanSpeed = KEYBOARD_PAN_SPEED / self.cameraZoom
+        local moveSpeed = effectivePanSpeed * dt
+        
+        -- Normalize if moving diagonally
+        if dx ~= 0 and dy ~= 0 then
+            moveSpeed = moveSpeed / math.sqrt(2)
+        end
+
+        -- Rotate the local movement vector by the camera's current rotation
+        local angle = self.cameraRotation or 0
+        local cosA, sinA = math.cos(angle), math.sin(angle)
+        
+        local worldDX = (dx * cosA - dy * sinA) * moveSpeed
+        local worldDY = (dx * sinA + dy * cosA) * moveSpeed
+        
+        -- Apply the world-space delta to the camera position
+        self.cameraX = self.cameraX + worldDX
+        self.cameraY = self.cameraY + worldDY
     end
 end
 
@@ -351,7 +412,7 @@ function PlayState:draw(stateManager)
 
     -- Get current player for UI/Hand drawing later
     local currentPlayer = self.players[self.gameService.currentPlayerIndex]
-    local currentOrigin = self.playerOrigins[self.gameService.currentPlayerIndex] or {x=0, y=0} -- Fallback origin
+    local currentOrigin = self.playerWorldOrigins[self.gameService.currentPlayerIndex] or {x=0, y=0} -- Fallback origin
     local screenW = love.graphics.getWidth()
     local screenH = love.graphics.getHeight()
 
@@ -361,37 +422,27 @@ function PlayState:draw(stateManager)
         animatingCardIds = self.animationController:getAnimatingCardIds()
     end
 
-    -- Draw ALL player networks using their origins - pass animatingCardIds to skip cards being animated
+    -- Apply camera transform before drawing the table: pivot to center, rotate, zoom, then translate camera
+    love.graphics.push()
+    -- Pivot to screen center for rotation
+    love.graphics.translate(screenW/2, screenH/2)
+    love.graphics.rotate(-(self.cameraRotation or 0))
+    -- Apply zoom
+    love.graphics.scale(self.cameraZoom, self.cameraZoom)
+    -- Translate the world so cameraX, cameraY land at screen center
+    love.graphics.translate(-self.cameraX, -self.cameraY)
+
+    -- Draw ALL player networks using rotated table wrapper
     local activeLinks = self.gameService.activeConvergenceLinks -- Get active links
-    for i, player in ipairs(self.players) do
-        local origin = self.playerOrigins[i] or {x=0, y=0} -- Fallback origin
-        self.renderer:drawNetwork(player.network, self.cameraX, self.cameraY, self.cameraZoom, origin.x, origin.y, activeLinks, animatingCardIds)
-    end
+    -- Prepare highlight box data (if needed)
+    local highlightMargin = 30 -- <<< MOVED DECLARATION HERE
+    local highlightBoxData = nil
+    local highlightBoxX0, highlightBoxY0, highlightBoxWidth, highlightBoxHeight
 
-    -- Draw any active card animations (after networks, before UI)
-    if self.animationController then
-        local activeAnimations = self.animationController:getActiveAnimations()
-        for id, animation in pairs(activeAnimations) do
-            if animation.type == 'cardPlay' then
-                self.renderer:drawCardAnimation(animation, self.cameraX, self.cameraY, self.cameraZoom)
-            elseif animation.type == 'shudder' then
-                self.renderer:drawCardAnimation(animation, self.cameraX, self.cameraY, self.cameraZoom)
-            end
-            -- handShudder animations will be drawn after the safe area and hand
-        end
-    end
-
-    -- Draw highlight box around the active player's grid area
-    local activePlayerIndex = self.gameService.currentPlayerIndex
-    local activePlayer = self.players[activePlayerIndex]
-    local activeOrigin = self.playerOrigins[activePlayerIndex] or {x=0, y=0}
-    local highlightMargin = 30 -- Reduced margin slightly
-    local highlightBoxX, highlightBoxY, highlightBoxWidth, highlightBoxHeight
-
-    -- Calculate network bounds
+    -- Calculate network bounds in the player's *local* grid space
     local minGridX, maxGridX, minGridY, maxGridY = nil, nil, nil, nil
-    if activePlayer and activePlayer.network and activePlayer.network.cards then
-        for _, card in pairs(activePlayer.network.cards) do
+    if currentPlayer and currentPlayer.network and currentPlayer.network.cards then
+        for _, card in pairs(currentPlayer.network.cards) do
             if type(card) == "table" and card.position then
                 if not minGridX or card.position.x < minGridX then minGridX = card.position.x end
                 if not maxGridX or card.position.x > maxGridX then maxGridX = card.position.x end
@@ -402,32 +453,84 @@ function PlayState:draw(stateManager)
     end
 
     if minGridX then -- Check if any cards were found
-        local minWorldX, minWorldY = self.renderer:gridToWorldCoords(minGridX, minGridY, activeOrigin.x, activeOrigin.y)
-        local maxCellWorldX, maxCellWorldY = self.renderer:gridToWorldCoords(maxGridX, maxGridY, activeOrigin.x, activeOrigin.y)
-        local maxWorldX = maxCellWorldX + self.renderer.CARD_WIDTH -- Use renderer instance
-        local maxWorldY = maxCellWorldY + self.renderer.CARD_HEIGHT -- Use renderer instance
+        -- Convert grid coords to world coords relative to player's LOCAL origin (0,0)
+        local minWorldX0, minWorldY0 = self.renderer:gridToWorldCoords(minGridX, minGridY, 0, 0)
+        local maxCellWorldX0, maxCellWorldY0 = self.renderer:gridToWorldCoords(maxGridX, maxGridY, 0, 0)
+        local maxWorldX0 = maxCellWorldX0 + self.renderer.CARD_WIDTH -- Use renderer instance
+        local maxWorldY0 = maxCellWorldY0 + self.renderer.CARD_HEIGHT -- Use renderer instance
 
-        highlightBoxX = minWorldX - highlightMargin
-        highlightBoxY = minWorldY - highlightMargin
-        highlightBoxWidth = (maxWorldX + highlightMargin) - highlightBoxX
-        highlightBoxHeight = (maxWorldY + highlightMargin) - highlightBoxY
+        highlightBoxX0 = minWorldX0 - highlightMargin
+        highlightBoxY0 = minWorldY0 - highlightMargin
+        highlightBoxWidth = (maxWorldX0 + highlightMargin) - highlightBoxX0
+        highlightBoxHeight = (maxWorldY0 + highlightMargin) - highlightBoxY0
     else
-        -- Default box around origin if no cards placed yet
-        highlightBoxX = activeOrigin.x - highlightMargin
-        highlightBoxY = activeOrigin.y - highlightMargin
+        -- Default box around local origin (0,0) if no cards placed yet
+        highlightBoxX0 = 0 - highlightMargin
+        highlightBoxY0 = 0 - highlightMargin
         highlightBoxWidth = self.renderer.CARD_WIDTH + (2 * highlightMargin) -- Use renderer instance
         highlightBoxHeight = self.renderer.CARD_HEIGHT + (2 * highlightMargin) -- Use renderer instance
     end
 
-    love.graphics.push()
-    local originalLineWidth = love.graphics.getLineWidth() -- Store original width
-    love.graphics.translate(-self.cameraX * self.cameraZoom, -self.cameraY * self.cameraZoom)
-    love.graphics.scale(self.cameraZoom, self.cameraZoom)
-    love.graphics.setLineWidth(4 / self.cameraZoom) -- Thicker line, adjusts with zoom
-    love.graphics.setColor(1, 1, 0, 0.7) -- Yellow, slightly transparent
-    love.graphics.rectangle("line", highlightBoxX, highlightBoxY, highlightBoxWidth, highlightBoxHeight)
-    love.graphics.setLineWidth(originalLineWidth) -- Restore original width inside the push/pop
+    -- Prepare highlight box data (if needed and calculated correctly)
+    if type(highlightBoxX0) == "number" and type(highlightBoxY0) == "number" and 
+       type(highlightBoxWidth) == "number" and type(highlightBoxHeight) == "number" then
+        highlightBoxData = {
+            x = highlightBoxX0, y = highlightBoxY0, 
+            w = highlightBoxWidth, h = highlightBoxHeight
+        }
+    else
+        print("Warning: Highlight box dimensions were not calculated correctly. Skipping highlight box.")
+        print(string.format("Values: x=%s, y=%s, w=%s, h=%s", 
+            tostring(highlightBoxX0), tostring(highlightBoxY0), 
+            tostring(highlightBoxWidth), tostring(highlightBoxHeight)))
+    end
+    
+    self.renderer:drawTable(
+        self.players,
+        self.gameService.currentPlayerIndex, -- Pass the local player index
+        activeLinks,
+        animatingCardIds,
+        highlightBoxData, -- Pass highlight box data
+        self.cameraZoom, -- <<< Pass cameraZoom for line width calculation
+        self.playerWorldOrigins -- <<< CORRECTED VARIABLE NAME
+    )
+
+    -- Restore camera transform after drawing the table
     love.graphics.pop()
+
+    -- Draw any active card animations (after networks, before UI)
+    if self.animationController then
+        local activeAnimations = self.animationController:getActiveAnimations()
+        for id, animation in pairs(activeAnimations) do
+            if animation.type == 'cardPlay' then
+                -- Need to re-apply camera for world-space animations (Correct Order)
+                love.graphics.push()
+                local sw, sh = love.graphics.getWidth(), love.graphics.getHeight()
+                love.graphics.translate(sw/2, sh/2)
+                love.graphics.rotate(-(self.cameraRotation or 0))
+                love.graphics.scale(self.cameraZoom, self.cameraZoom)
+                love.graphics.translate(-self.cameraX, -self.cameraY)
+                self.renderer:drawCardAnimation(animation)
+                love.graphics.pop()
+            elseif animation.type == 'shudder' then
+                -- Shudder might also be world-space, apply camera (Correct Order)
+                love.graphics.push()
+                local sw2, sh2 = love.graphics.getWidth(), love.graphics.getHeight()
+                love.graphics.translate(sw2/2, sh2/2)
+                love.graphics.rotate(-(self.cameraRotation or 0))
+                love.graphics.scale(self.cameraZoom, self.cameraZoom)
+                love.graphics.translate(-self.cameraX, -self.cameraY)
+                self.renderer:drawCardAnimation(animation)
+                love.graphics.pop()
+            end
+            -- handShudder animations will be drawn after the safe area and hand (screen space)
+        end
+    end
+
+    -- Draw highlight box around the active player's grid area
+    local activePlayerIndex = self.gameService.currentPlayerIndex
+    local activePlayer = self.players[activePlayerIndex]
+    -- local highlightMargin = 30 -- Reduced margin slightly -- <<< REMOVED FROM HERE
 
     -- Draw grid hover highlight (only for current player's grid space)
     -- Calculate isInSafeArea again here for clarity
@@ -441,9 +544,26 @@ function PlayState:draw(stateManager)
         local selectedCard = self.selectedHandIndex and currentPlayer.hand[self.selectedHandIndex] or nil
         -- Only draw highlight if a card is selected AND we are hovering over the grid (hoverGridX/Y won't be nil if not in safe area)
         if selectedCard and self.hoverGridX ~= nil and self.hoverGridY ~= nil and self.currentPhase == TurnPhase.BUILD then
-            local currentOrigin = self.playerOrigins[self.gameService.currentPlayerIndex] or {x=0, y=0}
+            -- local currentOrigin = self.playerOrigins[self.gameService.currentPlayerIndex] or {x=0, y=0} -- REMOVED
             local isValid = self.gameService:isPlacementValid(self.gameService.currentPlayerIndex, selectedCard, self.hoverGridX, self.hoverGridY)
-            self.renderer:drawHoverHighlight(self.hoverGridX, self.hoverGridY, self.cameraX, self.cameraY, self.cameraZoom, selectedCard, isValid, currentOrigin.x, currentOrigin.y)
+            -- Apply full camera transform: pivot to screen center, rotate, zoom, pan
+            local sw, sh = love.graphics.getWidth(), love.graphics.getHeight()
+            love.graphics.push()
+            love.graphics.translate(sw/2, sh/2)
+            love.graphics.rotate(-(self.cameraRotation or 0))
+            love.graphics.scale(self.cameraZoom, self.cameraZoom)
+            love.graphics.translate(-self.cameraX, -self.cameraY)
+            local origin = self.playerWorldOrigins[self.gameService.currentPlayerIndex] or { x = 0, y = 0 }
+            self.renderer:drawHoverHighlight(
+                self.hoverGridX,
+                self.hoverGridY,
+                selectedCard,
+                isValid,
+                origin.x,
+                origin.y,
+                activePlayer.orientation or 0 -- Pass player orientation
+            )
+            love.graphics.pop()
         end
     end
 
@@ -611,6 +731,82 @@ function PlayState:draw(stateManager)
         love.graphics.setFont(originalFont)
     end
     -- [[[ End Draw Pause Menu ]]]
+
+    -- [[[ DEBUG: Draw Port Hitboxes (World Space) ]]]
+    if self.debugDrawPortHitboxes then
+        love.graphics.push()
+        -- Re-apply camera transform
+        local sw, sh = love.graphics.getWidth(), love.graphics.getHeight()
+        love.graphics.translate(sw/2, sh/2)
+        love.graphics.rotate(-(self.cameraRotation or 0))
+        love.graphics.scale(self.cameraZoom, self.cameraZoom)
+        love.graphics.translate(-self.cameraX, -self.cameraY)
+ 
+        local clickRadius = 10 -- Match _getClickedPort
+        local origR, origG, origB, origA = love.graphics.getColor()
+        local origLineWidth = love.graphics.getLineWidth()
+        love.graphics.setColor(1, 0, 1, 0.8) -- Magenta, slightly transparent
+        love.graphics.setLineWidth(1 / self.cameraZoom)
+ 
+        local cardW = self.renderer.CARD_WIDTH
+        local cardH = self.renderer.CARD_HEIGHT
+        local gridSpacing = self.renderer.GRID_SPACING
+        local pivotOffsetX = cardW * 0.5
+        local pivotOffsetY = cardH * 0.5
+ 
+        for pIdx, player in ipairs(self.players) do
+            if player.network and player.network.cards then
+                local origin = self.playerWorldOrigins[pIdx] or {x=0, y=0}
+                local theta = player.orientation or 0
+                local cosT, sinT = math.cos(theta), math.sin(theta)
+ 
+                for _, card in pairs(player.network.cards) do
+                    if card and card.position then
+                        local gridX, gridY = card.position.x, card.position.y
+                        local cardLocalX = gridX * (cardW + gridSpacing) -- Card top-left, local unrotated
+                        local cardLocalY = gridY * (cardH + gridSpacing)
+                        
+                        for portIndex = 1, 8 do
+                            local portInfo = getPortInfo(self.renderer, portIndex)
+                            if portInfo then
+                                local localPX, localPY = portInfo[1], portInfo[2] -- Port offset relative to card top-left
+                                -- Absolute local coords of the port anchor
+                                local absLocalX = cardLocalX + localPX
+                                local absLocalY = cardLocalY + localPY
+ 
+                                -- Apply forward transform (inverse of getPortAtWorldPos)
+                                local portWorldX, portWorldY
+                                if player.orientation and player.orientation ~= 0 then
+                                    local theta = player.orientation
+                                    local cosT, sinT = math.cos(theta), math.sin(theta)
+                                    -- Translate relative to pivot
+                                    local relPivotX = absLocalX - pivotOffsetX
+                                    local relPivotY = absLocalY - pivotOffsetY
+                                    -- Rotate
+                                    local rotatedPivotX = relPivotX * cosT - relPivotY * sinT
+                                    local rotatedPivotY = relPivotX * sinT + relPivotY * cosT
+                                    -- Translate back from pivot and add world origin
+                                    portWorldX = rotatedPivotX + pivotOffsetX + origin.x
+                                    portWorldY = rotatedPivotY + pivotOffsetY + origin.y
+                                else
+                                    -- No rotation: world = local + origin
+                                    portWorldX = absLocalX + origin.x
+                                    portWorldY = absLocalY + origin.y
+                                end
+                                
+                                love.graphics.circle('line', portWorldX, portWorldY, clickRadius)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        love.graphics.setColor(origR, origG, origB, origA)
+        love.graphics.setLineWidth(origLineWidth)
+        love.graphics.pop() -- Restore world space transform
+    end
+    -- [[[ END DEBUG ]]]
 end
 
 -- Helper function to check if point (px, py) is inside a rectangle {x, y, w, h}
@@ -618,11 +814,52 @@ local function isPointInRect(px, py, rect)
     return px >= rect.x and px < rect.x + rect.w and py >= rect.y and py < rect.y + rect.h
 end
 
+-- Helper: Find port under world coordinate for any player's network
+function PlayState:_findPortAtWorld(wx, wy)
+    local clickRadius = 10
+    for pIdx, player in ipairs(self.players) do
+        local origin = self.playerWorldOrigins[pIdx] or { x=0, y=0 }
+        local theta = player.orientation or 0
+        local cosT, sinT = math.cos(theta), math.sin(theta)
+        for _, card in pairs(player.network.cards) do
+            if card and card.position then
+                local gx, gy = card.position.x, card.position.y
+                local cellX = gx * (self.renderer.CARD_WIDTH + self.renderer.GRID_SPACING)
+                local cellY = gy * (self.renderer.CARD_HEIGHT + self.renderer.GRID_SPACING)
+                -- position of card top-left in world after rotation
+                local rotatedX = cellX * cosT - cellY * sinT + origin.x
+                local rotatedY = cellX * sinT + cellY * cosT + origin.y
+                -- For each port on card
+                for portIndex = 1, 8 do
+                    local info = getPortInfo(self.renderer, portIndex)
+                    if info then
+                        local localPX, localPY = info[1], info[2]
+                        -- offset relative to card top-left
+                        local offX = localPX
+                        local offY = localPY
+                        -- rotate offset by theta
+                        local wOffX = offX * cosT - offY * sinT
+                        local wOffY = offX * sinT + offY * cosT
+                        local portWX = rotatedX + wOffX
+                        local portWY = rotatedY + wOffY
+                        local dx, dy = wx - portWX, wy - portWY
+                        if dx*dx + dy*dy <= clickRadius*clickRadius then
+                            return pIdx, gx, gy, card, portIndex
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return nil, nil, nil, nil, nil
+end
+
 function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
     if self.sequencePicker then
         self.sequencePicker:handleMousePressed(x, y)
         return
     end
+    
     -- NEW: Check if prompt is active FIRST
     if self.isDisplayingPrompt then
         if button == 1 then -- Only left click for prompt buttons
@@ -675,7 +912,6 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
     local currentPlayerIndex = self.gameService.currentPlayerIndex
     local currentPlayer = self.players[currentPlayerIndex]
     local currentPhase = self.currentPhase
-    local currentOrigin = self.playerOrigins[currentPlayerIndex] or {x=0, y=0} -- Get current player's origin
 
     if button == 1 then -- Left mouse button
         -- Check for Convergence Link UI click first (if in Converge phase)
@@ -718,231 +954,244 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
         else
             -- 3. Attempt Network Placement (Delegate to service) - Check Phase!
             if currentPhase == TurnPhase.BUILD and self.selectedHandIndex then
-                local worldX, worldY = self.renderer:screenToWorldCoords(x, y, self.cameraX, self.cameraY, self.cameraZoom)
-                -- Convert to grid coordinates relative to the CURRENT player's origin
-                local gridX, gridY = self.renderer:worldToGridCoords(worldX, worldY, currentOrigin.x, currentOrigin.y)
+                -- New Input Transformation Logic: map screen to world including camera rotation, then invert local rotation
+                local sx, sy = x, y -- Mouse screen coordinates
+                -- Convert to world coordinates with camera rotation, zoom, and pan
+                local worldX, worldY = self:_screenToWorld(sx, sy)
 
-                -- Check if placement is valid BEFORE starting animation
-                local selectedCard = currentPlayer.hand[self.selectedHandIndex]
-                local isValid = self.gameService:isPlacementValid(currentPlayerIndex, selectedCard, gridX, gridY)
-                if isValid then
-                    -- Check specifically if player can afford the card
-                    local canAfford = self.gameService:canAffordCard(currentPlayerIndex, selectedCard)
-                    
-                    if canAfford then
-                        -- Get start position (center of the hand card)
-                        local handBounds = self.handCardBounds[self.selectedHandIndex]
-                        local startScreenX = handBounds.x + handBounds.w / 2
-                        local startScreenY = handBounds.y + handBounds.h / 2
-                        local startWorldX, startWorldY = self.renderer:screenToWorldCoords(startScreenX, startScreenY, self.cameraX, self.cameraY, self.cameraZoom)
-                        -- Get end position (center of the grid cell)
-                        local endWorldXBase, endWorldYBase = self.renderer:gridToWorldCoords(gridX, gridY, currentOrigin.x, currentOrigin.y)
-                        local endWorldX = endWorldXBase + self.renderer.CARD_WIDTH / 2
-                        local endWorldY = endWorldYBase + self.renderer.CARD_HEIGHT / 2
-                        
-                        -- Store the card to be placed and its index
-                        local cardToPlaceIndex = self.selectedHandIndex
-                        local cardToPlace = selectedCard
-                        
-                        -- Start Animation!
-                        local animId = self.animationController:addAnimation({
-                            type = 'cardPlay',
-                            duration = 0.5, -- Slightly longer to appreciate the effects
-                            card = cardToPlace, -- The actual card object, which has a unique instanceId
-                            startWorldPos = { x = startWorldX, y = startWorldY },
-                            endWorldPos = { x = endWorldX, y = endWorldY },
-                            startScale = self.renderer.HAND_CARD_SCALE or 0.6,
-                            endScale = 1.0,
-                            startRotation = math.pi * 0.1, -- Slight tilt at start
-                            endRotation = 0, -- End with no rotation
-                            easingType = "outBack", -- Use the outBack easing for a slight overshoot
-                            startAlpha = 0.9,
-                            endAlpha = 1.0,
-                            context = 'grid'
-                        })
-                        
-                        -- Register completion callback
-                        self.animationController:registerCompletionCallback(animId, function()
-                            -- Actually place the card in the game state when animation completes
-                            local success, message = self.gameService:attemptPlacement(self, cardToPlaceIndex, gridX, gridY)
+                -- Identify target player's grid for placement (current player)
+                local targetPlayer = self.players[currentPlayerIndex]
+                local targetOrigin = self.playerWorldOrigins[currentPlayerIndex]
+                local gridX, gridY = nil, nil
+
+                if targetPlayer and targetOrigin then
+                    -- Translate to player-local space
+                    local dxP = worldX - targetOrigin.x
+                    local dyP = worldY - targetOrigin.y
+
+                    -- Invert player's local grid rotation
+                    local theta = targetPlayer.orientation or 0
+                    local cosT, sinT = math.cos(-theta), math.sin(-theta)
+                    local cardCenterX = self.renderer.CARD_WIDTH / 2
+                    local cardCenterY = self.renderer.CARD_HEIGHT / 2
+
+                    -- Rotate point back to network-local axes
+                    local rdx = dxP - cardCenterX
+                    local rdy = dyP - cardCenterY
+                    local unrotX = rdx * cosT - rdy * sinT + cardCenterX
+                    local unrotY = rdx * sinT + rdy * cosT + cardCenterY
+
+                    -- Convert to grid coordinates
+                    gridX, gridY = self.renderer:worldToGridCoords(unrotX, unrotY, 0, 0)
+                end
+                
+                -- If grid coords found, proceed with placement logic
+                if gridX ~= nil and gridY ~= nil then
+                    -- Check if placement is valid BEFORE starting animation
+                    local selectedCard = currentPlayer.hand[self.selectedHandIndex]
+                    local isValid = self.gameService:isPlacementValid(currentPlayerIndex, selectedCard, gridX, gridY)
+                    if isValid then
+                        local canAfford = self.gameService:canAffordCard(currentPlayerIndex, selectedCard)
+                        if canAfford then
+                            -- Get start position (center of the hand card) - Calculation is correct
+                            local handBounds = self.handCardBounds[self.selectedHandIndex]
+                            local startScreenX = handBounds.x + handBounds.w / 2
+                            local startScreenY = handBounds.y + handBounds.h / 2
+                            local startWorldX, startWorldY = self:_screenToWorld(startScreenX, startScreenY)
+                            
+                            -- Calculate CORRECT endWorldPos for animation:
+                            -- Start with target grid center relative to player origin (0,0) in unrotated space
+                            local endLocalX = (gridX * (self.renderer.CARD_WIDTH + self.renderer.GRID_SPACING)) + self.renderer.CARD_WIDTH / 2
+                            local endLocalY = (gridY * (self.renderer.CARD_HEIGHT + self.renderer.GRID_SPACING)) + self.renderer.CARD_HEIGHT / 2
+                            
+                            -- Apply player's local rotation to the local position vector using pivot at card center
+                            local pivotX = self.renderer.CARD_WIDTH / 2
+                            local pivotY = self.renderer.CARD_HEIGHT / 2
+                            local endRotX, endRotY
+                            do
+                                local playerTheta = targetPlayer.orientation or 0
+                                local cosP, sinP = math.cos(playerTheta), math.sin(playerTheta)
+                                -- Compute position relative to pivot
+                                local relX = endLocalX - pivotX
+                                local relY = endLocalY - pivotY
+                                -- Rotate relative vector
+                                local rotRelX = relX * cosP - relY * sinP
+                                local rotRelY = relX * sinP + relY * cosP
+                                -- Translate back around pivot
+                                endRotX = rotRelX + pivotX
+                                endRotY = rotRelY + pivotY
+                            end
+                            -- Translate by player's world origin to get final world coordinates
+                            local endWorldX = endRotX + targetOrigin.x
+                            local endWorldY = endRotY + targetOrigin.y
+                            
+                            local cardToPlaceIndex = self.selectedHandIndex
+                            local cardToPlace = selectedCard
+                            
+                            local animId = self.animationController:addAnimation({
+                                type = 'cardPlay',
+                                duration = 0.5,
+                                card = cardToPlace, 
+                                startWorldPos = { x = startWorldX, y = startWorldY }, 
+                                endWorldPos = { x = endWorldX, y = endWorldY }, -- pivot-based rotation
+                                startScale = self.renderer.HAND_CARD_SCALE or 0.6,
+                                endScale = 1.0,
+                                -- Animate starting and ending rotation to match player's grid orientation
+                                startRotation = (targetPlayer.orientation or 0) + math.pi * 0.1,
+                                endRotation = (targetPlayer.orientation or 0),
+                                easingType = "outBack",
+                                startAlpha = 0.9,
+                                endAlpha = 1.0,
+                                context = 'grid'
+                            })
+                            
+                            self.animationController:registerCompletionCallback(animId, function()
+                                local success, message = self.gameService:attemptPlacement(self, cardToPlaceIndex, gridX, gridY)
+                                self:updateStatusMessage(message)
+                            end)
+                            
+                            self.selectedHandIndex = nil
+                            self.hoveredHandIndex = nil
+                            self:updateStatusMessage("Placing card on the network...")
+                        else
+                            self:createShudderAnimation(self.selectedHandIndex, "cantAfford")
+                            local _, message = self.gameService:attemptPlacement(self, self.selectedHandIndex, gridX, gridY)
                             self:updateStatusMessage(message)
-                        end)
-                        
-                        -- Clear selection UI state
-                        self.selectedHandIndex = nil
-                        self.hoveredHandIndex = nil
-                        
-                        -- Display appropriate message during animation
-                        self:updateStatusMessage("Placing card on the network...")
+                        end
                     else
-                        -- Can't afford the card - do shudder animation instead
-                        self:createShudderAnimation(self.selectedHandIndex, "cantAfford")
-                        
-                        -- Get the error message but don't reset selection
                         local _, message = self.gameService:attemptPlacement(self, self.selectedHandIndex, gridX, gridY)
                         self:updateStatusMessage(message)
+                        self:createShudderAnimation(self.selectedHandIndex, "invalidPlacement")
                     end
                 else
-                    -- Placement not valid, update status from gameService
-                    local _, message = self.gameService:attemptPlacement(self, self.selectedHandIndex, gridX, gridY)
-                    self:updateStatusMessage(message)
-                    -- Don't reset selection, allow player to try again
-                    
-                    -- Add shudder animation for invalid placement too
-                    self:createShudderAnimation(self.selectedHandIndex, "invalidPlacement")
+                    -- Clicked outside any valid grid area for the current player
+                    self:updateStatusMessage("Click on a valid grid location.")
                 end
             elseif self.convergenceSelectionState == "selecting_own_output" then
-                -- Handle clicking on network to select output port
-                local worldX, worldY = self.renderer:screenToWorldCoords(x, y, self.cameraX, self.cameraY, self.cameraZoom)
-                local gridX, gridY, clickedCard, clickedPortIndex = self.renderer:getPortAtWorldPos(currentPlayer.network, worldX, worldY, currentOrigin.x, currentOrigin.y)
-
-                if clickedCard and clickedPortIndex then
-                    print(string.format("Clicked on card '%s' at (%d,%d), port %d", clickedCard.title, gridX, gridY, clickedPortIndex))
-                    -- Validate the selected port
-                    local portInfo = getPortInfo(self.renderer, clickedPortIndex) -- Pass renderer
-                    local isValid = true
-                    local reason = ""
-
-                    if not portInfo then
-                        isValid = false
-                        reason = "Internal error: Invalid port index."
-                    elseif not clickedCard:isPortDefined(clickedPortIndex) then
-                        isValid = false
-                        reason = "Selected port is closed."
-                    -- TODO: Add check for port availability (not occupied by another link) -> requires card/network state
-                    -- elseif not clickedCard:isPortAvailable(clickedPortIndex) then
-                    --    isValid = false
-                    --    reason = "Selected port is already occupied."
-                    elseif not portInfo[4] then -- Check if it IS an output port (portInfo[4] is is_output)
-                        isValid = false
-                        reason = "Selected port must be an OUTPUT."
-                    elseif portInfo[3] ~= self.selectedConvergenceLinkType then -- Check if type matches
-                        isValid = false
-                        reason = string.format("Selected port type (%s) does not match required link type (%s).", tostring(portInfo[3]), tostring(self.selectedConvergenceLinkType))
-                    
-                    -- NEW: Check if initiating node is the Reactor
-                    elseif clickedCard == currentPlayer.reactorCard then
-                        isValid = false
-                        reason = "Cannot initiate convergence from the Reactor."
-                        
-                    -- NEW: Check if port is blocked by adjacent card in own network
+                -- Handle selecting an OUTPUT port
+                do
+                    local worldX, worldY = self:_screenToWorld(x, y)
+                    -- Convert world to local network coordinates
+                    local origin = self.playerWorldOrigins[currentPlayerIndex] or { x=0, y=0 }
+                    local localX, localY
+                    if currentPlayer.orientation and currentPlayer.orientation ~= 0 then
+                        local pivotOffsetX = self.renderer.CARD_WIDTH * 0.5
+                        local pivotOffsetY = self.renderer.CARD_HEIGHT * 0.5
+                        local pivotWorldX = origin.x + pivotOffsetX
+                        local pivotWorldY = origin.y + pivotOffsetY
+                        local relPivotX = worldX - pivotWorldX
+                        local relPivotY = worldY - pivotWorldY
+                        local theta = currentPlayer.orientation
+                        local cosT, sinT = math.cos(-theta), math.sin(-theta)
+                        local unrotatedPivotX = relPivotX * cosT - relPivotY * sinT
+                        local unrotatedPivotY = relPivotX * sinT + relPivotY * cosT
+                        localX = unrotatedPivotX + pivotOffsetX
+                        localY = unrotatedPivotY + pivotOffsetY
                     else
-                        local initiatingAdjCoord = currentPlayer.network:getAdjacentCoordForPort({x=gridX, y=gridY}, clickedPortIndex) -- Use the clicked grid coords
-                        if initiatingAdjCoord and currentPlayer.network:getCardAt(initiatingAdjCoord.x, initiatingAdjCoord.y) then
-                            isValid = false
-                            reason = "Port blocked by adjacent card in network."
+                        localX = worldX - origin.x
+                        localY = worldY - origin.y
+                    end
+                    -- Call simplified renderer method with local coords
+                    local gx, gy, card, portIndex = self.renderer:getPortAtWorldPos(currentPlayer.network, localX, localY)
+
+                    if card and portIndex then -- Check if a port was found
+                        local portInfo = getPortInfo(self.renderer, portIndex)
+                        if portInfo and portInfo[4] and portInfo[3] == self.selectedConvergenceLinkType and card:isPortAvailable(portIndex) then
+                            self.initiatingConvergenceNodePos = { x = gx, y = gy }
+                            self.initiatingConvergencePortIndex = portIndex
+                            self.convergenceSelectionState = "selecting_opponent_input"
+                            self:updateStatusMessage(string.format("Select a %s INPUT port on an OPPONENT's network.",
+                                tostring(self.selectedConvergenceLinkType)))
+                            print("Output port selected. Ready for input port selection.")
+                        else
+                            self:updateStatusMessage("Invalid output port selected.")
                         end
-                    end
-
-                    if isValid then
-                        -- Store selection and move to next state
-                        self.initiatingConvergenceNodePos = {x=gridX, y=gridY}
-                        self.initiatingConvergencePortIndex = clickedPortIndex
-                        self.convergenceSelectionState = "selecting_opponent_input"
-                        self:updateStatusMessage(string.format("Now select an opponent's %s INPUT port.", tostring(self.selectedConvergenceLinkType)))
-                        print(string.format("Initiating port selected: P%d (%d,%d) Port %d. State -> selecting_opponent_input", currentPlayerIndex, gridX, gridY, clickedPortIndex))
-                        -- Buttons remain disabled
-                        -- TODO: Play confirmation sound?
                     else
-                        -- Invalid port clicked, remain in selecting_own_output state
-                        self:updateStatusMessage("Invalid port: " .. reason)
-                        print("Invalid initiating port selected: " .. reason)
-                        -- Buttons remain disabled
+                        self:updateStatusMessage(string.format("Click a %s OUTPUT port on your network.",
+                            tostring(self.selectedConvergenceLinkType)))
                     end
-                else
-                    -- Clicked on the grid but not near a specific port
-                    self:updateStatusMessage("Click closer to a valid output port.")
                 end
+                return
+
             elseif self.convergenceSelectionState == "selecting_opponent_input" then
-                -- Handle clicking on network to select input port
-                local worldX, worldY = self.renderer:screenToWorldCoords(x, y, self.cameraX, self.cameraY, self.cameraZoom)
+                -- Handle selecting an INPUT port
+                do
+                    local worldX, worldY = self:_screenToWorld(x, y)
+                    local targetPlayerIndex, targetGridX, targetGridY, targetCard, targetPortIndex = nil, nil, nil, nil, nil
 
-                -- Determine which opponent grid was clicked (iterate through players)
-                local foundTargetPlayerIndex = nil
-                local foundTargetGridX, foundTargetGridY = nil, nil
-                local foundTargetCard, foundTargetPortIndex = nil, nil
-
-                for pIdx, player in ipairs(self.players) do
-                    if pIdx ~= currentPlayerIndex then -- Only check opponents
-                        local opponentOrigin = self.playerOrigins[pIdx] or {x=0, y=0}
-                        local gridX, gridY, clickedCard, clickedPortIndex = self.renderer:getPortAtWorldPos(player.network, worldX, worldY, opponentOrigin.x, opponentOrigin.y)
-                        
-                        -- If a port was found on this opponent's grid, store it and stop checking others
-                        if clickedCard and clickedPortIndex then
-                            foundTargetPlayerIndex = pIdx
-                            foundTargetGridX = gridX
-                            foundTargetGridY = gridY
-                            foundTargetCard = clickedCard
-                            foundTargetPortIndex = clickedPortIndex
-                            print(string.format("Potential target: Player %d Card '%s' at (%d,%d), port %d", pIdx, clickedCard.title, gridX, gridY, clickedPortIndex))
-                            break -- Found a potential target, stop checking other players
+                    -- Iterate through opponents to find the clicked port
+                    for pIdx, player in ipairs(self.players) do
+                        if pIdx ~= currentPlayerIndex then
+                            -- Convert world to this opponent's local network coordinates
+                            local origin = self.playerWorldOrigins[pIdx] or { x=0, y=0 }
+                            local localX, localY
+                            if player.orientation and player.orientation ~= 0 then
+                                local pivotOffsetX = self.renderer.CARD_WIDTH * 0.5
+                                local pivotOffsetY = self.renderer.CARD_HEIGHT * 0.5
+                                local pivotWorldX = origin.x + pivotOffsetX
+                                local pivotWorldY = origin.y + pivotOffsetY
+                                local relPivotX = worldX - pivotWorldX
+                                local relPivotY = worldY - pivotWorldY
+                                local theta = player.orientation
+                                local cosT, sinT = math.cos(-theta), math.sin(-theta)
+                                local unrotatedPivotX = relPivotX * cosT - relPivotY * sinT
+                                local unrotatedPivotY = relPivotX * sinT + relPivotY * cosT
+                                localX = unrotatedPivotX + pivotOffsetX
+                                localY = unrotatedPivotY + pivotOffsetY
+                            else
+                                localX = worldX - origin.x
+                                localY = worldY - origin.y
+                            end
+                            -- Check if click hits a port in this opponent's local coords
+                            local gx, gy, card, portIndex = self.renderer:getPortAtWorldPos(player.network, localX, localY)
+                            if card and portIndex then
+                                -- Found a potential target
+                                targetPlayerIndex, targetGridX, targetGridY, targetCard, targetPortIndex = pIdx, gx, gy, card, portIndex
+                                break -- Stop checking other opponents
+                            end
                         end
                     end
-                end
 
-                if foundTargetCard and foundTargetPortIndex then
-                    -- Validate the selected port
-                    local portInfo = getPortInfo(self.renderer, foundTargetPortIndex)
-                    local isValid = true
-                    local reason = ""
-
-                    if not portInfo then
-                        isValid = false
-                        reason = "Internal error: Invalid port index."
-                    elseif not foundTargetCard:isPortDefined(foundTargetPortIndex) then
-                        isValid = false
-                        reason = "Selected port is closed."
-                    -- TODO: Add check for port availability (not occupied by another link) -> requires card/network state
-                    -- elseif not foundTargetCard:isPortAvailable(foundTargetPortIndex) then
-                    --    isValid = false
-                    --    reason = "Selected port is already occupied."
-                    elseif portInfo[4] then -- Check if it is NOT an output port (i.e., it IS an input)
-                        isValid = false
-                        reason = "Selected port must be an INPUT."
-                    elseif portInfo[3] ~= self.selectedConvergenceLinkType then -- Check if type matches
-                        isValid = false
-                        reason = string.format("Selected port type (%s) does not match required link type (%s).", tostring(portInfo[3]), tostring(self.selectedConvergenceLinkType))
-                    end
-
-                    if isValid then
-                        -- All checks passed! Attempt the convergence via GameService
-                        print("Target port validated. Attempting convergence...")
-                        self.targetConvergencePlayerIndex = foundTargetPlayerIndex
-                        self.targetConvergenceNodePos = {x=foundTargetGridX, y=foundTargetGridY}
-                        self.targetConvergencePortIndex = foundTargetPortIndex
-
-                        local success, message, shiftOccurred = self.gameService:attemptConvergence(
-                            currentPlayerIndex, -- Initiating player
-                            self.initiatingConvergenceNodePos,
-                            self.initiatingConvergencePortIndex, -- Added Initiating Port Index
-                            self.targetConvergencePlayerIndex,
-                            self.targetConvergenceNodePos,
-                            self.targetConvergencePortIndex, -- Added Target Port Index
-                            self.selectedConvergenceLinkType
-                        )
-
-                        self:updateStatusMessage(message) -- Display result
-                        -- Check if paradigm shifted (GameService now returns this)
-                        if success and shiftOccurred then
-                            self.activeParadigm = self.gameService:getCurrentParadigm() -- Re-sync
-                            -- Status message already updated by attemptConvergence, but we could add more detail
-                            print("PlayState detected Paradigm Shift!")
-                            self:updateStatusMessage() -- Update status to include new paradigm name
+                    -- Validate the found target port (if any)
+                    if targetCard and targetPortIndex then
+                        local portInfo = getPortInfo(self.renderer, targetPortIndex)
+                        local isCompatible = (COMPATIBLE_PORTS[self.initiatingConvergencePortIndex] == targetPortIndex)
+                        if portInfo and not portInfo[4] and portInfo[3] == self.selectedConvergenceLinkType
+                           and targetCard:isPortAvailable(targetPortIndex) and isCompatible then
+                            self.targetConvergencePlayerIndex = targetPlayerIndex
+                            self.targetConvergenceNodePos = { x = targetGridX, y = targetGridY }
+                            self.targetConvergencePortIndex = targetPortIndex
+                            local success, message, paradigmChanged = self.gameService:attemptConvergence(
+                                self.gameService.currentPlayerIndex,
+                                self.initiatingConvergenceNodePos,
+                                self.initiatingConvergencePortIndex,
+                                self.targetConvergencePlayerIndex,
+                                self.targetConvergenceNodePos,
+                                self.targetConvergencePortIndex,
+                                self.selectedConvergenceLinkType)
+                            self:updateStatusMessage(message)
+                            if success then
+                                print("Convergence successful!")
+                                self.gameService.audioManager:playSound("link_create")
+                                self:resetConvergenceSelection()
+                                self.buttonAdvancePhase:setEnabled(true)
+                                self.buttonEndTurn:setEnabled(true)
+                            else
+                                print("Convergence failed: " .. message)
+                                self.targetConvergencePlayerIndex = nil
+                                self.targetConvergenceNodePos = nil
+                                self.targetConvergencePortIndex = nil
+                                self:updateStatusMessage(message .. " Select a valid input port.")
+                            end
+                        else
+                            self:updateStatusMessage("Invalid target port.")
                         end
-                        self:resetConvergenceSelection() -- Clear selection state
-                        self.buttonAdvancePhase:setEnabled(true) -- Re-enable buttons
-                        self.buttonEndTurn:setEnabled(true)
-
                     else
-                        -- Invalid target port clicked
-                        self:updateStatusMessage("Invalid target port: " .. reason)
-                        print("Invalid target port selected: " .. reason)
-                        -- Remain in selecting_opponent_input state
+                        self:updateStatusMessage("Click an input port on an opponent's network.")
                     end
-                else
-                    -- Clicked, but not near a valid port on any opponent grid
-                    self:updateStatusMessage("Click closer to a valid opponent input port.")
                 end
+                return
+
             else
                 -- Clicked network area with no card selected or wrong phase
                 if self.selectedHandIndex then
@@ -950,7 +1199,6 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                 else
                     self:updateStatusMessage() -- Reset to default status
                 end
-                -- Re-enable buttons if we clicked off everything and aren't selecting convergence
                 self.buttonAdvancePhase:setEnabled(true)
                 self.buttonEndTurn:setEnabled(true)
             end
@@ -982,29 +1230,39 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
         -- Otherwise, handle Activation (if in Activate phase)
         if currentPhase == "Activate" then -- Activate phase logic updated for global targeting
              local activatingPlayerIndex = self.gameService.currentPlayerIndex
-             local worldX, worldY = self.renderer:screenToWorldCoords(x, y, self.cameraX, self.cameraY, self.cameraZoom)
+             -- Convert click to world coordinates
+             local worldX, worldY = self:_screenToWorld(x, y) -- NEW CORRECT TRANSFORM
              
              -- Find which player's grid was clicked and the target card
-             local targetPlayerIndex = nil
-             local targetGridX = nil
-             local targetGridY = nil
-             local targetCard = nil
- 
+             local targetPlayerIndex, targetGridX, targetGridY, targetCard = nil, nil, nil, nil
              for pIdx, player in ipairs(self.players) do
-                 local playerOrigin = self.playerOrigins[pIdx] or {x=0, y=0}
-                 local gridX, gridY = self.renderer:worldToGridCoords(worldX, worldY, playerOrigin.x, playerOrigin.y)
+                 -- Translate into network-local space
+                 local origin = self.playerWorldOrigins[pIdx] or { x = 0, y = 0 }
+                 local dxNet = worldX - origin.x
+                 local dyNet = worldY - origin.y
+                 -- Invert local rotation around the card center
+                 local theta = player.orientation or 0
+                 local cosT = math.cos(-theta)
+                 local sinT = math.sin(-theta)
+                 local cardCenterX = self.renderer.CARD_WIDTH / 2
+                 local cardCenterY = self.renderer.CARD_HEIGHT / 2
+                 local rdx = dxNet - cardCenterX
+                 local rdy = dyNet - cardCenterY
+                 local unrotX = rdx * cosT - rdy * sinT + cardCenterX
+                 local unrotY = rdx * sinT + rdy * cosT + cardCenterY
+                 -- Determine grid cell under cursor
+                 local gridX, gridY = self.renderer:worldToGridCoords(unrotX, unrotY, 0, 0)
                  local card = player.network:getCardAt(gridX, gridY)
-                 -- Check if a valid, non-reactor card exists at this grid position for this player
-                 if card and card.type ~= Card.Type.REACTOR then 
+                 if card and card.type ~= Card.Type.REACTOR then
                      targetPlayerIndex = pIdx
                      targetGridX = gridX
                      targetGridY = gridY
                      targetCard = card
                      print(string.format("Right-click targeted Player %d's card '%s' at grid (%d,%d)", pIdx, card.title, gridX, gridY))
-                     break -- Found a valid target
+                     break
                  end
              end
- 
+             
              -- If a valid target was found, attempt global activation
              if targetCard then
                  -- Retrieve all shortest paths
@@ -1082,16 +1340,37 @@ function PlayState:mousemoved(stateManager, x, y, dx, dy, istouch)
     local safeAreaTopY = screenH - self.BOTTOM_BUTTON_AREA_HEIGHT - handCardH - 20 -- <<< USE self.
     local isInSafeArea = (y >= safeAreaTopY)
 
-    -- Update world mouse coordinates (needed for panning regardless)
-    local worldX, worldY = self.renderer:screenToWorldCoords(x, y, self.cameraX, self.cameraY, self.cameraZoom)
+    -- Convert screen coordinates directly to world space
+    local worldX, worldY = self:_screenToWorld(x, y) -- NEW CORRECT TRANSFORM
 
-    -- Reset hover grid coords
+    -- Reset hover grid coordinates
     self.hoverGridX, self.hoverGridY = nil, nil
 
     -- Only calculate grid hover if NOT in the safe area
     if not isInSafeArea then
-        local currentOrigin = self.playerOrigins[self.gameService.currentPlayerIndex] or {x=0, y=0}
-        self.hoverGridX, self.hoverGridY = self.renderer:worldToGridCoords(worldX, worldY, currentOrigin.x, currentOrigin.y)
+        local currentPlayerIndex = self.gameService.currentPlayerIndex
+        local currentPlayer = self.players[currentPlayerIndex]
+        local origin = self.playerWorldOrigins[currentPlayerIndex] or { x = 0, y = 0 }
+
+        -- Translate to the player's network origin
+        local dxNet = worldX - origin.x
+        local dyNet = worldY - origin.y
+
+        -- Invert the player's local rotation around the card center
+        local theta = currentPlayer.orientation or 0
+        local cosT = math.cos(-theta)
+        local sinT = math.sin(-theta)
+        local cardCenterX = self.renderer.CARD_WIDTH / 2
+        local cardCenterY = self.renderer.CARD_HEIGHT / 2
+
+        -- Rotate point back to network-local axes
+        local rdx = dxNet - cardCenterX
+        local rdy = dyNet - cardCenterY
+        local unrotX = rdx * cosT - rdy * sinT + cardCenterX
+        local unrotY = rdx * sinT + rdy * cosT + cardCenterY
+
+        -- Determine grid cell from local coordinates
+        self.hoverGridX, self.hoverGridY = self.renderer:worldToGridCoords(unrotX, unrotY, 0, 0)
     end
 
     -- Check for hand hover (do this regardless of safe area)
@@ -1141,29 +1420,33 @@ end
 
 function PlayState:wheelmoved(stateManager, x, y)
     if self.isDisplayingPrompt then return end -- Ignore zoom if prompt is up
-    if self.isPaused then return end
+    if self.isPaused then return end         -- Ignore zoom when paused
 
-    -- Zoom in/out based on scroll direction (y > 0 is scroll up/zoom in)
-    local zoomFactor = 1.1
+    -- Only zoom on vertical scroll
+    local dyScroll = y
+    if dyScroll == 0 then return end
+
+    -- Get current mouse position in screen coords
+    local mouseX, mouseY = love.mouse.getPosition()
+
+    -- Compute world position under cursor before zoom
     local oldZoom = self.cameraZoom
-    local newZoom
+    local oldCameraX, oldCameraY = self.cameraX, self.cameraY
+    local worldMouseX, worldMouseY = self:_screenToWorld(mouseX, mouseY)
 
-    if y > 0 then
-        newZoom = math.min(self.maxZoom, self.cameraZoom * zoomFactor)
-    elseif y < 0 then
-        newZoom = math.max(self.minZoom, self.cameraZoom / zoomFactor)
+    -- Calculate new zoom level
+    local zoomFactor = 1.1
+    if dyScroll > 0 then
+        self.cameraZoom = math.min(self.maxZoom, self.cameraZoom * zoomFactor)
     else
-        return -- No change
+        self.cameraZoom = math.max(self.minZoom, self.cameraZoom / zoomFactor)
     end
 
-    self.cameraZoom = newZoom
-
-    -- Adjust camera position to zoom towards the mouse cursor
-    -- Get world coordinates under cursor before zoom
-    local worldMouseX, worldMouseY = self.renderer:screenToWorldCoords(self.lastMouseX, self.lastMouseY, self.cameraX, self.cameraY, oldZoom)
-    -- Calculate new camera position to keep world coords under cursor
-    self.cameraX = worldMouseX - (self.lastMouseX / self.cameraZoom)
-    self.cameraY = worldMouseY - (self.lastMouseY / self.cameraZoom)
+    -- Adjust camera so that the same world point stays under cursor
+    local newZoom = self.cameraZoom
+    local factor = oldZoom / newZoom
+    self.cameraX = worldMouseX - (worldMouseX - oldCameraX) * factor
+    self.cameraY = worldMouseY - (worldMouseY - oldCameraY) * factor
 end
 
 function PlayState:keypressed(stateManager, key)
@@ -1182,7 +1465,19 @@ function PlayState:keypressed(stateManager, key)
         end
     end
     -- Ignore other keypresses if paused or prompt is active?
-    if self.isPaused or self.isDisplayingPrompt then return end
+    if self.isPaused or self.isDisplayingPrompt then 
+        if key == 'h' then -- Allow toggling debug even if paused/prompted
+           self.debugDrawPortHitboxes = not self.debugDrawPortHitboxes
+           print("Debug Port Hitboxes: " .. tostring(self.debugDrawPortHitboxes))
+        end
+        return 
+    end
+
+    -- Toggle debug drawing for port hitboxes
+    if key == 'h' then
+        self.debugDrawPortHitboxes = not self.debugDrawPortHitboxes
+        print("Debug Port Hitboxes: " .. tostring(self.debugDrawPortHitboxes))
+    end
 end
 
 function PlayState:resetConvergenceSelection()
@@ -1228,9 +1523,9 @@ function PlayState:createShudderAnimation(cardIndex, errorType)
         -- Keep same scale, just vibrate
         startScale = self.renderer.HAND_CARD_SCALE or 0.6,
         endScale = self.renderer.HAND_CARD_SCALE or 0.6,
-        -- No rotation start/end, will be handled inside update
-        startRotation = 0,
-        endRotation = 0,
+        -- Animate from a slight tilt to the final grid orientation of the player
+        startRotation = math.pi * 0.1,
+        endRotation = (currentPlayer.orientation or 0),
         -- Add a tint that fades out
         startAlpha = 0.8,
         endAlpha = 1.0,
@@ -1333,6 +1628,33 @@ function PlayState:executeChosenActivation(pathData)
     self.gameService.audioManager:playSound('activation')
     local messages = { string.format("Activated global path (Cost %d E):", cost) }
     return self.gameService.activationService:_processActivationPath(pathData.path, player, pathData.isConvergenceStart, messages)
+end
+
+-- Safe wrapper for screenToNetworkLocal: fallback to identity if missing
+function PlayState:_screenToNetworkLocal(x, y, player, allPlayers, localPlayerIndex)
+    if self.renderer and self.renderer.screenToNetworkLocal then
+        return self.renderer:screenToNetworkLocal(x, y, player, allPlayers, localPlayerIndex)
+    else
+        print("Warning: screenToNetworkLocal not found on renderer, using identity.")
+        return x, y
+    end
+end
+
+-- Transform screen coordinates to world coordinates including camera rotation, zoom, and pan
+function PlayState:_screenToWorld(sx, sy)
+    local screenW, screenH = love.graphics.getWidth(), love.graphics.getHeight()
+    local cx, cy = screenW / 2, screenH / 2
+    -- Translate to pivot center
+    local dx, dy = sx - cx, sy - cy
+    -- Rotate by cameraRotation
+    local angle = self.cameraRotation or 0
+    local cosA, sinA = math.cos(angle), math.sin(angle)
+    local rx = dx * cosA - dy * sinA
+    local ry = dx * sinA + dy * cosA
+    -- Scale by inverse zoom and translate by camera position
+    local wx = rx / self.cameraZoom + self.cameraX
+    local wy = ry / self.cameraZoom + self.cameraY
+    return wx, wy
 end
 
 return PlayState 

@@ -52,7 +52,8 @@ local mockRenderer = { -- Base methods for the mock
     -- Constants needed by PlayState
     CARD_WIDTH = 100,
     CARD_HEIGHT = 140, -- Add missing constant
-    HAND_CARD_SCALE = 0.6 -- Add missing constant
+    HAND_CARD_SCALE = 0.6, -- Add missing constant
+    GRID_SPACING = 10 -- <<< ADDED MISSING CONSTANT >>>
 }
 mockRenderer.new = function() -- Constructor returns a new instance based on the base
     local instance = {
@@ -211,10 +212,44 @@ package.loaded['src.game.player'] = {
             data = 0,
             reactorCard = reactorCard,
             addResource_calls = {}, 
-            addCardToHand_calls = {}
+            addCardToHand_calls = {},
+            -- Assign a mock network directly
+            network = {
+                owner = nil, -- Will be set below
+                cards = {},
+                getCardAt = function(self_net, x, y) 
+                    -- Basic mock: return a generic non-reactor card at 0,0 for testing
+                    if x == 0 and y == 0 and self_net.owner then 
+                        -- Return a simple mock card, ensuring it exists and has a type
+                        -- We can just create a temporary one here for the test's purpose
+                        return { id="MOCK_TARGET_CARD", title="Mock Target", type=package.loaded['src.game.card'].Type.TECHNOLOGY, owner=self_net.owner } 
+                    end
+                    return nil 
+                end,
+                findReactor = function(self_net) 
+                    -- Return the owner's reactor card
+                    return self_net.owner and self_net.owner.reactorCard or nil 
+                end,
+                -- Add other mock network methods if needed by PlayState
+                getCardById = function(self_net, card_id)
+                    -- Simple search in the mock cards table if needed
+                    for _, card in pairs(self_net.cards) do
+                        if card.id == card_id then return card end
+                    end
+                    -- Check reactor card too
+                    if self_net.owner and self_net.owner.reactorCard and self_net.owner.reactorCard.id == card_id then
+                        return self_net.owner.reactorCard
+                    end
+                    return nil
+                end,
+                getAdjacentCoordForPort = function() return nil end, -- Add basic mock if needed
+                getOpposingPortIndex = function(portIndex) return portIndex end -- Basic mock
+            }
         }
         -- Set reactor card owner
         reactorCard.owner = p
+        -- Link network back to player
+        p.network.owner = p
         
         -- Add methods directly to p
         p.addResource = function(self_p, type, amount)
@@ -922,6 +957,49 @@ describe("PlayState Module", function()
             placement_spy:revert()
         end)
 
+    end)
+
+    describe(":wheelmoved()", function()
+        it("should zoom centered on cursor", function()
+            -- Arrange fixed mouse position
+            local mouseX, mouseY = 100, 100
+            love.mouse.getPosition = function() return mouseX, mouseY end
+            -- Initialize camera state
+            state.cameraZoom = 1.0
+            state.cameraX = 10.0
+            state.cameraY = 20.0
+            state.maxZoom = 5.0
+            state.minZoom = 0.2
+            -- Compute world position under cursor before zoom
+            local bwx, bwy = state:_screenToWorld(mouseX, mouseY)
+            -- Act: scroll up
+            state:wheelmoved(nil, 0, 1)
+            -- Compute world position under cursor after zoom
+            local awx, awy = state:_screenToWorld(mouseX, mouseY)
+            -- Assert world position invariant
+            assert.is_true(math.abs(bwx - awx) < 1e-6)
+            assert.is_true(math.abs(bwy - awy) < 1e-6)
+            -- Assert zoom increased
+            assert.is_true(state.cameraZoom > 1.0)
+        end)
+        it("should respect minZoom and maxZoom", function()
+            -- Arrange fixed mouse position
+            local mouseX, mouseY = 200, 150
+            love.mouse.getPosition = function() return mouseX, mouseY end
+            -- Set zoom at extremes
+            state.maxZoom = 3.0
+            state.minZoom = 0.5
+            state.cameraX = 0
+            state.cameraY = 0
+            -- Test no increase beyond maxZoom
+            state.cameraZoom = state.maxZoom
+            state:wheelmoved(nil, 0, 1)
+            assert.are.equal(state.maxZoom, state.cameraZoom)
+            -- Test no decrease beyond minZoom
+            state.cameraZoom = state.minZoom
+            state:wheelmoved(nil, 0, -1)
+            assert.are.equal(state.minZoom, state.cameraZoom)
+        end)
     end)
 
     -- Add describe blocks for other methods like input handlers etc.

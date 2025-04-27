@@ -95,6 +95,10 @@ end
 
 -- Initialize game with players
 function GameService:initializeGame(playerCount)
+    -- Define base rotation offset and total players
+    local baseRotation = 0
+    local totalPlayers = playerCount
+
     -- Create player objects
     for i = 1, playerCount do
         -- Create the player
@@ -102,6 +106,11 @@ function GameService:initializeGame(playerCount)
             id = i,
             name = "Player " .. i
         })
+        
+        -- Compute and assign orientation based on seat index (0-based)
+        player.orientation = baseRotation + (2 * math.pi / totalPlayers) * (i - 1)
+        -- Normalize orientation to [0, 2π)
+        player.orientation = player.orientation % (2 * math.pi)
         
         -- Set starting resources
         -- player:addResource('energy', 1)

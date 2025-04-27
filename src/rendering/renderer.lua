@@ -1,8 +1,19 @@
 -- src/rendering/renderer.lua
 -- Handles drawing the game state to the screen.
 
+-- Safeguard love global to support tests outside LÖVE environment
+if type(love) ~= 'table' then love = {} end
+love.graphics = love.graphics or {}
+love.graphics.getWidth = love.graphics.getWidth or function() return 0 end
+love.graphics.getHeight = love.graphics.getHeight or function() return 0 end
+love.graphics.getFont = love.graphics.getFont or function() return { setFilter = function() end, getHeight = function() return 16 end, getWidth = function() return 0 end } end
+love.graphics.newFont = love.graphics.newFont or function(...) return love.graphics.getFont() end
+love.filesystem = love.filesystem or {}
+love.filesystem.getInfo = love.filesystem.getInfo or function() return false end
+
 local Card = require('src.game.card') -- Needed for Card.Ports constants
 local StyleGuide = require('src.rendering.styles') -- Load the styles
+local PortRenderer = require('src.rendering.port_renderer') -- After loading StyleGuide, require the new PortRenderer
 
 local Renderer = {}
 Renderer.__index = Renderer
@@ -67,6 +78,7 @@ function Renderer:new()
     local uiFontMultiplier = 2
     local fontPath = "assets/fonts/Roboto-Regular.ttf"
     local fontPathSemiBold = "assets/fonts/Roboto-SemiBold.ttf"
+    -- Use LÖVE's default font
     local defaultFont = love.graphics.getFont()
     if love.filesystem.getInfo(fontPath) and love.filesystem.getInfo(fontPathSemiBold) then
         instance.fonts.worldStandard = love.graphics.newFont(fontPath, baseStandardSize * 3)
@@ -238,6 +250,18 @@ function Renderer:new()
     return instance
 end
 
+-- NEW: Get player color based on ID
+function Renderer:getPlayerColor(playerId)
+    local colors = {
+        {1, 0, 0, 1},    -- 1: Red
+        {0, 0, 1, 1},    -- 2: Blue
+        {1, 1, 0, 1},    -- 3: Yellow
+        {0, 1, 0, 1},    -- 4: Green
+        {0.5, 0, 0.5, 1} -- 5: Purple
+    }
+    return colors[playerId] or {0.7, 0.7, 0.7, 1} -- Default to Gray if ID out of range
+end
+
 -- Helper function to load and cache images
 function Renderer:_loadImage(path)
     if not path then return nil end
@@ -345,209 +369,19 @@ function Renderer:worldToGridCoords(wx, wy, originX, originY)
     return gridX, gridY
 end
 
--- Helper function to get port position and implicit type based on GDD 4.3
-local function getPortInfo(portIndex)
-    local props = Card:getPortProperties(portIndex) -- Use Card helper
-    if not props then return nil end
-
-    local halfW = CARD_WIDTH / 2
-    local halfH = CARD_HEIGHT / 2
-    local quartW = CARD_WIDTH / 4
-    local quartH = CARD_HEIGHT / 4
-
-    local x_offset, y_offset
-    if portIndex == Card.Ports.TOP_LEFT then x_offset, y_offset = quartW, 0 end
-    if portIndex == Card.Ports.TOP_RIGHT then x_offset, y_offset = halfW + quartW, 0 end
-    if portIndex == Card.Ports.BOTTOM_LEFT then x_offset, y_offset = quartW, CARD_HEIGHT end
-    if portIndex == Card.Ports.BOTTOM_RIGHT then x_offset, y_offset = halfW + quartW, CARD_HEIGHT end
-    if portIndex == Card.Ports.LEFT_TOP then x_offset, y_offset = 0, quartH end
-    if portIndex == Card.Ports.LEFT_BOTTOM then x_offset, y_offset = 0, halfH + quartH end
-    if portIndex == Card.Ports.RIGHT_TOP then x_offset, y_offset = CARD_WIDTH, quartH end
-    if portIndex == Card.Ports.RIGHT_BOTTOM then x_offset, y_offset = CARD_WIDTH, halfH + quartH end
-
-    if x_offset ~= nil then
-        return { x_offset = x_offset, y_offset = y_offset, type = props.type, is_output = props.is_output }
-    end
-    return nil
-end
-
--- Helper function to find the specific card port index closest to world coordinates
--- Returns: gridX, gridY, card, portIndex OR nil, nil, nil, nil
-function Renderer:getPortAtWorldPos(network, wx, wy, originX, originY)
-    originX = originX or 0
-    originY = originY or 0
-    local tolerance = self.PORT_RADIUS * 3.5 -- Use PORT_RADIUS
-    local toleranceSq = tolerance * tolerance
-
-    local clickGridX, clickGridY = self:worldToGridCoords(wx, wy, originX, originY)
-    local candidateCells = {
-        {clickGridX, clickGridY},
-        {clickGridX + 1, clickGridY},
-        {clickGridX - 1, clickGridY},
-        {clickGridX, clickGridY + 1},
-        {clickGridX, clickGridY - 1}
-    }
-
-    local closestMatch = {
-        distanceSq = toleranceSq,
-        card = nil,
-        gridX = nil,
-        gridY = nil,
-        portIndex = nil
-    }
-
-    for _, cellCoords in ipairs(candidateCells) do
-        local gridX, gridY = cellCoords[1], cellCoords[2]
-        local card = network:getCardAt(gridX, gridY)
-
-        if card then
-            local cardWX, cardWY = self:gridToWorldCoords(gridX, gridY, originX, originY)
-
-            for portIndex = 1, 8 do
-                local portInfo = getPortInfo(portIndex)
-                if portInfo then
-                    local isOutput = portInfo.is_output
-                    local r = self.PORT_RADIUS
-
-                    local anchorWX = cardWX + portInfo.x_offset
-                    local anchorWY = cardWY + portInfo.y_offset
-
-                    local centerWX, centerWY = anchorWX, anchorWY
-                    if isOutput then
-                        if portIndex == Card.Ports.TOP_LEFT or portIndex == Card.Ports.TOP_RIGHT then centerWY = anchorWY - r / 2
-                        elseif portIndex == Card.Ports.BOTTOM_LEFT or portIndex == Card.Ports.BOTTOM_RIGHT then centerWY = anchorWY + r / 2
-                        elseif portIndex == Card.Ports.LEFT_TOP or portIndex == Card.Ports.LEFT_BOTTOM then centerWX = anchorWX - r / 2
-                        elseif portIndex == Card.Ports.RIGHT_TOP or portIndex == Card.Ports.RIGHT_BOTTOM then centerWX = anchorWX + r / 2
-                        end
-                    end
-
-                    local distSq = (wx - centerWX)^2 + (wy - centerWY)^2
-
-                    if distSq < closestMatch.distanceSq then
-                        closestMatch.distanceSq = distSq
-                        closestMatch.card = card
-                        closestMatch.gridX = gridX
-                        closestMatch.gridY = gridY
-                        closestMatch.portIndex = portIndex
-                    end
-                end
-            end
-        end
-    end
-
-    if closestMatch.card then
-        return closestMatch.gridX, closestMatch.gridY, closestMatch.card, closestMatch.portIndex
-    else
-        return nil, nil, nil, nil
-    end
+-- Delegate to PortRenderer for port hit-testing
+function Renderer:getPortAtWorldPos(network, localX, localY)
+    return PortRenderer.getPortAtLocalPos(self, network, localX, localY)
 end
 
 -- Helper function to draw the 8 connection ports for a card
 function Renderer:drawCardPorts(card, sx, sy, alphaOverride, activeLinks)
-    alphaOverride = alphaOverride or 1.0
-    activeLinks = activeLinks or {}
-    if not card then return end
-
-    local linkMap = {}
-    for _, link in ipairs(activeLinks) do
-        linkMap[link.linkId] = link
-    end
-
-    local originalFont = love.graphics.getFont()
-    local originalColor = {love.graphics.getColor()}
-    local r = self.PORT_RADIUS -- Use instance variable
-
-    for portIndex = 1, 8 do
-        local info = getPortInfo(portIndex)
-        if info then
-            local portX = sx + info.x_offset
-            local portY = sy + info.y_offset
-            local isOutput = info.is_output
-            local isDefined = card:isPortDefined(portIndex)
-            local occupyingLinkId = card:getOccupyingLinkId(portIndex)
-            local isOccupied = occupyingLinkId ~= nil
-
-            local orientation
-            if portIndex == Card.Ports.TOP_LEFT or portIndex == Card.Ports.TOP_RIGHT then orientation = "top"
-            elseif portIndex == Card.Ports.BOTTOM_LEFT or portIndex == Card.Ports.BOTTOM_RIGHT then orientation = "bottom"
-            elseif portIndex == Card.Ports.LEFT_TOP or portIndex == Card.Ports.LEFT_BOTTOM then orientation = "left"
-            elseif portIndex == Card.Ports.RIGHT_TOP or portIndex == Card.Ports.RIGHT_BOTTOM then orientation = "right"
-            end
-
-            if isOccupied then
-                -- 1. Draw original shape underneath (dimmed)
-                self:_drawSinglePortShape(portIndex, portX, portY, r, alphaOverride * 0.4)
-
-                -- 2. Draw the larger tab centered on the visual center
-                local linkDetails = linkMap[occupyingLinkId]
-                local playerNumber = linkDetails and linkDetails.initiatingPlayerIndex or "?"
-
-                local tabSize = r * 3.5
-                local tabX, tabY
-                local fixedOffset = r * 1.0
-
-                if orientation == "top" then
-                    tabX = portX - tabSize / 2
-                    tabY = portY - fixedOffset - tabSize
-                elseif orientation == "bottom" then
-                    tabX = portX - tabSize / 2
-                    tabY = portY + fixedOffset
-                elseif orientation == "left" then
-                    tabX = portX - fixedOffset - tabSize
-                    tabY = portY - tabSize / 2
-                elseif orientation == "right" then
-                    tabX = portX + fixedOffset
-                    tabY = portY - tabSize / 2
-                else 
-                    local centerWX, centerWY = portX, portY
-                    if isOutput then
-                       if portIndex == Card.Ports.TOP_LEFT or portIndex == Card.Ports.TOP_RIGHT then centerWY = portY - r / 2
-                       elseif portIndex == Card.Ports.BOTTOM_LEFT or portIndex == Card.Ports.BOTTOM_RIGHT then centerWY = portY + r / 2
-                       elseif portIndex == Card.Ports.LEFT_TOP or portIndex == Card.Ports.LEFT_BOTTOM then centerWX = portX - r / 2
-                       elseif portIndex == Card.Ports.RIGHT_TOP or portIndex == Card.Ports.RIGHT_BOTTOM then centerWX = portX + r / 2
-                       end
-                    end
-                    tabX = centerWX - tabSize / 2
-                    tabY = centerWY - tabSize / 2
-                end
-
-                love.graphics.setColor(0.9, 0.9, 0.9, alphaOverride * 0.7)
-                love.graphics.rectangle("fill", tabX, tabY, tabSize, tabSize)
-                love.graphics.setColor(0, 0, 0, alphaOverride)
-                love.graphics.rectangle("line", tabX, tabY, tabSize, tabSize)
-
-                local tabFont = self.fonts.worldSmall or originalFont
-                love.graphics.setFont(tabFont)
-                love.graphics.setColor(0, 0, 0, alphaOverride)
-                local text = tostring(playerNumber)
-                local textScale = 0.45 / self.worldFontMultiplier
-                local nativeTextW = tabFont:getWidth(text)
-                local nativeTextH = tabFont:getHeight()
-                local scaledTextW = nativeTextW * textScale
-                local scaledTextH = nativeTextH * textScale
-                local textDrawX = tabX + (tabSize - scaledTextW) / 2
-                local textDrawY = tabY + (tabSize - scaledTextH) / 2
-
-                love.graphics.push()
-                love.graphics.translate(textDrawX, textDrawY)
-                love.graphics.scale(textScale, textScale)
-                love.graphics.print(text, 0, 0)
-                love.graphics.pop()
-
-            elseif isDefined then
-                -- Draw normal present port using the helper
-                 self:_drawSinglePortShape(portIndex, portX, portY, r, alphaOverride)
-
-            end
-        end
-    end
-    love.graphics.setFont(originalFont)
-    love.graphics.setColor(originalColor)
+    PortRenderer.drawCardPorts(self, card, sx, sy, alphaOverride, activeLinks)
 end
 
 -- Internal helper to draw the shape for a single port
 function Renderer:_drawSinglePortShape(portIndex, portX, portY, radius, alpha)
-    local info = getPortInfo(portIndex)
+    local info = PortRenderer.getPortInfo(self, portIndex)
     if not info then return end
 
     local portType = info.type
@@ -947,7 +781,7 @@ function Renderer:_drawCardConvergenceTabs(card, sx, sy, alphaOverride, activeLi
     -- use the card radius as offset inside canvas content
     local r = self.PORT_RADIUS
     for portIndex = 1, 8 do
-        local info = getPortInfo(portIndex)
+        local info = PortRenderer.getPortInfo(self, portIndex)
         if info then
             -- align to content origin on world canvas
             local portX = sx + info.x_offset
@@ -956,7 +790,7 @@ function Renderer:_drawCardConvergenceTabs(card, sx, sy, alphaOverride, activeLi
             local occupyingLinkId = card:getOccupyingLinkId(portIndex)
             if occupyingLinkId then
                 -- Draw the base port shape dimmed
-                self:_drawSinglePortShape(portIndex, portX, portY, r, alphaOverride * 0.4)
+                PortRenderer.drawPortShape(self, portIndex, portX, portY, r, alphaOverride * 0.4)
                 -- Draw the convergence tab
                 local linkDetails = linkMap[occupyingLinkId]
                 local playerNumber = linkDetails and linkDetails.initiatingPlayerIndex or "?"
@@ -1014,47 +848,86 @@ function Renderer:_drawCardConvergenceTabs(card, sx, sy, alphaOverride, activeLi
     love.graphics.setColor(originalColor)
 end
 
--- Draw a player's network grid, applying camera transform
-function Renderer:drawNetwork(network, cameraX, cameraY, cameraZoom, originX, originY, activeLinks, animatingCardIds)
-    if not network then return end
-    originX = originX or 0
-    originY = originY or 0
-    animatingCardIds = animatingCardIds or {} -- Ensure it's a table
-    local gridCardIds = animatingCardIds.gridCardIds or {} -- Extract grid card IDs
+-- Draws the player's network grid
+function Renderer:drawNetwork(network, originX, originY, activeLinks, animatingCardIds)
+    if not network then
+        print("Warning: drawNetwork called with nil network.")
+        return
+    end
+    
+    local playerColor = network.owner and self:getPlayerColor(network.owner.id) or {1, 1, 1, 1}
 
+    -- Set base color for the network (slightly dimmed based on player color)
+    love.graphics.setColor(playerColor[1] * 0.8, playerColor[2] * 0.8, playerColor[3] * 0.8, 0.6)
+    
+    -- Store original line width
+    local originalLineWidth = love.graphics.getLineWidth()
+
+    -- Apply the origin translation for this network
+    love.graphics.push()
+    love.graphics.translate(originX, originY)
+
+    -- Apply camera transformations if needed within drawNetwork (consider if this is still needed)
+    --[[  REMOVED - Camera is now handled globally before drawTable
     love.graphics.push()
     love.graphics.translate(-cameraX * cameraZoom, -cameraY * cameraZoom)
     love.graphics.scale(cameraZoom, cameraZoom)
-    love.graphics.setLineWidth(1 / cameraZoom)
+    ]]
 
-    local originalFont = love.graphics.getFont()
-    local originalColor = {love.graphics.getColor()}
+    -- Set line width adjusted for zoom for grid lines
+    -- love.graphics.setLineWidth(1 / cameraZoom)
+    -- Draw grid lines (optional - can be visually noisy)
+    -- self:drawGrid(originX, originY, cameraX, cameraY, cameraZoom)
 
-    local drawQueue = {}
-    for cardId, card in pairs(network.cards) do
-        -- Check if the card is currently animating
-        if type(card) == "table" and card.position and not animatingCardIds[card.instanceId] then
-            local wx, wy = self:gridToWorldCoords(card.position.x, card.position.y, originX, originY)
-            table.insert(drawQueue, { card = card, wx = wx, wy = wy })
-        else
-            if type(card) ~= "table" then
-                -- print(string.format("Warning in drawNetwork: Skipping non-table value..."))
+    -- Draw cards within the network
+    if network.cards then
+        for _, card in pairs(network.cards) do
+            local cardShouldRender = true
+            if animatingCardIds and card.id and animatingCardIds[card.id] then
+                -- Don't render cards that are part of a world-space animation (like card play)
+                -- because they will be rendered separately by the animation system.
+                cardShouldRender = false
+            end
+            
+            if cardShouldRender then
+                self:drawCard(card, originX, originY, activeLinks)
             end
         end
     end
 
-    for _, item in ipairs(drawQueue) do
-        self:_drawSingleCardInWorld(item.card, item.wx, item.wy, activeLinks)
-    end
-
-    love.graphics.setFont(originalFont)
-    love.graphics.setColor(originalColor)
-
+    -- Restore camera transform if it was applied locally
+    -- [[ REMOVED
+    -- love.graphics.pop() -- This was the original line causing the pop
+    -- ]]
+    
+    -- Restore origin translation
     love.graphics.pop()
+
+    -- Restore original line width and color
+    love.graphics.setLineWidth(originalLineWidth)
+    love.graphics.setColor(1,1,1,1) -- Reset color to white
+end
+
+-- Draw a single card within a network grid
+function Renderer:drawCard(card, originX, originY, activeLinks)
+    if not card then return end
+
+    local cardShouldRender = true
+    if animatingCardIds and card.id and animatingCardIds[card.id] then
+        -- Don't render cards that are part of a world-space animation (like card play)
+        -- because they will be rendered separately by the animation system.
+        cardShouldRender = false
+    end
+    
+    if cardShouldRender then
+        local sx, sy = self:gridToWorldCoords(card.position.x, card.position.y, originX, originY)
+        self:_drawSingleCardInWorld(card, sx, sy, activeLinks)
+    end
 end
 
 -- Draw highlight / card preview over the hovered grid cell, or red outline if invalid
-function Renderer:drawHoverHighlight(gridX, gridY, cameraX, cameraY, cameraZoom, selectedCard, isPlacementValid, originX, originY)
+function Renderer:drawHoverHighlight(gridX, gridY, selectedCard, isPlacementValid, originX, originY, orientation)
+    orientation = orientation or 0 -- Default to 0 if not provided
     isPlacementValid = isPlacementValid == nil or isPlacementValid == true
     originX = originX or 0
     originY = originY or 0
@@ -1062,16 +935,34 @@ function Renderer:drawHoverHighlight(gridX, gridY, cameraX, cameraY, cameraZoom,
     if gridX == nil or gridY == nil then return end
 
     if selectedCard then
-        local wx, wy = self:gridToWorldCoords(gridX, gridY, originX, originY)
+        local cardCenterX = self.CARD_WIDTH / 2
+        local cardCenterY = self.CARD_HEIGHT / 2
+
         love.graphics.push()
-        love.graphics.translate(-cameraX * cameraZoom, -cameraY * cameraZoom)
-        love.graphics.scale(cameraZoom, cameraZoom)
-        love.graphics.setLineWidth(1 / cameraZoom)
 
+        -- 1. Go to player's world origin
+        love.graphics.translate(originX, originY)
+        
+        -- 2. Apply local rotation around the center of the (0,0) grid cell
+        love.graphics.translate(cardCenterX, cardCenterY)
+        love.graphics.rotate(orientation)
+        love.graphics.translate(-cardCenterX, -cardCenterY)
+        
+        -- Now the coordinate system's origin is at the player's world origin,
+        -- but its axes are rotated by 'orientation'. (0,0) corresponds to the
+        -- top-left of the (0,0) grid cell in the rotated frame.
+
+        -- 3. Calculate the top-left corner of the target grid cell *within this rotated frame*.
+        local targetRotatedX = gridX * (self.CARD_WIDTH + self.GRID_SPACING)
+        local targetRotatedY = gridY * (self.CARD_HEIGHT + self.GRID_SPACING)
+
+        -- 4. Draw the card using _drawSingleCardInWorld, passing the calculated position.
+        -- Since the coordinate system is already correctly positioned and rotated, 
+        -- drawing the card's content unrotated relative to (targetRotatedX, targetRotatedY) works.
         local useInvalidBorder = not isPlacementValid
-        self:_drawSingleCardInWorld(selectedCard, wx, wy, nil, 0.5, useInvalidBorder)
-
-        love.graphics.pop()
+        self:_drawSingleCardInWorld(selectedCard, targetRotatedX, targetRotatedY, nil, 0.5, useInvalidBorder)
+        
+        love.graphics.pop() -- Restore original transform state
     end
 end
 
@@ -1211,7 +1102,7 @@ function Renderer:drawHand(player, selectedIndex, animatingCardIds)
 end
 
 -- Draw a single card that is currently animating
-function Renderer:drawCardAnimation(animation, cameraX, cameraY, cameraZoom)
+function Renderer:drawCardAnimation(animation)
     if not animation or not animation.card then return end
 
     local card = animation.card
@@ -1228,11 +1119,11 @@ function Renderer:drawCardAnimation(animation, cameraX, cameraY, cameraZoom)
         return
     end
 
-    -- Apply camera transform
-    love.graphics.push()
-    love.graphics.translate(-cameraX * cameraZoom, -cameraY * cameraZoom)
-    love.graphics.scale(cameraZoom, cameraZoom)
-    love.graphics.setLineWidth(1 / cameraZoom) -- Keep line width consistent if drawing borders
+    -- Apply camera transform -- REMOVED (Handled by caller)
+    -- love.graphics.push()
+    -- love.graphics.translate(-cameraX * cameraZoom, -cameraY * cameraZoom)
+    -- love.graphics.scale(cameraZoom, cameraZoom)
+    -- love.graphics.setLineWidth(1 / cameraZoom) -- Keep line width consistent if drawing borders
 
     -- Calculate draw parameters similar to drawHoveredHandCard/drawSingleCardInWorld
     local sf = self.canvasRenderScaleFactor or 1
@@ -1273,7 +1164,7 @@ function Renderer:drawCardAnimation(animation, cameraX, cameraY, cameraZoom)
     end
     
     love.graphics.setColor(originalColor)
-    love.graphics.pop() -- Restore camera transform
+    -- love.graphics.pop() -- Restore camera transform -- REMOVED
 end
 
 -- Drawing UI elements (resources, VP, turn info)
@@ -1694,6 +1585,74 @@ function Renderer:drawHandCardAnimation(animation)
     end
     
     love.graphics.setColor(originalColor)
+end
+
+-- Add a new wrapper to draw all player tables with rotation
+function Renderer:drawTable(players, localPlayerIndex, activeLinks, animatingCardIds, highlightBox, cameraZoom, playerWorldOrigins)
+    if not playerWorldOrigins then
+        print("Error: playerWorldOrigins not provided to drawTable!")
+        return
+    end
+
+    for i, player in ipairs(players) do
+        local worldOrigin = playerWorldOrigins[i]
+        if not worldOrigin then
+            print(string.format("Warning: Missing world origin for player %d", i))
+            goto continue_loop -- Skip drawing this player if origin is missing
+        end
+
+        love.graphics.push() -- Push for individual player transform
+
+        -- 1. Translate to the player's fixed world origin
+        love.graphics.translate(worldOrigin.x, worldOrigin.y)
+        
+        -- 2. Apply local rotation around the center of the (0,0) grid cell
+        local cardCenterX = self.CARD_WIDTH / 2
+        local cardCenterY = self.CARD_HEIGHT / 2
+        love.graphics.translate(cardCenterX, cardCenterY) -- Move pivot to card center
+        love.graphics.rotate(player.orientation or 0)      -- Rotate
+        love.graphics.translate(-cardCenterX, -cardCenterY) -- Move pivot back
+
+        -- 3. Draw the network relative to (0,0) in this translated/rotated frame
+        self:drawNetwork(player.network,
+                         0, 0, -- Network draws relative to (0,0) after transforms
+                         activeLinks, animatingCardIds)
+
+        -- 4. Draw Highlight Box if this is the local player
+        if i == localPlayerIndex and highlightBox then
+            -- Box coordinates are relative to the player's (0,0) origin before local rotation
+            -- Draw them directly here, the transforms above place them correctly.
+            local originalLineWidth = love.graphics.getLineWidth()
+            love.graphics.setLineWidth(4 / (cameraZoom or 1.0)) -- Use passed cameraZoom
+            love.graphics.setColor(1, 1, 0, 0.7) -- Yellow, slightly transparent
+            love.graphics.rectangle("line", highlightBox.x, highlightBox.y, highlightBox.w, highlightBox.h)
+            love.graphics.setLineWidth(originalLineWidth)
+        end
+
+        love.graphics.pop() -- Pop individual player transform
+        
+        ::continue_loop::
+    end
+end
+
+-- Add inverse rotation helper for input mapping: convert screen coords to network-local screen coords
+function Renderer:screenToNetworkLocal(sx, sy, player, allPlayers, localPlayerIndex)
+    -- Invert the rotation applied in drawTable for the player's network
+    if not player or not player.orientation or player.orientation == 0 then
+        return sx, sy
+    end
+    local screenW, screenH = love.graphics.getWidth(), love.graphics.getHeight()
+    local cx, cy = screenW / 2, screenH / 2
+    -- Translate to center
+    local dx = sx - cx
+    local dy = sy - cy
+    -- Rotate by inverse of orientation
+    local angle = -player.orientation
+    local cosA, sinA = math.cos(angle), math.sin(angle)
+    local rx = dx * cosA - dy * sinA
+    local ry = dx * sinA + dy * cosA
+    -- Translate back
+    return rx + cx, ry + cy
 end
 
 return Renderer
