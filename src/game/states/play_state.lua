@@ -23,13 +23,8 @@ local COMPATIBLE_PORTS = {
 local PlayState = {}
 
 -- Constants for Setup (adjust as needed)
-local NUM_PLAYERS = 3
-local STARTING_ENERGY = 5 -- Placeholder - GDD 4.1 value TBD
-local STARTING_DATA = 5     -- Placeholder - GDD 4.1 value TBD
-local STARTING_MATERIAL = 5 -- Placeholder - GDD 4.1 value TBD
-local STARTING_HAND_CARD_IDS = { "NODE_TECH_001", "NODE_CULT_001" } -- Placeholder - GDD 4.1 Seed Cards TBD
+local NUM_PLAYERS = 5
 local KEYBOARD_PAN_SPEED = 400 -- Base pixels per second at zoom 1.0
-local PLAYER_GRID_OFFSET_Y = 0 -- Keep grids aligned vertically for now
 
 -- UI Constants (mirrored from Renderer for input checking)
 local UI_ICON_SIZE = 18
