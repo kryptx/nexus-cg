@@ -23,7 +23,7 @@ local COMPATIBLE_PORTS = {
 local PlayState = {}
 
 -- Constants for Setup (adjust as needed)
-local NUM_PLAYERS = 5
+local NUM_PLAYERS = 3
 local KEYBOARD_PAN_SPEED = 400 -- Base pixels per second at zoom 1.0
 
 -- UI Constants (mirrored from Renderer for input checking)
