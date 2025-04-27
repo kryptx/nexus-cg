@@ -1,15 +1,11 @@
+---@diagnostic disable: duplicate-set-field, undefined-field
 -- tests/game/game_service_spec.lua
 -- Unit tests for the GameService module
 
-local luassert = require "luassert"
-local Card = require "src/game/card"
-local Rules = require "src/game/rules"
-local Network = require "src/game/network"
-local Player = require "src/game/player"
-local GameServiceModule = require "src/game/game_service"
+local Card = require "src.game.card"
+local GameServiceModule = require "src.game.game_service"
 local GameService = GameServiceModule.GameService
 local TurnPhase = GameServiceModule.TurnPhase
-local CardPorts = require('src.game.card').Ports
 
 -- Helper to create basic mock objects
 local function createMockCard(id, title, materialCost, dataCost, activationFunc)

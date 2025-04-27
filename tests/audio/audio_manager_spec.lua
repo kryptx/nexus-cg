@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field
 -- tests/audio/audio_manager_spec.lua
 -- Unit tests for the AudioManager module
 

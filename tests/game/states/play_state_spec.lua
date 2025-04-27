@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, need-check-nil
 -- tests/game/states/play_state_spec.lua
 -- Unit tests for the PlayState module
 
@@ -301,6 +302,7 @@ package.loaded['src.controllers.AnimationController'] = mockAnimationController 
 
 -- Now require the module under test
 local PlayState = require 'src.game.states.play_state'
+local created_networks = {}
 
 describe("PlayState Module", function()
     local state

@@ -1,10 +1,7 @@
 -- src/game/states/play_state.lua
 -- The main gameplay state
 
-local Player = require('src.game.player')
 local Card = require('src.game.card')
-local Network = require('src.game.network')
-local CardDefinitions = require('src.game.data.card_definitions')
 local Renderer = require('src.rendering.renderer')
 local Button = require('src.ui.button') -- Require the Button module
 local ServiceModule = require('src.game.game_service') -- Require GameService module
@@ -86,25 +83,6 @@ local function getPortInfo(renderer, portIndex)
     if portIndex == Card.Ports.LEFT_BOTTOM then return { 0, halfH + quartH, Card.Type.RESOURCE, false } end
     if portIndex == Card.Ports.RIGHT_TOP then return { cardW, quartH, Card.Type.KNOWLEDGE, false } end
     if portIndex == Card.Ports.RIGHT_BOTTOM then return { cardW, halfH + quartH, Card.Type.RESOURCE, true } end
-    return nil
-end
-
--- Helper function to determine the clicked port based on local card coordinates
--- Assumes coords are relative to the card's top-left corner (unrotated)
-local function _getClickedPort(localX, localY, renderer)
-    if not renderer then return nil end
-    local clickRadius = 10 -- Reduced radius
-    -- Check all defined ports by distance from their center
-    for _, portIndex in pairs(Card.Ports) do
-        local info = getPortInfo(renderer, portIndex)
-        if info then
-            local px, py = info[1], info[2]
-            local dx, dy = localX - px, localY - py
-            if dx*dx + dy*dy <= clickRadius*clickRadius then
-                return portIndex
-            end
-        end
-    end
     return nil
 end
 

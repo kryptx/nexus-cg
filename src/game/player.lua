@@ -14,7 +14,7 @@ function Player:new(config)
     local instance = setmetatable({}, Player)
 
     instance.id = config.id or error("Player must have an ID")
-    instance.name = config.name or "Player " .. tostring(instance.id)
+    instance.name = config.name or ("Player " .. tostring(instance.id))
 
     -- Game State
     instance.resources = {

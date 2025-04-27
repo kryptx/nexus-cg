@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field
 -- tests/game/player_spec.lua
 -- Unit tests for the Player module
 

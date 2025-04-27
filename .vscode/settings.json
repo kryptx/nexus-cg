@@ -1,0 +1,19 @@
+{
+  "Lua.diagnostics.disable": [
+    "redundant-parameter"
+  ],
+  "Lua.diagnostics.globals": [
+    "describe",
+    "before_each",
+    "it",
+    "assert",
+    "is_table",
+    "is_nil",
+    "is_true",
+    "is_false",
+    "is_number",
+    "are",
+    "after_each",
+    "love"
+  ]
+}

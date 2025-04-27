@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field
 -- tests/core/state_manager_spec.lua
 -- Unit tests for the StateManager module
 

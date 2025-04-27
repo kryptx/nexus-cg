@@ -1,10 +1,10 @@
 -- scripts/extract_cards_to_csv.lua
 -- Extracts card definitions from data files into a CSV format.
 
-local CardTypes = require('src.game.card').Type -- Needed for potentially converting type enum back to string if necessary
-local CardPorts = require('src.game.card').Ports -- Needed for port names
+local Card = require('src.game.card')
+local CardTypes = Card.Type
+local CardPorts = Card.Ports
 local all_definitions = require('src.game.data.card_definitions')
-local CostCalculator = require('src.utils.cost_calculator') -- Require the calculator
 
 local output_file_path = "card_definitions.csv"
 local file, err = io.open(output_file_path, "w")
