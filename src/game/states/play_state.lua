@@ -10,6 +10,7 @@ local TurnPhase = ServiceModule.TurnPhase -- Extract TurnPhase constants
 local StyleGuide = require('src.rendering.styles') -- Require the styles
 local Text = require('src.ui.text') -- Need Text for wrapping
 local SequencePicker = require('src.ui.sequence_picker')
+local Easing = require('src.utils.easing') -- Import Easing module for camera animations
 
 -- Define port compatibility (Output Port -> Input Port)
 local COMPATIBLE_PORTS = {
@@ -186,9 +187,85 @@ end
 function PlayState:centerCameraOnPlayer(playerIndex)
     local origin = self.playerWorldOrigins[playerIndex] or { x = 0, y = 0 }
     local player = self.players[playerIndex]
-    self.cameraX = origin.x
-    self.cameraY = origin.y
-    self.cameraRotation = (player and player.orientation) or 0
+    local targetRotation = (player and player.orientation) or 0
+    
+    -- Define a consistent target zoom level
+    local targetZoom = 1.0 -- Standard zoom level to always animate to
+    
+    -- If we have an animation controller, animate the camera movement
+    if self.animationController then
+        -- Store current camera position and target position
+        local startPos = { x = self.cameraX, y = self.cameraY }
+        local endPos = { x = origin.x, y = origin.y }
+        local startRotation = self.cameraRotation
+        local startZoom = self.cameraZoom
+        
+        -- Create a dummy object to track camera animation
+        local cameraDummy = { id = "camera_"..playerIndex, instanceId = "camera_anim_"..playerIndex }
+        
+        -- Add camera animation with nice easing
+        local animId = self.animationController:addAnimation({
+            type = 'cameraMove',
+            duration = 0.8, -- Adjust duration as needed
+            card = cameraDummy, -- Use dummy object for the animation
+            startWorldPos = startPos,
+            endWorldPos = endPos,
+            startScale = startZoom,
+            endScale = targetZoom,
+            startRotation = startRotation,
+            endRotation = targetRotation,
+            easingType = "inOutQuad", -- Use smooth easing
+            meta = {
+                animatingZoom = true,
+                startZoom = startZoom,
+                targetZoom = targetZoom
+            }
+        })
+        
+        -- Register update callback for the animation
+        self.animationController:registerCompletionCallback(animId, function()
+            -- Ensure final position is exact
+            self.cameraX = origin.x
+            self.cameraY = origin.y
+            self.cameraRotation = targetRotation
+            self.cameraZoom = targetZoom -- Set to consistent target zoom
+        end)
+        
+        -- Store animation ID to track it
+        self.currentCameraAnimation = animId
+    else
+        -- Fallback to instant camera movement if no animation controller
+        self.cameraX = origin.x
+        self.cameraY = origin.y
+        self.cameraRotation = targetRotation
+        self.cameraZoom = targetZoom -- Set to consistent target zoom immediately
+    end
+end
+
+-- Add this method to update camera position during animations
+function PlayState:updateCamera(dt)
+    -- Update camera position from active animations
+    if self.animationController and self.currentCameraAnimation then
+        local cameraAnim = self.animationController:getActiveAnimations()[self.currentCameraAnimation]
+        if cameraAnim then
+            -- Apply animated values to camera
+            self.cameraX = cameraAnim.currentWorldPos.x
+            self.cameraY = cameraAnim.currentWorldPos.y
+            self.cameraRotation = cameraAnim.currentRotation
+            
+            -- Apply zoom animation if meta data indicates we're animating zoom
+            if cameraAnim.meta and cameraAnim.meta.animatingZoom then
+                -- Use the animation's progress to calculate current zoom
+                local zoomProgress = cameraAnim.progress
+                local startZoom = cameraAnim.meta.startZoom
+                local targetZoom = cameraAnim.meta.targetZoom
+                
+                -- Apply eased zoom transition
+                local easedProgress = Easing.inOutQuad(zoomProgress)
+                self.cameraZoom = startZoom + (targetZoom - startZoom) * easedProgress
+            end
+        end
+    end
 end
 
 -- Add this helper function to PlayState
@@ -374,6 +451,9 @@ function PlayState:update(stateManager, dt)
         self.cameraX = self.cameraX + worldDX
         self.cameraY = self.cameraY + worldDY
     end
+
+    -- Update camera position during animations
+    self:updateCamera(dt)
 end
 
 function PlayState:draw(stateManager)
