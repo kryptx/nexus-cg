@@ -1025,34 +1025,6 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                     -- Clicked outside any valid grid area for the current player
                     self:updateStatusMessage("Click on a valid grid location.")
                 end
-            elseif self.convergenceSelectionState == "selecting_own_output" then
-                -- Handle selecting an OUTPUT port
-                do
-                    local worldX, worldY = self:_screenToWorld(x, y)
-                    local pIdx = self.gameService.currentPlayerIndex
-                    -- Convert world coords to network-local coords directly
-                    local netLocal = self:_worldToNetworkLocal(worldX, worldY, pIdx)
-                    local gx, gy, card, portIndex = self.renderer:getPortAtWorldPos(currentPlayer.network, netLocal.x, netLocal.y)
-                     
-                     if card and portIndex then -- Check if a port was found
-                         local portInfo = getPortInfo(self.renderer, portIndex)
-                         if portInfo and portInfo[4] and portInfo[3] == self.selectedConvergenceLinkType and card:isPortAvailable(portIndex) then
-                             self.initiatingConvergenceNodePos = { x = gx, y = gy }
-                             self.initiatingConvergencePortIndex = portIndex
-                             self.convergenceSelectionState = "selecting_opponent_input"
-                             self:updateStatusMessage(string.format("Select a %s INPUT port on an OPPONENT's network.",
-                                 tostring(self.selectedConvergenceLinkType)))
-                             print("Output port selected. Ready for input port selection.")
-                         else
-                             self:updateStatusMessage("Invalid output port selected.")
-                         end
-                     else
-                         self:updateStatusMessage(string.format("Click a %s OUTPUT port on your network.",
-                             tostring(self.selectedConvergenceLinkType)))
-                     end
-                end
-                return
-
             elseif self.convergenceSelectionState == "selecting_opponent_input" then
                 -- Handle selecting an INPUT port
                 do
