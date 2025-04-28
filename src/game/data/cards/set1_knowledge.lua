@@ -363,7 +363,7 @@ definitions["NODE_KNOW_010"] = {
   vpValue = 0, 
   imagePath = "assets/images/xeno-linguistics-lab.png", 
   flavorText = "Attempting to understand the 'other'.",
-  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.RIGHT_TOP] = true },
+  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.RIGHT_TOP] = true, [CardPorts.BOTTOM_RIGHT] = true },
 }
 
 definitions["NODE_KNOW_011"] = {
@@ -494,7 +494,7 @@ definitions["NODE_KNOW_014"] = {
   vpValue = 1, 
   imagePath = "assets/images/quantum-entanglement-comms.png", 
   flavorText = "Instantaneous communication, unbound by distance.",
-  definedPorts = { [CardPorts.LEFT_TOP] = true, [CardPorts.RIGHT_TOP] = true },
+  definedPorts = { [CardPorts.LEFT_TOP] = true, [CardPorts.RIGHT_TOP] = true, [CardPorts.BOTTOM_RIGHT] = true },
 }
 
 definitions["NODE_KNOW_015"] = {

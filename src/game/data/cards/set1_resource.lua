@@ -165,6 +165,7 @@ definitions["NODE_RES_005"] = {
   definedPorts = {
       [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
       [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
+      [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
       [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
       [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
   },
@@ -228,6 +229,7 @@ definitions["NODE_RES_007"] = {
   imagePath = "assets/images/solar-collector-array.png",
   definedPorts = {
       [CardPorts.LEFT_BOTTOM] = true,   -- Resource Input
+      [CardPorts.LEFT_TOP] = true,      -- Knowledge Output
       [CardPorts.RIGHT_BOTTOM] = true,  -- Resource Output
       [CardPorts.TOP_RIGHT] = true,     -- Technology Input
   },
@@ -258,7 +260,7 @@ definitions["NODE_RES_008"] = {
       -- Description: "If you pay 1 Energy: You gain 2 Material."
   }),
   vpValue = 0, imagePath = "assets/images/asteroid-mining-claim.png", flavorText = "Untapped riches in the belt.",
-  definedPorts = { [CardPorts.TOP_RIGHT] = true, [CardPorts.RIGHT_BOTTOM] = true },
+  definedPorts = { [CardPorts.TOP_RIGHT] = true, [CardPorts.RIGHT_BOTTOM] = true, [CardPorts.LEFT_TOP] = true },
 }
 
 definitions["NODE_RES_009"] = {
@@ -278,7 +280,7 @@ definitions["NODE_RES_009"] = {
       -- Description: "Owner gains 1 Material."
   }),
   vpValue = 0, imagePath = "assets/images/hydroponics-bay.png", flavorText = "Sustenance grown under artificial suns.",
-  definedPorts = { [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.LEFT_BOTTOM] = true },
+  definedPorts = { [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.LEFT_BOTTOM] = true, [CardPorts.BOTTOM_LEFT] = true },
 }
 
 definitions["NODE_RES_010"] = {
@@ -303,7 +305,7 @@ definitions["NODE_RES_010"] = {
       -- Description: "You gain 1 Material. Owner gains 1 Material."
   }),
   vpValue = 0, imagePath = "assets/images/automated-refinery.png", flavorText = "Turning raw ore into usable components.",
-  definedPorts = { [CardPorts.LEFT_BOTTOM] = true, [CardPorts.RIGHT_BOTTOM] = true },
+  definedPorts = { [CardPorts.LEFT_BOTTOM] = true, [CardPorts.RIGHT_BOTTOM] = true, [CardPorts.TOP_LEFT] = true, [CardPorts.BOTTOM_RIGHT] = true },
 }
 
 definitions["NODE_RES_011"] = {
@@ -329,7 +331,7 @@ definitions["NODE_RES_011"] = {
       -- Description: "If you pay 1 Data: You draw 1 card."
   }),
   vpValue = 0, imagePath = "assets/images/prospector-drone-control.png", flavorText = "Seeking out the veins of wealth.",
-  definedPorts = { [CardPorts.RIGHT_TOP] = true, [CardPorts.RIGHT_BOTTOM] = true },
+  definedPorts = { [CardPorts.RIGHT_TOP] = true, [CardPorts.RIGHT_BOTTOM] = true, [CardPorts.LEFT_TOP] = true },
 }
 
 definitions["NODE_RES_012"] = {
@@ -354,7 +356,7 @@ definitions["NODE_RES_012"] = {
       -- Description: "Activator gains 1 Material. If adjacent to 1+ Technology node(s): Owner gains 1 Data."
   }),
   vpValue = 0, imagePath = "assets/images/bio-printer-feedstock.png", flavorText = "Raw materials for engineered life.",
-  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.TOP_RIGHT] = true, [CardPorts.LEFT_BOTTOM] = true }, -- Cult Out, Tech In, Res In
+  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.TOP_RIGHT] = true, [CardPorts.LEFT_TOP] = true }, -- Cult Out, Tech In, Know Out
 }
 
 definitions["NODE_RES_013"] = {
@@ -401,8 +403,9 @@ definitions["NODE_RES_014"] = {
   vpValue = 0,
   imagePath = "assets/images/salvage-operation.png",
   definedPorts = {
-      [CardPorts.LEFT_BOTTOM] = true,
-      [CardPorts.RIGHT_BOTTOM] = true,
+      [CardPorts.LEFT_TOP] = true,      -- Knowledge Output
+      [CardPorts.LEFT_BOTTOM] = true,   -- Resource Input
+      [CardPorts.RIGHT_BOTTOM] = true,  -- Resource Output
   },
   art = nil,
   flavorText = "Recovering scrap to fuel progress.",

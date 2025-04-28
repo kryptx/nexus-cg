@@ -328,7 +328,7 @@ definitions["NODE_CULT_008"] = {
       -- Description: "Activator draws 1 card. If activator pays 1 Data: Activator draws 1 additional card; Owner draws 1 card."
   }),
   vpValue = 0, imagePath = "assets/images/historical-archive-access.png", flavorText = "Lessons from Old Earth.",
-  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.BOTTOM_LEFT] = true },
+  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.BOTTOM_LEFT] = true, [CardPorts.LEFT_TOP] = true },
 }
 definitions["NODE_CULT_009"] = {
   id = "NODE_CULT_009", title = "Artisan Collective", type = CardTypes.CULTURE,
@@ -356,7 +356,7 @@ definitions["NODE_CULT_009"] = {
       -- Description: "Activator gains 1 Material. If adjacent to 1+ Culture node: Activator gains 1 VP."
   }),
   vpValue = 0, imagePath = "assets/images/artisan-collective.png", flavorText = "Beauty forged from necessity.",
-  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.LEFT_BOTTOM] = true },
+  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.LEFT_BOTTOM] = true, [CardPorts.RIGHT_BOTTOM] = true, [CardPorts.BOTTOM_RIGHT] = true },
 }
 
 definitions["NODE_CULT_010"] = {
@@ -385,7 +385,7 @@ definitions["NODE_CULT_010"] = {
       -- Description: "If activator pays 1 Data: Activator steals 1 Material from the owner; Activator gains 1 VP."
   }),
   vpValue = 0, imagePath = "assets/images/smugglers-den.png", flavorText = "Goods acquired through... unofficial channels.",
-  definedPorts = { [CardPorts.BOTTOM_LEFT] = true, [CardPorts.RIGHT_BOTTOM] = true },
+  definedPorts = { [CardPorts.BOTTOM_LEFT] = true, [CardPorts.RIGHT_BOTTOM] = true, [CardPorts.BOTTOM_RIGHT] = true },
 }
 definitions["NODE_CULT_011"] = {
   id = "NODE_CULT_011", title = "Public Forum Interface", type = CardTypes.CULTURE,
@@ -532,7 +532,6 @@ definitions["NODE_CULT_015"] = {
   definedPorts = {
       [CardPorts.TOP_LEFT] = true,      -- Culture Output
       [CardPorts.BOTTOM_LEFT] = true,   -- Culture Input
-      [CardPorts.LEFT_TOP] = true,      -- Knowledge Output
       [CardPorts.BOTTOM_RIGHT] = true,  -- Technology Output
   },
 }
@@ -582,10 +581,9 @@ definitions["NODE_CULT_017"] = {
   imagePath = "assets/images/virtual-coliseum.png",
   flavorText = "Spectacles that transcend space-time.",
   definedPorts = {
-      [CardPorts.TOP_LEFT] = true,
-      [CardPorts.BOTTOM_LEFT] = true,
-      [CardPorts.LEFT_TOP] = true,
-      [CardPorts.BOTTOM_RIGHT] = true,
+      [CardPorts.TOP_LEFT] = true,      -- Culture Output
+      [CardPorts.BOTTOM_LEFT] = true,   -- Culture Input
+      [CardPorts.LEFT_TOP] = true,      -- Knowledge Output
   },
 }
 
@@ -608,10 +606,10 @@ definitions["NODE_CULT_018"] = {
   imagePath = "assets/images/cultural-archive.png",
   flavorText = "Preserving the echoes of civilization.",
   definedPorts = {
-      [CardPorts.TOP_LEFT] = true,
-      [CardPorts.BOTTOM_LEFT] = true,
-      [CardPorts.LEFT_TOP] = true,
-      [CardPorts.BOTTOM_RIGHT] = true,
+      [CardPorts.TOP_LEFT] = true,      -- Culture Output
+      [CardPorts.BOTTOM_LEFT] = true,   -- Culture Input
+      [CardPorts.LEFT_TOP] = true,      -- Knowledge Output
+      [CardPorts.RIGHT_TOP] = true,     -- Knowledge Input
   },
 }
 

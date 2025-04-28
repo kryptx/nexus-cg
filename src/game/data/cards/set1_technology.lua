@@ -382,7 +382,7 @@ definitions["NODE_TECH_012"] = {
     }),
     vpValue = 0, imagePath = "assets/images/high-frequency-trading-hub.png", 
     flavorText = "Exploiting information asymmetry through aggressive data tactics.",
-    definedPorts = { [CardPorts.TOP_RIGHT] = true, [CardPorts.BOTTOM_RIGHT] = true },
+    definedPorts = { [CardPorts.TOP_RIGHT] = true, [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.RIGHT_BOTTOM] = true, [CardPorts.BOTTOM_LEFT] = true },
 }
 definitions["NODE_TECH_013"] = {
     id = "NODE_TECH_013", title = "Planetary Defense Sensor", type = CardTypes.TECHNOLOGY,
@@ -457,7 +457,7 @@ definitions["NODE_TECH_015"] = {
     }),
     vpValue = 1, imagePath = "assets/images/predictive-algorithm.png", 
     flavorText = "Forecasting the ebb and flow of the network, optimizing for long activation chains.",
-    definedPorts = { [CardPorts.TOP_RIGHT] = true, [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.LEFT_TOP] = true },
+    definedPorts = { [CardPorts.TOP_RIGHT] = true, [CardPorts.TOP_LEFT] = true, [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.LEFT_TOP] = true },
 }
 definitions["NODE_TECH_016"] = {
     id = "NODE_TECH_016", title = "Automated Assembly Line", type = CardTypes.TECHNOLOGY,
@@ -480,7 +480,7 @@ definitions["NODE_TECH_016"] = {
     }),
     vpValue = 0, imagePath = "assets/images/automated-assembly-line.png", 
     flavorText = "Mass production optimized for technological supply chains.",
-    definedPorts = { [CardPorts.TOP_RIGHT] = true, [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.RIGHT_BOTTOM] = true },
+    definedPorts = { [CardPorts.TOP_RIGHT] = true, [CardPorts.TOP_LEFT] = true, [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.RIGHT_BOTTOM] = true },
 }
 definitions["NODE_TECH_017"] = {
     id = "NODE_TECH_017", title = "Resource Scanner Drone", type = CardTypes.TECHNOLOGY,
