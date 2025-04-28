@@ -913,17 +913,24 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
 
     if button == 1 then -- Left mouse button
         -- Check for Convergence Link UI click first (if in Converge phase)
-        if currentPhase == "Converge" and self.convergenceSelectionState == nil and self.hoveredLinkType then
-            -- Initiate convergence selection
-            self.selectedConvergenceLinkType = self.hoveredLinkType
-            self.convergenceSelectionState = "selecting_own_output"
-            self:updateStatusMessage(string.format("Select a %s OUTPUT port on your network.", tostring(self.selectedConvergenceLinkType)))
-            print(string.format("Starting convergence selection for type: %s", tostring(self.selectedConvergenceLinkType)))
-            self.hoveredLinkType = nil -- Clear hover after selection
-            -- Disable phase/turn buttons
-            self.buttonAdvancePhase:setEnabled(false)
-            self.buttonEndTurn:setEnabled(false)
-            return -- Handled the click
+        if currentPhase == TurnPhase.CONVERGE and self.convergenceSelectionState == nil then
+            local worldX, worldY = self:_screenToWorld(x, y)
+            local netLocal = self:_worldToNetworkLocal(worldX, worldY, currentPlayerIndex)
+            local gx, gy, card, portIndex = self.renderer:getPortAtWorldPos(currentPlayer.network, netLocal.x, netLocal.y)
+            if card and portIndex then
+                local portInfo = getPortInfo(self.renderer, portIndex)
+                if portInfo and portInfo[4] then -- found an output port
+                    self.selectedConvergenceLinkType = portInfo[3]
+                    self.initiatingConvergenceNodePos = { x = gx, y = gy }
+                    self.initiatingConvergencePortIndex = portIndex
+                    self.convergenceSelectionState = "selecting_opponent_input"
+                    self:updateStatusMessage("Select an input port on an opponent's network.")
+                    -- Disable phase/turn buttons during selection
+                    self.buttonAdvancePhase:setEnabled(false)
+                    self.buttonEndTurn:setEnabled(false)
+                    return -- Handled click
+                end
+            end
         end
 
         -- 2. Check Hand Cards (Only if not selecting convergence)
