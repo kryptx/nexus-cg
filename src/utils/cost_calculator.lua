@@ -18,7 +18,7 @@ local MATERIAL_EQUIVALENT = {
 }
 
 local PORT_COST_ME = 0.75
-local CONVERGENCE_EFFECT_MULTIPLIER = 0.5
+local CONVERGENCE_EFFECT_MULTIPLIER = 0.25
 local CONDITIONAL_EFFECT_MULTIPLIER = 0.5
 local MINIMUM_COST_ME = 1.0
 local GENESIS_COST_MULTIPLIER = 0.5 -- Halve the cost for genesis cards
@@ -90,11 +90,11 @@ local function getDynamicConvergenceMultiplier(definedPorts)
     if sides == 1 then
         return 0.1
     elseif sides == 2 then
-        return 0.3
+        return 0.2
     elseif sides == 3 then
-        return 0.5
+        return 0.3
     elseif sides >= 4 then
-        return 0.7
+        return 0.4
     end
     return 0.0
 end
