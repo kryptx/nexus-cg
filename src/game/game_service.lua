@@ -113,12 +113,12 @@ function GameService:initializeGame(playerCount)
         player.orientation = player.orientation % (2 * math.pi)
         
         -- Set starting resources
-        -- player:addResource('energy', 1)
-        -- player:addResource('data', 3)
-        -- player:addResource('material', 4)
-        player:addResource('energy', 10)
-        player:addResource('data', 10)
-        player:addResource('material', 20)
+        player:addResource('energy', 1)
+        player:addResource('data', 3)
+        player:addResource('material', 4)
+        -- player:addResource('energy', 10)
+        -- player:addResource('data', 10)
+        -- player:addResource('material', 20)
         
         -- Create reactor card first using Card constructor with reactor definition
         local reactorData = CardDefinitions["REACTOR_BASE"]
