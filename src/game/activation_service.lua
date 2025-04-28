@@ -223,59 +223,6 @@ function ActivationService:findGlobalActivationPaths(targetCard, activatorReacto
     end
 end
 
--- Update attemptActivationGlobal to use internal pathfinder
-function ActivationService:attemptActivationGlobal(activatingPlayerIndex, targetPlayerIndex, targetGridX, targetGridY)
-    local gs = self.gameService
-    -- Phase and input checks remain in GameService
-
-    local activatingPlayer = gs.players[activatingPlayerIndex]
-    local targetPlayer = gs.players[targetPlayerIndex]
-    if not activatingPlayer or not targetPlayer then return false, "Invalid player index provided." end
-
-    local targetCard = targetPlayer.network:getCardAt(targetGridX, targetGridY)
-    if not targetCard then return false, "No card at target location." end
-    if targetCard.type == Card.Type.REACTOR then
-        return false, "Cannot activate the Reactor itself."
-    end
-
-    local activatorReactor = activatingPlayer.network:findReactor()
-    if not activatorReactor then return false, "Error: Activating player's reactor not found." end
-
-    local foundAny, shortestPathsData, reason
-    -- Allow overrides via GameService for testing if defined, else use internal pathfinder
-    -- TODO: Update external calls if gs.findGlobalActivationPath is used for testing override
-    if gs.findGlobalActivationPaths then -- Check for potentially overridden function
-        foundAny, shortestPathsData, reason = gs:findGlobalActivationPaths(targetCard, activatorReactor, activatingPlayer)
-    else
-        foundAny, shortestPathsData, reason = self:findGlobalActivationPaths(targetCard, activatorReactor, activatingPlayer)
-    end
-
-    local path, cost, isConvStart
-    if foundAny and shortestPathsData and #shortestPathsData > 0 then
-        -- TODO: Implement choice mechanism here. For now, just take the first path.
-        local firstPathData = shortestPathsData[1]
-        path = firstPathData.path
-        cost = firstPathData.cost - 1 -- Activation cost is path length - 1
-        isConvStart = firstPathData.isConvergenceStart
-        print(string.format("[Activation] Using first of %d shortest paths found. Cost: %d", #shortestPathsData, cost))
-    else
-        return false, string.format("No valid global activation path: %s", reason or "Unknown reason")
-    end
-
-    if activatingPlayer.resources.energy < cost then
-        return false, string.format("Not enough energy. Cost: %d E (Have: %d E)", cost, activatingPlayer.resources.energy)
-    end
-
-    -- Deduct energy and play sound
-    activatingPlayer:spendResource('energy', cost)
-    gs.audioManager:playSound('activation')
-
-    local messages = { string.format("Activated global path (Cost %d E):", cost) }
-    -- Process the path (handles pausing if needed)
-    local status, msg = self:_processActivationPath(path, activatingPlayer, isConvStart, messages)
-    return status, msg
-end
-
 -- Resume a paused activation
 function ActivationService:resumeActivation()
     if not self.pausedActivationPath or not self.pausedActivationContext then

@@ -83,7 +83,7 @@ function SequencePicker:draw()
         local x = startX
         -- Draw cards left-to-right
         for _, elem in ipairs(seqData.path) do
-            local canvas = self.renderer:_generateCardCanvas(elem.card)
+            local canvas = self.renderer.cardRenderer:_generateCardCanvas(elem.card)
             love.graphics.draw(canvas, x, y + padding, 0, drawScale, drawScale)
             table.insert(self.cardBounds, { x = x, y = y + padding, w = cardW, h = cardH, card = elem.card })
             x = x + cardW + padding
@@ -94,15 +94,19 @@ function SequencePicker:draw()
         love.graphics.setColor(0.3, 0.5, 0.8, 1)
         love.graphics.rectangle('fill', btnX, btnY, buttonW, buttonH, 5, 5)
         love.graphics.setColor(1, 1, 1, 1)
-        local font = love.graphics.getFont()
-        love.graphics.printf("Select", btnX, btnY + (buttonH - font:getHeight()) / 2, buttonW, 'center')
+        -- Set font for button text
+        local prevFont = love.graphics.getFont()
+        local buttonFont = self.renderer.fonts and self.renderer.fonts.uiStandard or prevFont
+        love.graphics.setFont(buttonFont)
+        love.graphics.printf("Select", btnX, btnY + (buttonH - buttonFont:getHeight()) / 2, buttonW, 'center')
+        love.graphics.setFont(prevFont)
         table.insert(self.buttonBounds, { x = btnX, y = btnY, w = buttonW, h = buttonH })
     end
 
     -- Draw hovered card preview (300% zoom), clamped and with activation area highlight
     if self.hoveredCard then
         local mx, my = love.mouse.getPosition()
-        local canvas = self.renderer:_generateCardCanvas(self.hoveredCard.card)
+        local canvas = self.renderer.cardRenderer:_generateCardCanvas(self.hoveredCard.card)
         if canvas then
             local previewScale = 3.0 * invSf
             local w = canvas:getWidth() * previewScale

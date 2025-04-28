@@ -726,6 +726,10 @@ function GameService:addResourceToAllPlayers(resourceType, amount)
     end
 end
 
+function GameService:getActivationChainInfo()
+    return self.activationService:getActivationChainInfo()
+end
+
 -- Checks if the game end conditions are met and sets the gameOver flag
 function GameService:triggerGameEndCheck()
     if self.gameOver then return end -- Already over
@@ -874,11 +878,6 @@ function GameService:providePlayerYesNoAnswer(answer)
         local status, resumeMsg = self.activationService:resumeActivation()
         if resumeMsg then print(resumeMsg) end
     end
-end
-
--- NEW: Delegate global activation to ActivationService
-function GameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayerIndex, targetGridX, targetGridY)
-    return self.activationService:attemptActivationGlobal(activatingPlayerIndex, targetPlayerIndex, targetGridX, targetGridY)
 end
 
 -- NEW: Destroy a random link connected to the given node

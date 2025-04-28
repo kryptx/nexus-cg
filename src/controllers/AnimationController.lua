@@ -95,8 +95,13 @@ function AnimationController:registerCompletionCallback(animId, callback)
         print("Warning: Invalid callback registration")
         return false
     end
-    
-    self.completionCallbacks[animId] = callback
+    -- Append callback to list for this animId
+    local list = self.completionCallbacks[animId]
+    if not list then
+        list = {}
+        self.completionCallbacks[animId] = list
+    end
+    table.insert(list, callback)
     print(string.format("Registered completion callback for animation %s", animId))
     return true
 end
@@ -194,8 +199,7 @@ function AnimationController:update(dt)
                 anim.isComplete = true
                 table.insert(completedIds, id)
                 print(string.format("Animation %d complete.", id))
-                
-                -- Check if we have a completion callback for this animation
+                -- If callbacks registered, schedule id to run
                 if self.completionCallbacks[id] then
                     table.insert(callbacksToRun, id)
                 end
@@ -205,13 +209,14 @@ function AnimationController:update(dt)
 
     -- Run completion callbacks for finished animations
     for _, id in ipairs(callbacksToRun) do
-        if self.completionCallbacks[id] then
-            print(string.format("Running completion callback for animation %d", id))
-            local success, err = pcall(self.completionCallbacks[id])
-            if not success then
-                print(string.format("Error in animation completion callback: %s", err))
+        print(string.format("Running completion callbacks for animation %s", id))
+        local cbs = self.completionCallbacks[id]
+        if cbs and type(cbs) == "table" then
+            for _, cb in ipairs(cbs) do
+                cb()
             end
-            self.completionCallbacks[id] = nil -- Remove the callback after running
+        elseif type(cbs) == "function" then
+            cbs()
         end
     end
 

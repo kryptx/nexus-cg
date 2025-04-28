@@ -89,6 +89,8 @@ function camera.animateToTarget(state, animationController, targetX, targetY, ta
         end)
         -- Store animation key on the state for update tracking
         state.currentCameraAnimation = animKey
+        -- Return the animation key so callers can attach callbacks
+        return animKey
     else
         -- Fallback to instant movement
         state.cameraX = targetX

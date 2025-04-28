@@ -123,7 +123,6 @@ local mockGameService = { -- Base methods for the mock
     discardCard = function() return true, "Mock Card Discarded" end,
     attemptPlacement = function() return false, "Mock Placement Failed" end,
     attemptActivation = function() return false, "Mock Activation Failed" end,
-    attemptActivationGlobal = function() return false, "Mock Global Activation Failed" end,
     -- Add new methods required by PlayState
     getCurrentParadigm = function() return nil end, -- Return nil for now
     getCurrentPhase = function() return "Build" end, -- Return default phase
@@ -650,7 +649,6 @@ describe("PlayState Module", function()
         local mockX, mockY, mockButtonNum = 10, 10, 1 -- Mock click coordinates & button
         local mockManager = {} -- Simple mock manager table
         local original_attemptPlacement
-        local original_attemptActivationGlobal
 
         before_each(function()
             state:enter()
@@ -665,30 +663,12 @@ describe("PlayState Module", function()
             }
             -- Store originals before potential replacement in tests
             original_attemptPlacement = state.gameService.attemptPlacement
-            original_attemptActivationGlobal = state.gameService.attemptActivationGlobal
         end)
         
         after_each(function()
              -- Restore original methods if they were replaced
              state.gameService.attemptPlacement = original_attemptPlacement
-             state.gameService.attemptActivationGlobal = original_attemptActivationGlobal
         end)
-
-        -- Helper function to patch player 1's network for activation tests
-        local function patchPlayer1NetworkForActivation()
-            local player1 = state.players[1]
-            if player1 and player1.network then
-                player1.network.getCardAt = function(self_net, x, y)
-                    if x == 0 and y == 0 then
-                        return { id="MOCK_TARGET", title="Mock Target Card", type="Technology" } -- Mock card at 0,0
-                    else
-                        return nil -- Original mock behaviour for other coords
-                    end
-                end
-            else
-                error("Test setup error: Player 1 or network not found for mock patching in test")
-            end
-        end
 
         it("should prioritize UI elements and do nothing else if UI handles click", function()
             -- Arrange
@@ -890,36 +870,6 @@ describe("PlayState Module", function()
             assert.are.equal(0, placement_called_with[5])
             -- The initial status is "Placing card..." but after callback it should be the mock message
             assert.are.equal("Mock Placement Called (Build Phase)", state.statusMessage)
-            -- Restore handled by after_each
-        end)
-
-        it("should call attemptActivationGlobal with right mouse button", function()
-            -- Arrange
-            -- Stub pathfinding to force single-path fallback
-            state.gameService.activationService.findGlobalActivationPaths = function(self, targetCard, activatorReactor, activatingPlayer)
-                -- Return foundAny=true and a single dummy path (fallback will call attemptActivationGlobal)
-                return true, { { path = {} } }, nil
-            end
-            state.selectedHandIndex = nil
-            state.currentPhase = "Activate"
-
-            local activation_called_with = nil
-            state.gameService.attemptActivationGlobal = function(self, act_idx, target_idx, gx_arg, gy_arg) -- Replace with new mock signature
-                activation_called_with = { self, act_idx, target_idx, gx_arg, gy_arg }
-                return true, "Mock Activation Called" -- Mock success
-            end
-            
-            -- Act
-            state:mousepressed(nil, 400, 300, 2) -- Right click
-
-            -- Assert
-            assert.is_not_nil(activation_called_with, "attemptActivationGlobal should be called")
-            assert.are.same(state.gameService, activation_called_with[1])
-            assert.are.equal(1, activation_called_with[2]) -- Check activator index (should be 1)
-            assert.are.equal(1, activation_called_with[3]) -- Check target index (should be 1 since only P1 exists in mock)
-            assert.are.equal(0, activation_called_with[4])
-            assert.are.equal(0, activation_called_with[5])
-            assert.are.equal("Mock Activation Called (Activate Phase)", state.statusMessage)
             -- Restore handled by after_each
         end)
 

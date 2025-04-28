@@ -12,7 +12,7 @@ local Text = require('src.ui.text') -- Need Text for wrapping
 local SequencePicker = require('src.ui.sequence_picker')
 local CameraUtil = require('src.utils.camera') -- Import Camera utility for coordinate and zoom handling
 local Vector = require('src.utils.vector') -- Import Vector utility for orientation math
-local Animations = require('src.game.animations') -- <<< REQUIRE ANIMATIONS MODULE
+local Animations = require('src.game.animations')
 
 -- Define port compatibility (Output Port -> Input Port)
 local COMPATIBLE_PORTS = {
@@ -178,6 +178,10 @@ function PlayState:init(animationController, gameService) -- Accept animationCon
     -- Calculate initial layout using current window size
     self:_recalculateLayout(love.graphics.getWidth(), love.graphics.getHeight())
     print("Initial layout calculated using window size: " .. love.graphics.getWidth() .. "x" .. love.graphics.getHeight())
+
+    -- After existing methods, add helper to start each activation step
+    self.highlightedActivationCard = nil  -- Track the card being highlighted during activation
+    self.activationSequence = nil         -- Store pending activation sequence
 end
 
 -- Generic camera centering and rotation helper
@@ -385,6 +389,10 @@ function PlayState:update(stateManager, dt)
 
     -- Update camera position during animations
     self:updateCamera(dt)
+    -- Update highlight pulse timer
+    if self.highlightedActivationCard then
+        self.highlightedActivationCard.elapsed = (self.highlightedActivationCard.elapsed or 0) + dt
+    end
 end
 
 function PlayState:draw(stateManager)
@@ -482,6 +490,28 @@ function PlayState:draw(stateManager)
         self.cameraZoom, -- <<< Pass cameraZoom for line width calculation
         self.playerWorldOrigins -- <<< CORRECTED VARIABLE NAME
     )
+
+    -- Draw the highlighted activation card
+    if self.highlightedActivationCard then
+        local hl = self.highlightedActivationCard
+        -- Animated pulsing, rotation, and scale for activation highlight
+        local speed = 4.0
+        local scaleAmp = 0.2
+        local baseScale = 1.1
+        local pulse = math.cos(hl.elapsed * speed) * scaleAmp + baseScale  -- scale [1,1.2]
+        local alpha = math.cos(hl.elapsed * speed + math.pi/2) * 0.15 + 0.85  -- opacity [0.7,1.0]
+
+        love.graphics.push()
+        -- Apply camera transform and highlight orientation
+        love.graphics.translate(hl.center.x, hl.center.y)
+        love.graphics.rotate(hl.orientation or 0)
+        love.graphics.scale(pulse, pulse)
+        love.graphics.setColor(0, 0.5, 1, alpha)
+        -- Set line width so final width remains constant under scaling
+        love.graphics.setLineWidth((2 / self.cameraZoom) / pulse)
+        love.graphics.rectangle('line', -hl.halfW, -hl.halfH, hl.halfW * 2, hl.halfH * 2)
+        love.graphics.pop()
+    end
 
     -- Restore camera transform after drawing the table
     love.graphics.pop()
@@ -755,7 +785,11 @@ function PlayState:draw(stateManager)
                             if portInfo then
                                 local localPX, localPY = portInfo[1], portInfo[2]
                                 local localPos = Vector.new(cardLocalX + localPX, cardLocalY + localPY)
-                                local worldPos = Vector.localToWorld(localPos, origin, theta)
+                                -- Rotate around network pivot at the center of the first grid cell
+                                local halfW = self.renderer.CARD_WIDTH / 2
+                                local halfH = self.renderer.CARD_HEIGHT / 2
+                                local rotatedLocal = Vector.rotateAround(localPos, Vector.new(halfW, halfH), theta)
+                                local worldPos = Vector.add(rotatedLocal, origin)
                                 love.graphics.circle('line', worldPos.x, worldPos.y, clickRadius)
                             end
                         end
@@ -769,6 +803,7 @@ function PlayState:draw(stateManager)
         love.graphics.pop() -- Restore world space transform
     end
     -- [[[ END DEBUG ]]]
+
 end
 
 -- Helper function to check if point (px, py) is inside a rectangle {x, y, w, h}
@@ -817,11 +852,23 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
             if self.promptYesBounds and isPointInRect(x, y, self.promptYesBounds) then
                 print("[PlayState] Clicked YES on prompt.")
                 self.gameService:providePlayerYesNoAnswer(true)
+                -- Resume our PlayState activation sequence if paused
+                if self.activationSequence then
+                    -- Move past the paused node and resume sequence
+                    self.activationSequence.idx = self.activationSequence.idx + 1
+                    self:_startActivationStep()
+                end
                 -- State is cleared in draw based on gameService.isWaitingForInput
                 return -- Handled the click
             elseif self.promptNoBounds and isPointInRect(x, y, self.promptNoBounds) then
                 print("[PlayState] Clicked NO on prompt.")
                 self.gameService:providePlayerYesNoAnswer(false)
+                -- Resume our PlayState activation sequence if paused
+                if self.activationSequence then
+                    -- Skip the paused node and resume sequence
+                    self.activationSequence.idx = self.activationSequence.idx + 1
+                    self:_startActivationStep()
+                end
                 -- State is cleared in draw based on gameService.isWaitingForInput
                 return -- Handled the click
             end
@@ -905,22 +952,9 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
         else
             -- 3. Attempt Network Placement (Delegate to service) - Check Phase!
             if currentPhase == TurnPhase.BUILD and self.selectedHandIndex then
-                -- New Input Transformation Logic: map screen to world including camera rotation, then invert local rotation
-                local sx, sy = x, y -- Mouse screen coordinates
-                -- Convert to world coordinates with camera rotation, zoom, and pan
-                local worldX, worldY = self:_screenToWorld(sx, sy)
-
-                -- Identify target player's grid for placement (current player)
-                local targetPlayer = self.players[currentPlayerIndex]
-                local targetOrigin = self.playerWorldOrigins[currentPlayerIndex]
-                local gridX, gridY = nil, nil
-
-                if targetPlayer and targetOrigin then
-                    -- Convert world point to network-local grid coordinates
-                    local localNet = self:_worldToNetworkLocal(worldX, worldY, currentPlayerIndex)
-                    gridX, gridY = self.renderer:worldToGridCoords(localNet.x, localNet.y, 0, 0)
-                end
-                
+                -- Use helper to convert screen coordinates directly to grid coordinates
+                local gridX, gridY = self:_screenToGrid(x, y, currentPlayerIndex)
+             
                 -- If grid coords found, proceed with placement logic
                 if gridX ~= nil and gridY ~= nil then
                     -- Check if placement is valid BEFORE starting animation
@@ -942,22 +976,22 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                             
                             -- Apply player's local rotation to the local position vector using vector utility
                             local pivot = Vector.new(self.renderer.CARD_WIDTH / 2, self.renderer.CARD_HEIGHT / 2)
-                            local rotatedPos = Vector.rotateAround(Vector.new(endLocalX, endLocalY), pivot, targetPlayer.orientation or 0)
+                            local rotatedPos = Vector.rotateAround(Vector.new(endLocalX, endLocalY), pivot, currentPlayer.orientation or 0)
                             local endRotX, endRotY = rotatedPos.x, rotatedPos.y
                             
                             -- Translate by player's world origin to get final world coordinates
-                            local endWorldX = endRotX + targetOrigin.x
-                            local endWorldY = endRotY + targetOrigin.y
+                            local endWorldX = endRotX + self.playerWorldOrigins[currentPlayerIndex].x
+                            local endWorldY = endRotY + self.playerWorldOrigins[currentPlayerIndex].y
                             
                             local cardToPlaceIndex = self.selectedHandIndex
                             local cardToPlace = selectedCard
                             
                             -- Get animation config from the Animations module
                             local animConfig = Animations.getCardPlayConfig(
-                                self.renderer, 
-                                targetPlayer, 
-                                cardToPlace, 
-                                { x = startWorldX, y = startWorldY }, 
+                                self.renderer,
+                                currentPlayer,
+                                cardToPlace,
+                                { x = startWorldX, y = startWorldY },
                                 { x = endWorldX, y = endWorldY }
                             )
                             local animId = self.animationController:addAnimation(animConfig)
@@ -1111,55 +1145,49 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
 
         -- Otherwise, handle Activation (if in Activate phase)
         if currentPhase == "Activate" then -- Activate phase logic updated for global targeting
-             local activatingPlayerIndex = self.gameService.currentPlayerIndex
-             -- Convert click to world coordinates
-             local worldX, worldY = self:_screenToWorld(x, y) -- NEW CORRECT TRANSFORM
-             
-             -- Find which player's grid was clicked and the target card
-             local targetPlayerIndex, targetGridX, targetGridY, targetCard = nil, nil, nil, nil
-             for pIdx, player in ipairs(self.players) do
-                 -- Translate world coords into this player's network-local space using the helper
-                 local localNet = self:_worldToNetworkLocal(worldX, worldY, pIdx)
-                 
-                 -- Determine grid cell under the local coordinates
-                 local gridX, gridY = self.renderer:worldToGridCoords(localNet.x, localNet.y, 0, 0)
-                 local card = player.network:getCardAt(gridX, gridY)
-                 if card and card.type ~= Card.Type.REACTOR then
-                     targetPlayerIndex = pIdx
-                     targetGridX = gridX
-                     targetGridY = gridY
-                     targetCard = card
-                     print(string.format("Right-click targeted Player %d's card '%s' at grid (%d,%d)", pIdx, card.title, gridX, gridY))
-                     break
-                 end
-             end
-             
-             -- If a valid target was found, attempt global activation
-             if targetCard then
-                 -- Retrieve all shortest paths
-                 local activatingPlayer = self.players[activatingPlayerIndex]
-                 local activatorReactor = activatingPlayer.network:findReactor()
-                 local foundAny, pathsData, reason = self.gameService.activationService:findGlobalActivationPaths(targetCard, activatorReactor, activatingPlayer)
-                 if foundAny then
-                     if #pathsData > 1 then
-                         -- Show sequence picker for player choice
-                         self.sequencePicker = SequencePicker:new(self.renderer, pathsData, function(idx)
-                             local chosen = pathsData[idx]
-                             self.sequencePicker = nil
-                             local status, msg = self:executeChosenActivation(chosen)
-                             self:updateStatusMessage(msg)
-                         end)
-                     else
-                         -- Only one path: fallback to original activation call for existing tests
-                         local success, msg = self.gameService:attemptActivationGlobal(activatingPlayerIndex, targetPlayerIndex, targetGridX, targetGridY)
-                         self:updateStatusMessage(msg)
-                     end
-                 else
-                     self:updateStatusMessage("No valid global activation path: " .. reason)
-                 end
-             else
-                 self:updateStatusMessage("Right-click a valid node (not a Reactor) to activate.")
-             end
+            local activatingPlayerIndex = self.gameService.currentPlayerIndex
+            -- Find which player's grid was clicked and the target card
+            local targetPlayerIndex, targetGridX, targetGridY, targetCard = nil, nil, nil, nil
+            for pIdx, player in ipairs(self.players) do
+                -- Convert screen coordinates directly to grid coords for this player
+                local gridX, gridY = self:_screenToGrid(x, y, pIdx)
+                local card = player.network:getCardAt(gridX, gridY)
+                if card and card.type ~= Card.Type.REACTOR then
+                    targetPlayerIndex = pIdx
+                    targetGridX = gridX
+                    targetGridY = gridY
+                    targetCard = card
+                    print(string.format("Right-click targeted Player %d's card '%s' at grid (%d,%d)", pIdx, card.title, gridX, gridY))
+                    break
+                end
+            end
+            
+            -- If a valid target was found, attempt global activation
+            if targetCard then
+                -- Retrieve all shortest paths
+                local activatingPlayer = self.players[activatingPlayerIndex]
+                local activatorReactor = activatingPlayer.network:findReactor()
+                local foundAny, pathsData, reason = self.gameService.activationService:findGlobalActivationPaths(targetCard, activatorReactor, activatingPlayer)
+                if foundAny then
+                    if #pathsData > 1 then
+                        -- Show sequence picker for player choice
+                        self.sequencePicker = SequencePicker:new(self.renderer, pathsData, function(idx)
+                            local chosen = pathsData[idx]
+                            self.sequencePicker = nil
+                            local status, msg = self:executeChosenActivation(chosen)
+                            self:updateStatusMessage(msg)
+                        end)
+                    else
+                        -- Only one path: execute it directly without re-running pathfinding
+                        local status, msg = self:executeChosenActivation(pathsData[1])
+                        self:updateStatusMessage(msg)
+                    end
+                else
+                    self:updateStatusMessage("No valid global activation path: " .. reason)
+                end
+            else
+                self:updateStatusMessage("Right-click a valid node (not a Reactor) to activate.")
+            end
              
         else
              self:updateStatusMessage("Activation only allowed in Activate phase.")
@@ -1211,18 +1239,13 @@ function PlayState:mousemoved(stateManager, x, y, dx, dy, istouch)
     local safeAreaTopY = screenH - self.BOTTOM_BUTTON_AREA_HEIGHT - handCardH - 20 -- <<< USE self.
     local isInSafeArea = (y >= safeAreaTopY)
 
-    -- Convert screen coordinates directly to world space
-    local worldX, worldY = self:_screenToWorld(x, y) -- NEW CORRECT TRANSFORM
-
     -- Reset hover grid coordinates
     self.hoverGridX, self.hoverGridY = nil, nil
 
     -- Only calculate grid hover if NOT in the safe area
     if not isInSafeArea then
         local currentPlayerIndex = self.gameService.currentPlayerIndex
-        -- Convert world coords to network-local coords for hover
-        local localNet = self:_worldToNetworkLocal(worldX, worldY, currentPlayerIndex)
-        self.hoverGridX, self.hoverGridY = self.renderer:worldToGridCoords(localNet.x, localNet.y, 0, 0)
+        self.hoverGridX, self.hoverGridY = self:_screenToGrid(x, y, currentPlayerIndex)
     end
 
     -- Check for hand hover (do this regardless of safe area)
@@ -1443,10 +1466,22 @@ function PlayState:executeChosenActivation(pathData)
     if player.resources.energy < cost then
         return false, string.format("Not enough energy. Cost: %d E (Have: %d E)", cost, player.resources.energy)
     end
+    -- Deduct energy and play sound
     player:spendResource('energy', cost)
     self.gameService.audioManager:playSound('activation')
-    local messages = { string.format("Activated global path (Cost %d E):", cost) }
-    return self.gameService.activationService:_processActivationPath(pathData.path, player, pathData.isConvergenceStart, messages)
+    -- Message for UI
+    local initialMsg = string.format("Activated global path (Cost %d E):", cost)
+    -- Initialize activation sequence with path and context
+    self.activationSequence = {
+        path = pathData.path,
+        idx = 1,
+        player = player,
+        isConvergenceStart = pathData.isConvergenceStart
+    }
+    -- Update status and kick off first animation step
+    self:updateStatusMessage(initialMsg)
+    self:_startActivationStep()
+    return true, initialMsg
 end
 
 -- Safe wrapper for screenToNetworkLocal: fallback to identity if missing
@@ -1475,13 +1510,60 @@ function PlayState:_worldToNetworkLocal(wx, wy, playerIndex)
     return Vector.subtract(localPivoted, origin)
 end
 
--- Convert network-local coords to world position for a given player index
-function PlayState:_networkLocalToWorld(nx, ny, playerIndex)
-    local origin = Vector.new(self.playerWorldOrigins[playerIndex].x, self.playerWorldOrigins[playerIndex].y)
-    local pivot = Vector.add(origin, Vector.new(self.renderer.CARD_WIDTH/2, self.renderer.CARD_HEIGHT/2))
-    local localPos = Vector.new(nx, ny)
-    -- Rotate around pivot by orientation and translate to world
-    return Vector.localToWorld(localPos, pivot, self.players[playerIndex].orientation or 0)
+-- Insert new helper to convert screen coords to grid coords
+function PlayState:_screenToGrid(sx, sy, playerIndex)
+    local worldX, worldY = self:_screenToWorld(sx, sy)
+    local localNet = self:_worldToNetworkLocal(worldX, worldY, playerIndex)
+    if not self.renderer then return nil, nil end
+    return self.renderer:worldToGridCoords(localNet.x, localNet.y, 0, 0)
+end
+
+-- After existing methods, add helper to start each activation step
+function PlayState:_startActivationStep()
+    local seq = self.activationSequence
+    if not seq or seq.idx > #seq.path then
+        -- Sequence complete
+        self.activationSequence = nil
+        return
+    end
+    -- Get next path element
+    local elem = seq.path[seq.idx]
+    local cardNode, owner = elem.card, elem.owner
+    -- Compute card center in world coords
+    local localX, localY = self.renderer:gridToWorldCoords(cardNode.position.x, cardNode.position.y, 0, 0)
+    local halfW = self.renderer.CARD_WIDTH / 2
+    local halfH = self.renderer.CARD_HEIGHT / 2
+    local centerLocal = Vector.new(localX + halfW, localY + halfH)
+    -- Rotate around card center pivot, then translate by world origin
+    local pivot = Vector.new(halfW, halfH)
+    local rotatedLocal = Vector.rotateAround(centerLocal, pivot, owner.orientation)
+    local centerWorld = Vector.add(rotatedLocal, self.playerWorldOrigins[owner.id])
+    -- Highlight this card with a rectangle
+    self.highlightedActivationCard = {
+        center = centerWorld,
+        halfW = halfW,
+        halfH = halfH,
+        orientation = owner.orientation,
+        elapsed = 0
+    }
+    -- Animate camera toward card and zoom in
+    local targetZoom = 2.0
+    local animKey = CameraUtil.animateToTarget(self, self.animationController,
+        centerWorld.x, centerWorld.y,
+        self.cameraRotation, targetZoom, 0.5)
+    -- When camera animation finishes, trigger the card effect and next step
+    self.animationController:registerCompletionCallback(animKey, function()
+        -- Remove highlight
+        self.highlightedActivationCard = nil
+        -- Execute the card's activation effect (may pause for user input)
+        local status = cardNode:activateEffect(self.gameService, seq.player, nil)
+        -- Only continue if the action did not pause for input
+        if status ~= "waiting" then
+            -- Advance sequence index and start next step
+            seq.idx = seq.idx + 1
+            self:_startActivationStep()
+        end
+    end)
 end
 
 return PlayState 
