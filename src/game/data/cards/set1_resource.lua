@@ -66,7 +66,6 @@ definitions["NODE_RES_002"] = {
   imagePath = "assets/images/automated-drill-site.png",
   definedPorts = {
       [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
-      [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
       [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
       [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
   },

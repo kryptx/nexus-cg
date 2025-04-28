@@ -13,22 +13,6 @@ local ActivationService = require('src.game.activation_service') -- Extracted ac
 local GameService = {}
 GameService.__index = GameService
 
--- Helper function for BFS path tracking (shallow copy)
-local function shallow_copy(original)
-    if type(original) ~= 'table' then return original end -- Handle non-tables
-    local copy = {}
-    for k, v in ipairs(original) do
-        copy[k] = v
-    end
-    -- Also copy non-integer keys if any (though path is likely array)
-    for k, v in pairs(original) do
-        if type(k) ~= 'number' or k < 1 or k > #original then
-            copy[k] = v
-        end
-    end
-    return copy
-end
-
 -- Define Turn Phases
 local TurnPhase = {
     ENERGY_GAIN = "Energy Gain", -- Phase for start-of-turn energy gain

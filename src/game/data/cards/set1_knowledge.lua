@@ -425,7 +425,7 @@ definitions["NODE_KNOW_012"] = {
   vpValue = 0, 
   imagePath = "assets/images/ai-ethics-committee.png", 
   flavorText = "Guiding the minds of the future.",
-  definedPorts = { [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.RIGHT_TOP] = true },
+  definedPorts = { [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.RIGHT_TOP] = true, [CardPorts.BOTTOM_LEFT] = true },
 }
 
 definitions["NODE_KNOW_013"] = {
@@ -592,7 +592,14 @@ definitions["NODE_KNOW_017"] = {
   vpValue = 0, 
   imagePath = "assets/images/educational-network.png", 
   flavorText = "Disseminating knowledge through shared connections.",
-  definedPorts = { [CardPorts.BOTTOM_LEFT] = true, [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.LEFT_TOP] = true }, -- Cult In, Tech Out, Know Out
+  definedPorts = { 
+    [CardPorts.TOP_LEFT] = true,      -- Culture Output
+    [CardPorts.BOTTOM_LEFT] = true,   -- Culture Input
+    [CardPorts.BOTTOM_RIGHT] = true,  -- Technology Output
+    [CardPorts.LEFT_TOP] = true,      -- Knowledge Output
+    [CardPorts.LEFT_BOTTOM] = true,   -- Resource Input
+    [CardPorts.RIGHT_TOP] = true,     -- Knowledge Input
+  },
 }
 
 definitions["NODE_KNOW_018"] = {
