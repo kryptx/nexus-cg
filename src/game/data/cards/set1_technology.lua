@@ -431,7 +431,7 @@ definitions["NODE_TECH_014"] = {
     }),
     vpValue = 0, imagePath = "assets/images/tunnel-bore-control.png", 
     flavorText = "Expanding the frontier downwards, most efficient in unexplored territory.",
-    definedPorts = { [CardPorts.BOTTOM_LEFT] = true, [CardPorts.BOTTOM_RIGHT] = true },
+    definedPorts = { [CardPorts.BOTTOM_LEFT] = true, [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.RIGHT_BOTTOM] = true },
 }
 
 definitions["NODE_TECH_015"] = {

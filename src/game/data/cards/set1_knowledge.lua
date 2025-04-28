@@ -394,7 +394,7 @@ definitions["NODE_KNOW_011"] = {
   vpValue = 0, 
   imagePath = "assets/images/philosophers-conclave.png", 
   flavorText = "Debating the nature of existence, lightyears from home.",
-  definedPorts = { [CardPorts.BOTTOM_LEFT] = true, [CardPorts.LEFT_TOP] = true },
+  definedPorts = { [CardPorts.BOTTOM_LEFT] = true, [CardPorts.LEFT_TOP] = true, [CardPorts.RIGHT_TOP] = true },
 }
 
 definitions["NODE_KNOW_012"] = {
