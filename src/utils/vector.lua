@@ -117,4 +117,33 @@ function Vector.toString(v)
     return "(" .. v.x .. ", " .. v.y .. ")"
 end
 
+-- Rotate vector v by angle (in radians) around the origin
+function Vector.rotate(v, angle)
+    local cosA = math.cos(angle)
+    local sinA = math.sin(angle)
+    return Vector.new(
+        v.x * cosA - v.y * sinA,
+        v.x * sinA + v.y * cosA
+    )
+end
+
+-- Rotate vector v by angle around a pivot point
+function Vector.rotateAround(v, pivot, angle)
+    local translated = Vector.subtract(v, pivot)
+    local rotated = Vector.rotate(translated, angle)
+    return Vector.add(rotated, pivot)
+end
+
+-- Transform a local position to world coordinates by applying rotation and translation
+function Vector.localToWorld(localPos, origin, angle)
+    local rotated = Vector.rotate(localPos, angle)
+    return Vector.add(rotated, origin)
+end
+
+-- Transform a world position to local coordinates by rotating around a pivot
+function Vector.worldToLocalAround(worldPos, pivot, angle)
+    -- Rotate worldPos around pivot by -angle
+    return Vector.rotateAround(worldPos, pivot, -angle)
+end
+
 return Vector

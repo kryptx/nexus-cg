@@ -302,6 +302,7 @@ package.loaded['src.controllers.AnimationController'] = mockAnimationController 
 
 -- Now require the module under test
 local PlayState = require 'src.game.states.play_state'
+local CameraUtil = require('src.utils.camera') -- Require CameraUtil for spying
 local created_networks = {}
 
 describe("PlayState Module", function()
@@ -429,6 +430,8 @@ describe("PlayState Module", function()
             -- Enable discard buttons
             state.buttonDiscardMaterial:setEnabled(true)
             state.buttonDiscardData:setEnabled(true)
+            -- Spy on the CameraUtil function that should be called
+            local cameraUtil_spy = spy.on(CameraUtil, "animateToTarget")
 
             -- Act
             state:endTurn()
@@ -439,8 +442,11 @@ describe("PlayState Module", function()
             assert.is_false(state.buttonDiscardMaterial.enabled) -- Check specific button
             assert.is_false(state.buttonDiscardData.enabled)   -- Check specific button
             assert.are.equal("Player 1's turn. (Build Phase)", state.statusMessage, "statusMessage should be updated to default for new turn")
-            
+            -- Assert that the camera centering function was called
+            assert.spy(cameraUtil_spy).was_called(1)
+
             state.gameService.endTurn = original_endTurn -- Restore original
+            cameraUtil_spy:revert() -- Revert the spy
         end)
 
         it("should update status message if gameService:endTurn fails", function()

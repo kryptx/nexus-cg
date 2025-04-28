@@ -559,35 +559,8 @@ function CardRenderer:_drawSingleCardInWorld(card, wx, wy, activeLinks, alphaOve
         love.graphics.print("Tokens: " .. card.tokens, wx + 5, wy + self.renderer.CARD_HEIGHT - 15)
     end
 
-    self:_drawCardConvergenceTabs(card, wx, wy, alphaOverride, activeLinks)
-end
-
--- Extracted method to draw convergence link tabs for world view
-function CardRenderer:_drawCardConvergenceTabs(card, sx, sy, alphaOverride, activeLinks)
-    alphaOverride = alphaOverride or 1.0
-    activeLinks = activeLinks or {}
-    local linkMap = {}
-    for _, link in ipairs(activeLinks) do linkMap[link.linkId] = link end
-    local r = self.renderer.PORT_RADIUS
-    for portIndex = 1, 8 do
-        local info = PortRenderer.getPortInfo(self.renderer, portIndex)
-        if info then
-            local portX = sx + info.x_offset
-            local portY = sy + info.y_offset
-            local isOutput = info.is_output
-            local occupyingLinkId = card:getOccupyingLinkId(portIndex)
-            if occupyingLinkId then
-                PortRenderer.drawPortShape(self.renderer, portIndex, portX, portY, r, alphaOverride * 0.4)
-                local linkDetails = linkMap[occupyingLinkId]
-                local playerNumber = linkDetails and linkDetails.initiatingPlayerIndex or "?"
-                local tabSize = r * 3.5
-                local fixedOffset = r
-                local orientation
-                -- orientation logic here
-                -- ... rest of convergence tab logic copied ...
-            end
-        end
-    end
+    -- Call PortRenderer directly instead
+    PortRenderer.drawCardPorts(self.renderer, card, wx, wy, alphaOverride, activeLinks)
 end
 
 return CardRenderer 

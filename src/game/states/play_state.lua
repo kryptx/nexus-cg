@@ -10,7 +10,9 @@ local TurnPhase = ServiceModule.TurnPhase -- Extract TurnPhase constants
 local StyleGuide = require('src.rendering.styles') -- Require the styles
 local Text = require('src.ui.text') -- Need Text for wrapping
 local SequencePicker = require('src.ui.sequence_picker')
-local Easing = require('src.utils.easing') -- Import Easing module for camera animations
+local CameraUtil = require('src.utils.camera') -- Import Camera utility for coordinate and zoom handling
+local Vector = require('src.utils.vector') -- Import Vector utility for orientation math
+local Animations = require('src.game.animations') -- <<< REQUIRE ANIMATIONS MODULE
 
 -- Define port compatibility (Output Port -> Input Port)
 local COMPATIBLE_PORTS = {
@@ -24,7 +26,7 @@ local PlayState = {}
 
 -- Constants for Setup (adjust as needed)
 local NUM_PLAYERS = 3
-local KEYBOARD_PAN_SPEED = 400 -- Base pixels per second at zoom 1.0
+local KEYBOARD_PAN_SPEED = 600 -- Base pixels per second at zoom 1.0
 
 -- UI Constants (mirrored from Renderer for input checking)
 local UI_ICON_SIZE = 18
@@ -183,91 +185,31 @@ function PlayState:centerCameraOnPlayer(playerIndex)
     local origin = self.playerWorldOrigins[playerIndex] or { x = 0, y = 0 }
     local player = self.players[playerIndex]
     local targetRotation = (player and player.orientation) or 0
-    
-    -- Define a consistent target zoom level
     local targetZoom = 1.0 -- Standard zoom level to always animate to
-    
-    -- If we have an animation controller, animate the camera movement
-    if self.animationController then
-        -- Store current camera position and target position
-        local startPos = { x = self.cameraX, y = self.cameraY }
-        local endPos = { x = origin.x, y = origin.y }
-        local startRotation = self.cameraRotation
-        local startZoom = self.cameraZoom
-        
-        -- Create a dummy object to track camera animation
-        local cameraDummy = { id = "camera_"..playerIndex, instanceId = "camera_anim_"..playerIndex }
-        
-        -- Add camera animation with nice easing
-        local animId = self.animationController:addAnimation({
-            type = 'cameraMove',
-            duration = 0.8, -- Adjust duration as needed
-            card = cameraDummy, -- Use dummy object for the animation
-            startWorldPos = startPos,
-            endWorldPos = endPos,
-            startScale = startZoom,
-            endScale = targetZoom,
-            startRotation = startRotation,
-            endRotation = targetRotation,
-            easingType = "inOutQuad", -- Use smooth easing
-            meta = {
-                animatingZoom = true,
-                startZoom = startZoom,
-                targetZoom = targetZoom
-            }
-        })
-        
-        -- Register update callback for the animation
-        self.animationController:registerCompletionCallback(animId, function()
-            -- Ensure final position is exact
-            self.cameraX = origin.x
-            self.cameraY = origin.y
-            self.cameraRotation = targetRotation
-            self.cameraZoom = targetZoom -- Set to consistent target zoom
-        end)
-        
-        -- Store animation ID to track it
-        self.currentCameraAnimation = animId
-    else
-        -- Fallback to instant camera movement if no animation controller
-        self.cameraX = origin.x
-        self.cameraY = origin.y
-        self.cameraRotation = targetRotation
-        self.cameraZoom = targetZoom -- Set to consistent target zoom immediately
-    end
+
+    -- Use CameraUtil to handle the animation or instant move
+    CameraUtil.animateToTarget(
+        self, -- Pass the state object (PlayState instance)
+        self.animationController,
+        origin.x,
+        origin.y,
+        targetRotation,
+        targetZoom,
+        0.8 -- Animation duration
+    )
 end
 
 -- Add this method to update camera position during animations
 function PlayState:updateCamera(dt)
-    -- Update camera position from active animations
-    if self.animationController and self.currentCameraAnimation then
-        local cameraAnim = self.animationController:getActiveAnimations()[self.currentCameraAnimation]
-        if cameraAnim then
-            -- Apply animated values to camera
-            self.cameraX = cameraAnim.currentWorldPos.x
-            self.cameraY = cameraAnim.currentWorldPos.y
-            self.cameraRotation = cameraAnim.currentRotation
-            
-            -- Apply zoom animation if meta data indicates we're animating zoom
-            if cameraAnim.meta and cameraAnim.meta.animatingZoom then
-                -- Use the animation's progress to calculate current zoom
-                local zoomProgress = cameraAnim.progress
-                local startZoom = cameraAnim.meta.startZoom
-                local targetZoom = cameraAnim.meta.targetZoom
-                
-                -- Apply eased zoom transition
-                local easedProgress = Easing.inOutQuad(zoomProgress)
-                self.cameraZoom = startZoom + (targetZoom - startZoom) * easedProgress
-            end
-        end
-    end
+    -- Delegate update logic to CameraUtil
+    CameraUtil.updateFromAnimation(self, self.animationController)
 end
 
 -- Add this helper function to PlayState
 function PlayState:_calculatePlayerWorldOrigins()
     -- Example: Arrange players in a circle in world space
     -- Radius might depend on number of players or be fixed
-    local worldRadius = 400 -- Adjust as needed
+    local worldRadius = 1000 -- Adjust as needed
     self.playerWorldOrigins = {} -- Ensure this table exists on self
     local numPlayers = #self.players
     if numPlayers == 0 then return end -- Avoid division by zero
@@ -282,10 +224,9 @@ function PlayState:_calculatePlayerWorldOrigins()
         end
         -- Use player.orientation directly (assuming it's radians and 0 means player's +Y points East)
         local angle = player.orientation + math.pi/2
-        local worldX = worldRadius * math.cos(angle)
-        local worldY = worldRadius * math.sin(angle)
-        self.playerWorldOrigins[i] = { x = worldX, y = worldY }
-        print(string.format("[DEBUG] Player %d world origin set to (%f, %f) for orientation %f rad", i, worldX, worldY, angle))
+        local originVec = Vector.rotate(Vector.new(worldRadius, 0), angle)
+        self.playerWorldOrigins[i] = originVec
+        print(string.format("[DEBUG] Player %d world origin set to (%f, %f) for orientation %f rad", i, originVec.x, originVec.y, angle))
     end
 end
 
@@ -435,16 +376,11 @@ function PlayState:update(stateManager, dt)
             moveSpeed = moveSpeed / math.sqrt(2)
         end
 
-        -- Rotate the local movement vector by the camera's current rotation
-        local angle = self.cameraRotation or 0
-        local cosA, sinA = math.cos(angle), math.sin(angle)
-        
-        local worldDX = (dx * cosA - dy * sinA) * moveSpeed
-        local worldDY = (dx * sinA + dy * cosA) * moveSpeed
-        
-        -- Apply the world-space delta to the camera position
-        self.cameraX = self.cameraX + worldDX
-        self.cameraY = self.cameraY + worldDY
+        -- Rotate and scale the movement vector using Vector utility
+        local movement = Vector.new(dx, dy)
+        local worldMovement = Vector.scale(Vector.rotate(movement, self.cameraRotation or 0), moveSpeed)
+        self.cameraX = self.cameraX + worldMovement.x
+        self.cameraY = self.cameraY + worldMovement.y
     end
 
     -- Update camera position during animations
@@ -465,7 +401,6 @@ function PlayState:draw(stateManager)
 
     -- Get current player for UI/Hand drawing later
     local currentPlayer = self.players[self.gameService.currentPlayerIndex]
-    local currentOrigin = self.playerWorldOrigins[self.gameService.currentPlayerIndex] or {x=0, y=0} -- Fallback origin
     local screenW = love.graphics.getWidth()
     local screenH = love.graphics.getHeight()
 
@@ -804,50 +739,24 @@ function PlayState:draw(stateManager)
         local cardW = self.renderer.CARD_WIDTH
         local cardH = self.renderer.CARD_HEIGHT
         local gridSpacing = self.renderer.GRID_SPACING
-        local pivotOffsetX = cardW * 0.5
-        local pivotOffsetY = cardH * 0.5
- 
+
         for pIdx, player in ipairs(self.players) do
             if player.network and player.network.cards then
                 local origin = self.playerWorldOrigins[pIdx] or {x=0, y=0}
-                local theta = player.orientation or 0
-                local cosT, sinT = math.cos(theta), math.sin(theta)
- 
+                local theta = player.orientation or 0 
                 for _, card in pairs(player.network.cards) do
                     if card and card.position then
                         local gridX, gridY = card.position.x, card.position.y
-                        local cardLocalX = gridX * (cardW + gridSpacing) -- Card top-left, local unrotated
+                        local cardLocalX = gridX * (cardW + gridSpacing)
                         local cardLocalY = gridY * (cardH + gridSpacing)
-                        
+
                         for portIndex = 1, 8 do
                             local portInfo = getPortInfo(self.renderer, portIndex)
                             if portInfo then
-                                local localPX, localPY = portInfo[1], portInfo[2] -- Port offset relative to card top-left
-                                -- Absolute local coords of the port anchor
-                                local absLocalX = cardLocalX + localPX
-                                local absLocalY = cardLocalY + localPY
- 
-                                -- Apply forward transform (inverse of getPortAtWorldPos)
-                                local portWorldX, portWorldY
-                                if player.orientation and player.orientation ~= 0 then
-                                    local theta = player.orientation
-                                    local cosT, sinT = math.cos(theta), math.sin(theta)
-                                    -- Translate relative to pivot
-                                    local relPivotX = absLocalX - pivotOffsetX
-                                    local relPivotY = absLocalY - pivotOffsetY
-                                    -- Rotate
-                                    local rotatedPivotX = relPivotX * cosT - relPivotY * sinT
-                                    local rotatedPivotY = relPivotX * sinT + relPivotY * cosT
-                                    -- Translate back from pivot and add world origin
-                                    portWorldX = rotatedPivotX + pivotOffsetX + origin.x
-                                    portWorldY = rotatedPivotY + pivotOffsetY + origin.y
-                                else
-                                    -- No rotation: world = local + origin
-                                    portWorldX = absLocalX + origin.x
-                                    portWorldY = absLocalY + origin.y
-                                end
-                                
-                                love.graphics.circle('line', portWorldX, portWorldY, clickRadius)
+                                local localPX, localPY = portInfo[1], portInfo[2]
+                                local localPos = Vector.new(cardLocalX + localPX, cardLocalY + localPY)
+                                local worldPos = Vector.localToWorld(localPos, origin, theta)
+                                love.graphics.circle('line', worldPos.x, worldPos.y, clickRadius)
                             end
                         end
                     end
@@ -869,35 +778,24 @@ end
 
 -- Helper: Find port under world coordinate for any player's network
 function PlayState:_findPortAtWorld(wx, wy)
-    local clickRadius = 10
+    local clickRadiusSq = 10 * 10
+    local clickPoint = Vector.new(wx, wy)
     for pIdx, player in ipairs(self.players) do
-        local origin = self.playerWorldOrigins[pIdx] or { x=0, y=0 }
+        local origin = self.playerWorldOrigins[pIdx] or Vector.new(0, 0)
         local theta = player.orientation or 0
-        local cosT, sinT = math.cos(theta), math.sin(theta)
         for _, card in pairs(player.network.cards) do
             if card and card.position then
-                local gx, gy = card.position.x, card.position.y
-                local cellX = gx * (self.renderer.CARD_WIDTH + self.renderer.GRID_SPACING)
-                local cellY = gy * (self.renderer.CARD_HEIGHT + self.renderer.GRID_SPACING)
-                -- position of card top-left in world after rotation
-                local rotatedX = cellX * cosT - cellY * sinT + origin.x
-                local rotatedY = cellX * sinT + cellY * cosT + origin.y
-                -- For each port on card
+                local cellLocal = Vector.new(
+                    card.position.x * (self.renderer.CARD_WIDTH + self.renderer.GRID_SPACING),
+                    card.position.y * (self.renderer.CARD_HEIGHT + self.renderer.GRID_SPACING)
+                )
                 for portIndex = 1, 8 do
                     local info = getPortInfo(self.renderer, portIndex)
                     if info then
-                        local localPX, localPY = info[1], info[2]
-                        -- offset relative to card top-left
-                        local offX = localPX
-                        local offY = localPY
-                        -- rotate offset by theta
-                        local wOffX = offX * cosT - offY * sinT
-                        local wOffY = offX * sinT + offY * cosT
-                        local portWX = rotatedX + wOffX
-                        local portWY = rotatedY + wOffY
-                        local dx, dy = wx - portWX, wy - portWY
-                        if dx*dx + dy*dy <= clickRadius*clickRadius then
-                            return pIdx, gx, gy, card, portIndex
+                        local portLocal = Vector.new(cellLocal.x + info[1], cellLocal.y + info[2])
+                        local portWorld = Vector.localToWorld(portLocal, origin, theta)
+                        if Vector.distanceSquared(clickPoint, portWorld) <= clickRadiusSq then
+                            return pIdx, card.position.x, card.position.y, card, portIndex
                         end
                     end
                 end
@@ -1018,24 +916,9 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                 local gridX, gridY = nil, nil
 
                 if targetPlayer and targetOrigin then
-                    -- Translate to player-local space
-                    local dxP = worldX - targetOrigin.x
-                    local dyP = worldY - targetOrigin.y
-
-                    -- Invert player's local grid rotation
-                    local theta = targetPlayer.orientation or 0
-                    local cosT, sinT = math.cos(-theta), math.sin(-theta)
-                    local cardCenterX = self.renderer.CARD_WIDTH / 2
-                    local cardCenterY = self.renderer.CARD_HEIGHT / 2
-
-                    -- Rotate point back to network-local axes
-                    local rdx = dxP - cardCenterX
-                    local rdy = dyP - cardCenterY
-                    local unrotX = rdx * cosT - rdy * sinT + cardCenterX
-                    local unrotY = rdx * sinT + rdy * cosT + cardCenterY
-
-                    -- Convert to grid coordinates
-                    gridX, gridY = self.renderer:worldToGridCoords(unrotX, unrotY, 0, 0)
+                    -- Convert world point to network-local grid coordinates
+                    local localNet = self:_worldToNetworkLocal(worldX, worldY, currentPlayerIndex)
+                    gridX, gridY = self.renderer:worldToGridCoords(localNet.x, localNet.y, 0, 0)
                 end
                 
                 -- If grid coords found, proceed with placement logic
@@ -1057,23 +940,11 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                             local endLocalX = (gridX * (self.renderer.CARD_WIDTH + self.renderer.GRID_SPACING)) + self.renderer.CARD_WIDTH / 2
                             local endLocalY = (gridY * (self.renderer.CARD_HEIGHT + self.renderer.GRID_SPACING)) + self.renderer.CARD_HEIGHT / 2
                             
-                            -- Apply player's local rotation to the local position vector using pivot at card center
-                            local pivotX = self.renderer.CARD_WIDTH / 2
-                            local pivotY = self.renderer.CARD_HEIGHT / 2
-                            local endRotX, endRotY
-                            do
-                                local playerTheta = targetPlayer.orientation or 0
-                                local cosP, sinP = math.cos(playerTheta), math.sin(playerTheta)
-                                -- Compute position relative to pivot
-                                local relX = endLocalX - pivotX
-                                local relY = endLocalY - pivotY
-                                -- Rotate relative vector
-                                local rotRelX = relX * cosP - relY * sinP
-                                local rotRelY = relX * sinP + relY * cosP
-                                -- Translate back around pivot
-                                endRotX = rotRelX + pivotX
-                                endRotY = rotRelY + pivotY
-                            end
+                            -- Apply player's local rotation to the local position vector using vector utility
+                            local pivot = Vector.new(self.renderer.CARD_WIDTH / 2, self.renderer.CARD_HEIGHT / 2)
+                            local rotatedPos = Vector.rotateAround(Vector.new(endLocalX, endLocalY), pivot, targetPlayer.orientation or 0)
+                            local endRotX, endRotY = rotatedPos.x, rotatedPos.y
+                            
                             -- Translate by player's world origin to get final world coordinates
                             local endWorldX = endRotX + targetOrigin.x
                             local endWorldY = endRotY + targetOrigin.y
@@ -1081,22 +952,15 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                             local cardToPlaceIndex = self.selectedHandIndex
                             local cardToPlace = selectedCard
                             
-                            local animId = self.animationController:addAnimation({
-                                type = 'cardPlay',
-                                duration = 0.5,
-                                card = cardToPlace, 
-                                startWorldPos = { x = startWorldX, y = startWorldY }, 
-                                endWorldPos = { x = endWorldX, y = endWorldY }, -- pivot-based rotation
-                                startScale = self.renderer.HAND_CARD_SCALE or 0.6,
-                                endScale = 1.0,
-                                -- Animate starting and ending rotation to match player's grid orientation
-                                startRotation = (targetPlayer.orientation or 0) + math.pi * 0.1,
-                                endRotation = (targetPlayer.orientation or 0),
-                                easingType = "outBack",
-                                startAlpha = 0.9,
-                                endAlpha = 1.0,
-                                context = 'grid'
-                            })
+                            -- Get animation config from the Animations module
+                            local animConfig = Animations.getCardPlayConfig(
+                                self.renderer, 
+                                targetPlayer, 
+                                cardToPlace, 
+                                { x = startWorldX, y = startWorldY }, 
+                                { x = endWorldX, y = endWorldY }
+                            )
+                            local animId = self.animationController:addAnimation(animConfig)
                             
                             self.animationController:registerCompletionCallback(animId, function()
                                 local success, message = self.gameService:attemptPlacement(self, cardToPlaceIndex, gridX, gridY)
@@ -1124,45 +988,27 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                 -- Handle selecting an OUTPUT port
                 do
                     local worldX, worldY = self:_screenToWorld(x, y)
-                    -- Convert world to local network coordinates
-                    local origin = self.playerWorldOrigins[currentPlayerIndex] or { x=0, y=0 }
-                    local localX, localY
-                    if currentPlayer.orientation and currentPlayer.orientation ~= 0 then
-                        local pivotOffsetX = self.renderer.CARD_WIDTH * 0.5
-                        local pivotOffsetY = self.renderer.CARD_HEIGHT * 0.5
-                        local pivotWorldX = origin.x + pivotOffsetX
-                        local pivotWorldY = origin.y + pivotOffsetY
-                        local relPivotX = worldX - pivotWorldX
-                        local relPivotY = worldY - pivotWorldY
-                        local theta = currentPlayer.orientation
-                        local cosT, sinT = math.cos(-theta), math.sin(-theta)
-                        local unrotatedPivotX = relPivotX * cosT - relPivotY * sinT
-                        local unrotatedPivotY = relPivotX * sinT + relPivotY * cosT
-                        localX = unrotatedPivotX + pivotOffsetX
-                        localY = unrotatedPivotY + pivotOffsetY
-                    else
-                        localX = worldX - origin.x
-                        localY = worldY - origin.y
-                    end
-                    -- Call simplified renderer method with local coords
-                    local gx, gy, card, portIndex = self.renderer:getPortAtWorldPos(currentPlayer.network, localX, localY)
-
-                    if card and portIndex then -- Check if a port was found
-                        local portInfo = getPortInfo(self.renderer, portIndex)
-                        if portInfo and portInfo[4] and portInfo[3] == self.selectedConvergenceLinkType and card:isPortAvailable(portIndex) then
-                            self.initiatingConvergenceNodePos = { x = gx, y = gy }
-                            self.initiatingConvergencePortIndex = portIndex
-                            self.convergenceSelectionState = "selecting_opponent_input"
-                            self:updateStatusMessage(string.format("Select a %s INPUT port on an OPPONENT's network.",
-                                tostring(self.selectedConvergenceLinkType)))
-                            print("Output port selected. Ready for input port selection.")
-                        else
-                            self:updateStatusMessage("Invalid output port selected.")
-                        end
-                    else
-                        self:updateStatusMessage(string.format("Click a %s OUTPUT port on your network.",
-                            tostring(self.selectedConvergenceLinkType)))
-                    end
+                    local pIdx = self.gameService.currentPlayerIndex
+                    -- Convert world coords to network-local coords directly
+                    local netLocal = self:_worldToNetworkLocal(worldX, worldY, pIdx)
+                    local gx, gy, card, portIndex = self.renderer:getPortAtWorldPos(currentPlayer.network, netLocal.x, netLocal.y)
+                     
+                     if card and portIndex then -- Check if a port was found
+                         local portInfo = getPortInfo(self.renderer, portIndex)
+                         if portInfo and portInfo[4] and portInfo[3] == self.selectedConvergenceLinkType and card:isPortAvailable(portIndex) then
+                             self.initiatingConvergenceNodePos = { x = gx, y = gy }
+                             self.initiatingConvergencePortIndex = portIndex
+                             self.convergenceSelectionState = "selecting_opponent_input"
+                             self:updateStatusMessage(string.format("Select a %s INPUT port on an OPPONENT's network.",
+                                 tostring(self.selectedConvergenceLinkType)))
+                             print("Output port selected. Ready for input port selection.")
+                         else
+                             self:updateStatusMessage("Invalid output port selected.")
+                         end
+                     else
+                         self:updateStatusMessage(string.format("Click a %s OUTPUT port on your network.",
+                             tostring(self.selectedConvergenceLinkType)))
+                     end
                 end
                 return
 
@@ -1175,26 +1021,9 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
                     -- Iterate through opponents to find the clicked port
                     for pIdx, player in ipairs(self.players) do
                         if pIdx ~= currentPlayerIndex then
-                            -- Convert world to this opponent's local network coordinates
-                            local origin = self.playerWorldOrigins[pIdx] or { x=0, y=0 }
-                            local localX, localY
-                            if player.orientation and player.orientation ~= 0 then
-                                local pivotOffsetX = self.renderer.CARD_WIDTH * 0.5
-                                local pivotOffsetY = self.renderer.CARD_HEIGHT * 0.5
-                                local pivotWorldX = origin.x + pivotOffsetX
-                                local pivotWorldY = origin.y + pivotOffsetY
-                                local relPivotX = worldX - pivotWorldX
-                                local relPivotY = worldY - pivotWorldY
-                                local theta = player.orientation
-                                local cosT, sinT = math.cos(-theta), math.sin(-theta)
-                                local unrotatedPivotX = relPivotX * cosT - relPivotY * sinT
-                                local unrotatedPivotY = relPivotX * sinT + relPivotY * cosT
-                                localX = unrotatedPivotX + pivotOffsetX
-                                localY = unrotatedPivotY + pivotOffsetY
-                            else
-                                localX = worldX - origin.x
-                                localY = worldY - origin.y
-                            end
+                            -- Convert world to this opponent's local network coordinates using helper
+                            local netLocal = self:_worldToNetworkLocal(worldX, worldY, pIdx)
+                            local localX, localY = netLocal.x, netLocal.y
                             -- Check if click hits a port in this opponent's local coords
                             local gx, gy, card, portIndex = self.renderer:getPortAtWorldPos(player.network, localX, localY)
                             if card and portIndex then
@@ -1289,22 +1118,11 @@ function PlayState:mousepressed(stateManager, x, y, button, istouch, presses)
              -- Find which player's grid was clicked and the target card
              local targetPlayerIndex, targetGridX, targetGridY, targetCard = nil, nil, nil, nil
              for pIdx, player in ipairs(self.players) do
-                 -- Translate into network-local space
-                 local origin = self.playerWorldOrigins[pIdx] or { x = 0, y = 0 }
-                 local dxNet = worldX - origin.x
-                 local dyNet = worldY - origin.y
-                 -- Invert local rotation around the card center
-                 local theta = player.orientation or 0
-                 local cosT = math.cos(-theta)
-                 local sinT = math.sin(-theta)
-                 local cardCenterX = self.renderer.CARD_WIDTH / 2
-                 local cardCenterY = self.renderer.CARD_HEIGHT / 2
-                 local rdx = dxNet - cardCenterX
-                 local rdy = dyNet - cardCenterY
-                 local unrotX = rdx * cosT - rdy * sinT + cardCenterX
-                 local unrotY = rdx * sinT + rdy * cosT + cardCenterY
-                 -- Determine grid cell under cursor
-                 local gridX, gridY = self.renderer:worldToGridCoords(unrotX, unrotY, 0, 0)
+                 -- Translate world coords into this player's network-local space using the helper
+                 local localNet = self:_worldToNetworkLocal(worldX, worldY, pIdx)
+                 
+                 -- Determine grid cell under the local coordinates
+                 local gridX, gridY = self.renderer:worldToGridCoords(localNet.x, localNet.y, 0, 0)
                  local card = player.network:getCardAt(gridX, gridY)
                  if card and card.type ~= Card.Type.REACTOR then
                      targetPlayerIndex = pIdx
@@ -1402,28 +1220,9 @@ function PlayState:mousemoved(stateManager, x, y, dx, dy, istouch)
     -- Only calculate grid hover if NOT in the safe area
     if not isInSafeArea then
         local currentPlayerIndex = self.gameService.currentPlayerIndex
-        local currentPlayer = self.players[currentPlayerIndex]
-        local origin = self.playerWorldOrigins[currentPlayerIndex] or { x = 0, y = 0 }
-
-        -- Translate to the player's network origin
-        local dxNet = worldX - origin.x
-        local dyNet = worldY - origin.y
-
-        -- Invert the player's local rotation around the card center
-        local theta = currentPlayer.orientation or 0
-        local cosT = math.cos(-theta)
-        local sinT = math.sin(-theta)
-        local cardCenterX = self.renderer.CARD_WIDTH / 2
-        local cardCenterY = self.renderer.CARD_HEIGHT / 2
-
-        -- Rotate point back to network-local axes
-        local rdx = dxNet - cardCenterX
-        local rdy = dyNet - cardCenterY
-        local unrotX = rdx * cosT - rdy * sinT + cardCenterX
-        local unrotY = rdx * sinT + rdy * cosT + cardCenterY
-
-        -- Determine grid cell from local coordinates
-        self.hoverGridX, self.hoverGridY = self.renderer:worldToGridCoords(unrotX, unrotY, 0, 0)
+        -- Convert world coords to network-local coords for hover
+        local localNet = self:_worldToNetworkLocal(worldX, worldY, currentPlayerIndex)
+        self.hoverGridX, self.hoverGridY = self.renderer:worldToGridCoords(localNet.x, localNet.y, 0, 0)
     end
 
     -- Check for hand hover (do this regardless of safe area)
@@ -1475,31 +1274,11 @@ function PlayState:wheelmoved(stateManager, x, y)
     if self.isDisplayingPrompt then return end -- Ignore zoom if prompt is up
     if self.isPaused then return end         -- Ignore zoom when paused
 
-    -- Only zoom on vertical scroll
+    -- Delegate zoom handling to CameraUtil
     local dyScroll = y
-    if dyScroll == 0 then return end
-
-    -- Get current mouse position in screen coords
-    local mouseX, mouseY = love.mouse.getPosition()
-
-    -- Compute world position under cursor before zoom
-    local oldZoom = self.cameraZoom
-    local oldCameraX, oldCameraY = self.cameraX, self.cameraY
-    local worldMouseX, worldMouseY = self:_screenToWorld(mouseX, mouseY)
-
-    -- Calculate new zoom level
-    local zoomFactor = 1.1
-    if dyScroll > 0 then
-        self.cameraZoom = math.min(self.maxZoom, self.cameraZoom * zoomFactor)
-    else
-        self.cameraZoom = math.max(self.minZoom, self.cameraZoom / zoomFactor)
+    if dyScroll ~= 0 then
+        CameraUtil.zoom(self, dyScroll)
     end
-
-    -- Adjust camera so that the same world point stays under cursor
-    local newZoom = self.cameraZoom
-    local factor = oldZoom / newZoom
-    self.cameraX = worldMouseX - (worldMouseX - oldCameraX) * factor
-    self.cameraY = worldMouseY - (worldMouseY - oldCameraY) * factor
 end
 
 function PlayState:keypressed(stateManager, key)
@@ -1566,29 +1345,16 @@ function PlayState:createShudderAnimation(cardIndex, errorType)
     local centerY = handStartY + (self.renderer.HAND_CARD_HEIGHT or 84)/2
     
     -- Create the animation with parameters based on error type
-    self.animationController:addAnimation({
-        type = 'handShudder', -- Rename animation type to distinguish from world shudder
-        duration = 0.4,
-        card = selectedCard, -- Uses the card with its own instanceId
-        -- Keep the card in the same position, but in SCREEN space
-        startScreenPos = { x = centerX, y = centerY },
-        endScreenPos = { x = centerX, y = centerY },
-        -- Keep same scale, just vibrate
-        startScale = self.renderer.HAND_CARD_SCALE or 0.6,
-        endScale = self.renderer.HAND_CARD_SCALE or 0.6,
-        -- Animate from a slight tilt to the final grid orientation of the player
-        startRotation = math.pi * 0.1,
-        endRotation = (currentPlayer.orientation or 0),
-        -- Add a tint that fades out
-        startAlpha = 0.8,
-        endAlpha = 1.0,
-        -- Use our shudder easing function
-        easingType = "shudder",
-        -- Metadata for the GameService error message
-        meta = { errorType = errorType or "generic" },
-        -- Explicitly mark as hand context
-        context = 'hand'
-    })
+    -- Get animation config from the Animations module
+    local animConfig = Animations.getHandShudderConfig(
+        self.renderer, 
+        currentPlayer, 
+        selectedCard, 
+        centerX, 
+        centerY, 
+        errorType
+    )
+    self.animationController:addAnimation(animConfig)
 end
 
 -- Helper to update UI element positions based on screen size
@@ -1695,19 +1461,27 @@ end
 
 -- Transform screen coordinates to world coordinates including camera rotation, zoom, and pan
 function PlayState:_screenToWorld(sx, sy)
-    local screenW, screenH = love.graphics.getWidth(), love.graphics.getHeight()
-    local cx, cy = screenW / 2, screenH / 2
-    -- Translate to pivot center
-    local dx, dy = sx - cx, sy - cy
-    -- Rotate by cameraRotation
-    local angle = self.cameraRotation or 0
-    local cosA, sinA = math.cos(angle), math.sin(angle)
-    local rx = dx * cosA - dy * sinA
-    local ry = dx * sinA + dy * cosA
-    -- Scale by inverse zoom and translate by camera position
-    local wx = rx / self.cameraZoom + self.cameraX
-    local wy = ry / self.cameraZoom + self.cameraY
-    return wx, wy
+    return CameraUtil.screenToWorld(self, sx, sy)
+end
+
+-- Convert a world point (sx,sy) to network-local coordinates for a given player index
+function PlayState:_worldToNetworkLocal(wx, wy, playerIndex)
+    local origin = Vector.new(self.playerWorldOrigins[playerIndex].x, self.playerWorldOrigins[playerIndex].y)
+    local pivot = Vector.add(origin, Vector.new(self.renderer.CARD_WIDTH/2, self.renderer.CARD_HEIGHT/2))
+    local worldPt = Vector.new(wx, wy)
+    -- Rotate around pivot by inverse orientation
+    local localPivoted = Vector.worldToLocalAround(worldPt, pivot, self.players[playerIndex].orientation or 0)
+    -- Subtract origin to get network-local coords
+    return Vector.subtract(localPivoted, origin)
+end
+
+-- Convert network-local coords to world position for a given player index
+function PlayState:_networkLocalToWorld(nx, ny, playerIndex)
+    local origin = Vector.new(self.playerWorldOrigins[playerIndex].x, self.playerWorldOrigins[playerIndex].y)
+    local pivot = Vector.add(origin, Vector.new(self.renderer.CARD_WIDTH/2, self.renderer.CARD_HEIGHT/2))
+    local localPos = Vector.new(nx, ny)
+    -- Rotate around pivot by orientation and translate to world
+    return Vector.localToWorld(localPos, pivot, self.players[playerIndex].orientation or 0)
 end
 
 return PlayState 

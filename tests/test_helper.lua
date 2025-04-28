@@ -20,3 +20,6 @@ love.graphics.getFont = love.graphics.getFont or function()
 end
 love.filesystem = love.filesystem or {}
 love.filesystem.getInfo = love.filesystem.getInfo or function(_) return nil end
+
+love.mouse = love.mouse or {}
+love.mouse.getPosition = love.mouse.getPosition or function() return 0, 0 end

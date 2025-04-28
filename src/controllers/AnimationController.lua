@@ -97,7 +97,7 @@ function AnimationController:registerCompletionCallback(animId, callback)
     end
     
     self.completionCallbacks[animId] = callback
-    print(string.format("Registered completion callback for animation %d", animId))
+    print(string.format("Registered completion callback for animation %s", animId))
     return true
 end
 
