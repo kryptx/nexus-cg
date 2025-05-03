@@ -1,7 +1,7 @@
 # NEXUS: The Convergence
 ## Player Rulebook (v0.3)
 
-Welcome to **NEXUS: The Convergence**, a 2–5 player strategic card game of network building, resource management, and dynamic interdependence. Your goal is to grow your network, harness resources, and leverage "convergence" links to activate powerful effects—aiming to be the first to reach **25 Victory Points (VP)** or trigger the end game by depleting the Node card deck.
+Welcome to **NEXUS: The Convergence**, a 2–5 player strategic card game of network building, resource management, and dynamic interdependence. Your goal is to skillfully grow your network, harness vital resources, and leverage powerful "convergence" links, ultimately aiming to achieve supremacy through strategic expansion and interconnectedness.
 
 ---
 
@@ -29,7 +29,7 @@ Welcome to **NEXUS: The Convergence**, a 2–5 player strategic card game of net
     *   1 Player Board.
     *   1 Reactor Card (placed face-up in their play area).
     *   4 Convergence Link sets (kept nearby, unused).
-    *   Initial Resources: **0 Energy**, **1 Data**, **2 Material**.
+    *   Initial Resources: **0 Energy**, **1 Data**, **3 Material**.
 2.  **Genesis Cards:** Create a separate pool of all Genesis Cards. Shuffle this pool, deal **one** Genesis Card face-down to each player (added to their hand). Shuffle any remaining Genesis Cards into the main Node deck.
 3.  **Deal Starting Hand:** Shuffle the main Node deck thoroughly. Deal **two** additional Node cards face-down to each player. Players now have a starting hand of 3 cards (1 Genesis + 2 Node).
 4.  **Central Setup:**
@@ -76,6 +76,7 @@ During this phase, you may perform one or both of the following actions, in any 
         *   **Connectivity:** Must be adjacent to an existing card.
         *   **Fixed Orientation:** Cards **cannot** be rotated. Place them with the text upright.
         *   **Connection Point Matching:** To place Card B next to Card A, look at the edge where they touch. At least one **Input port present** on Card B's connecting edge must align with a corresponding **Output port present** on Card A's adjacent edge. Other ports don't need to match for placement legality. (See Section 11 for Port details).
+        *   **Link Obstruction:** You may not place a node in a space that is occupied by a convergence link; in other words, you may not place along any edge where a link is attached to either port (even if the node does not attach to that port).
         *   **Uniqueness Rule:** Your network **cannot contain more than one copy of the exact same card**. If you draw a duplicate of a card already in your network, you cannot play it (but you can discard it).
 *   **(B) Discard for Resources:**
     *   Discard one card from your hand face-down to the discard pile.
@@ -159,10 +160,9 @@ The game end is triggered when either of the following occurs *at the end of any
 *   The main Node draw deck is depleted for the first time (even if during the Cleanup Phase draw).
 
 Once triggered, finish the current round of play so that every player has had an equal number of turns. Then, proceed to Final Scoring:
-
-1.  **Network Size:** Gain **1 VP** for each Node card currently active in your network (do *not* count your Reactor).
-2.  **Endgame Objectives/Paradigm Bonuses:** Add any VP awarded from specific card effects or the final active Paradigm card that grant end-game points. (Check card text).
-3.  **(Optional Rule - Check if Used) Resource Conversion:** Convert remaining resources (Energy, Data, Material) into VP at a pre-agreed ratio (e.g., 5 total resources = 1 VP).
+1.  **Node Scores:** Add up the printed Victory Points on each Node card in your network (do not count your Reactor); cards without printed Victory Points are worth 0.
+2.  **Underrepresented Type Bonus:** Determine the node type (Culture, Technology, Resource, or Knowledge) that you have built the fewest cards of in your network (excluding your Reactor). Gain **2 VP** for each card of that type in your network.
+3.  **Endgame Objectives/Paradigm Bonuses:** Add any VP awarded from specific card effects or the final active Paradigm card that grant end-game points. (Check card text).
 
 **Winner:** The player with the highest total Victory Point score wins!
 
