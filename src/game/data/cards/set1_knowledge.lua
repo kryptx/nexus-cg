@@ -41,7 +41,7 @@ definitions["NODE_KNOW_002"] = {
   id = "NODE_KNOW_002",
   title = "Materials Analysis Lab",
   type = CardTypes.KNOWLEDGE,
-  resourceRatio = { material = 2, data = 3 },
+  resourceRatio = { material = 2, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -108,10 +108,10 @@ definitions["NODE_KNOW_004"] = {
   id = "NODE_KNOW_004",
   title = "AI Research Center",
   type = CardTypes.KNOWLEDGE,
-  resourceRatio = { material = 1, data = 2 },
+  resourceRatio = { material = 1, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
-          { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } },
+          { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
           { condition = { type = "satisfiedInputs", count = 3 },
             effect = "gainVPForOwner", options = { amount = 1 } }
       }
@@ -336,7 +336,7 @@ definitions["NODE_KNOW_010"] = {
   id = "NODE_KNOW_010", 
   title = "Xeno-Linguistics Lab", 
   type = CardTypes.KNOWLEDGE,
-  resourceRatio = { material = 1, data = 3 },
+  resourceRatio = { material = 1, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { 
@@ -370,7 +370,7 @@ definitions["NODE_KNOW_011"] = {
   id = "NODE_KNOW_011", 
   title = "Philosopher's Conclave", 
   type = CardTypes.KNOWLEDGE,
-  resourceRatio = { material = 1, data = 3 },
+  resourceRatio = { material = 1, data = 0 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -401,7 +401,7 @@ definitions["NODE_KNOW_012"] = {
   id = "NODE_KNOW_012", 
   title = "AI Ethics Committee", 
   type = CardTypes.KNOWLEDGE,
-  resourceRatio = { material = 1, data = 4 },
+  resourceRatio = { material = 1, data = 2 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -432,7 +432,7 @@ definitions["NODE_KNOW_013"] = {
   id = "NODE_KNOW_013", 
   title = "Deep Space Observatory", 
   type = CardTypes.KNOWLEDGE,
-  resourceRatio = { material = 1, data = 1 },
+  resourceRatio = { material = 1, data = 0 },
   activationEffect = CardEffects.createActivationEffect({
       actions = { 
         { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -606,7 +606,7 @@ definitions["NODE_KNOW_018"] = {
   id = "NODE_KNOW_018", 
   title = "Centralized Knowledge Bank", 
   type = CardTypes.KNOWLEDGE,
-  resourceRatio = { material = 1, data = 4 },
+  resourceRatio = { material = 1, data = 2 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { 
@@ -641,7 +641,7 @@ definitions["NODE_KNOW_019"] = {
   id = "NODE_KNOW_019", 
   title = "Geological Data Analysis", 
   type = CardTypes.KNOWLEDGE,
-  resourceRatio = { material = 2, data = 3 },
+  resourceRatio = { material = 2, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
             { 

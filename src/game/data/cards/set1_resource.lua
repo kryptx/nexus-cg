@@ -146,11 +146,12 @@ definitions["NODE_RES_005"] = {
   resourceRatio = { material = 2, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
-          { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
+          { condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.MATERIAL, amount = 1 },
+            effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
           { condition = { type = "adjacency", nodeType = CardTypes.TECHNOLOGY, count = 1 },
             effect = "gainVPForOwner", options = { amount = 1 } }
       }
-      -- Description: "You gain 1 Data. If adjacent to 1+ Technology node(s): You gain 1 VP."
+      -- Description: "If Owner pays 1 Material: Owner gains 1 Data. If adjacent to 1+ Technology node(s): Owner gains 1 VP."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
@@ -179,18 +180,19 @@ definitions["NODE_RES_006"] = {
   resourceRatio = { material = 3, data = 2 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
-          { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
-          { condition = { type = "adjacency", nodeType = CardTypes.KNOWLEDGE, count = 1 },
-            effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
+          { condition = { type = "adjacency", nodeType = CardTypes.RESOURCE, count = 1 },
+            effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
+          { condition = { type = "adjacency", nodeType = CardTypes.RESOURCE, count = 2 },
+            effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
       }
-      -- Description: "You gain 1 Data. If adjacent to 1+ Knowledge node(s): You gain 1 Data."
+      -- Description: "If adjacent to 1+ Resource node(s): Gain 1 Material. If adjacent to 2+ Resource node(s): Gain 1 Material."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
            { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
            { effect = "gainVPForOwner", options = { amount = 1 } }
       }
-      -- Description: "You gain 1 Data. You gain 1 VP."
+      -- Description: "Gain 1 Data. Owner gains 1 VP."
   }),
   vpValue = 1,
   imagePath = "assets/images/geological-survey-outpost.png",
@@ -209,20 +211,20 @@ definitions["NODE_RES_007"] = {
   id = "NODE_RES_007",
   title = "Solar Collector Array",
   type = CardTypes.RESOURCE,
-  resourceRatio = { material = 5, data = 1 },
+  resourceRatio = { material = 1, data = 0 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 1 } },
           { condition = { type = "adjacentEmptyCells", count = 2 },
             effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 1 } }
       }
-      -- Description: "You gain 1 Energy. If adjacent to 2+ empty cell(s): You gain 1 Energy."
+      -- Description: "Gain 1 Energy. If adjacent to 2+ empty cell(s): Gain 1 Energy."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
        actions = {
            { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
        }
-       -- Description: "You gain 1 Material."
+       -- Description: "Gain 1 Material."
   }),
   vpValue = 0,
   imagePath = "assets/images/solar-collector-array.png",
@@ -238,7 +240,7 @@ definitions["NODE_RES_007"] = {
 
 definitions["NODE_RES_008"] = {
   id = "NODE_RES_008", title = "Asteroid Mining Claim", type = CardTypes.RESOURCE,
-  resourceRatio = { material = 3, data = 0 },
+  resourceRatio = { material = 1, data = 0 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
@@ -264,7 +266,7 @@ definitions["NODE_RES_008"] = {
 
 definitions["NODE_RES_009"] = {
   id = "NODE_RES_009", title = "Hydroponics Bay", type = CardTypes.RESOURCE,
-  resourceRatio = { material = 2, data = 1 },
+  resourceRatio = { material = 3, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
@@ -477,7 +479,7 @@ definitions["NODE_RES_017"] = {
   id = "NODE_RES_017",
   title = "Deep Shaft Excavator",
   type = CardTypes.RESOURCE,
-  resourceRatio = { material = 4, data = 2 },
+  resourceRatio = { material = 2, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } },

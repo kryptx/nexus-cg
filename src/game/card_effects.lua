@@ -452,11 +452,14 @@ local function _requestPaymentAndExecute(playerToAsk, costResource, costAmount, 
         benefitContext = { effectType = actionToExecute.condition and "convergence" or "activation" }
     end
     
-    -- Generate a more informative description of what the player will get using the determined context
-    local benefitDescription = generateActionDescription({
-        effect = actionToExecute.effect,
-        options = actionToExecute.options or {}
-    }, benefitContext)
+    -- Support grouping multiple effects under one paymentOffer condition
+    local effList = actionToExecute.effects or { { effect = actionToExecute.effect, options = actionToExecute.options or {} } }
+    -- Generate benefit descriptions for all effects in the group
+    local benefitDescriptions = {}
+    for _, effDef in ipairs(effList) do
+        table.insert(benefitDescriptions, generateActionDescription({ effect = effDef.effect, options = effDef.options }, benefitContext))
+    end
+    local benefitDescription = table.concat(benefitDescriptions, "; ")
     
     -- Create a detailed question with payment cost and benefit
     local questionString = string.format("Pay %d %s to: %s", 
@@ -464,10 +467,11 @@ local function _requestPaymentAndExecute(playerToAsk, costResource, costAmount, 
         costResource:sub(1, 1):upper() .. costResource:sub(2),
         benefitDescription)
         
-    -- For resource gains, make it even more visually clear
-    if actionToExecute.effect:find("addResource") and actionToExecute.options and actionToExecute.options.resource then
-        local gainedResource = actionToExecute.options.resource:sub(1, 1):upper() .. actionToExecute.options.resource:sub(2)
-        local gainedAmount = actionToExecute.options.amount or 1
+    -- For single-effect resource gains, make it more visually clear
+    local firstEff = effList and effList[1]
+    if firstEff and firstEff.effect and type(firstEff.effect) == "string" and firstEff.effect:find("addResource") and firstEff.options and firstEff.options.resource then
+        local gainedResource = firstEff.options.resource:sub(1, 1):upper() .. firstEff.options.resource:sub(2)
+        local gainedAmount = firstEff.options.amount or 1
         questionString = string.format("Pay %d %s to gain %d %s", 
             costAmount, 
             costResource:sub(1, 1):upper() .. costResource:sub(2),
@@ -489,9 +493,11 @@ local function _requestPaymentAndExecute(playerToAsk, costResource, costAmount, 
         if answer then
             print(string.format("[Callback] Player %d agreed to pay %d %s.", playerWhoAnswered.id, costAmount, costResource))
             if playerWhoAnswered:spendResource(costResource, costAmount) then
-                print(string.format("[Callback] Player %d paid %d %s. Executing original action '%s'...", playerWhoAnswered.id, costAmount, costResource, actionToExecute.effect))
-                -- Execute the original paid action
-                CardEffects._executeSingleAction(actionToExecute.effect, actionToExecute.options, gameService, activatingPlayer, sourceNetwork, sourceNode)
+                print(string.format("[Callback] Player %d paid %d %s. Executing payment group actions...", playerWhoAnswered.id, costAmount, costResource))
+                -- Execute each effect in the payment group
+                for _, effDef in ipairs(effList) do
+                    CardEffects._executeSingleAction(effDef.effect, effDef.options or {}, gameService, activatingPlayer, sourceNetwork, sourceNode)
+                end
             else
                 print(string.format("Warning: Failed to spend resource for player %d after passing initial check.", playerWhoAnswered.id))
             end
@@ -502,13 +508,20 @@ local function _requestPaymentAndExecute(playerToAsk, costResource, costAmount, 
         for j = actionIndex + 1, #actionsList do
             local nextAction = actionsList[j]
             local cond = nextAction.condition
-            local eff = nextAction.effect
-            local opts = nextAction.options or {}
-            if not cond or evaluateCondition(cond, gameService, activatingPlayer, sourceNetwork, sourceNode) then
-                print(string.format("[Callback] Continuing action '%s' after payment step...", eff))
-                CardEffects._executeSingleAction(eff, opts, gameService, activatingPlayer, sourceNetwork, sourceNode)
-            else
-                print(string.format("[Callback] Skipping action '%s' due to failed condition.", eff))
+            -- Treat separate paymentOffer actions independently
+            if cond and cond.type == "paymentOffer" then
+                local payerType2 = cond.payer
+                local playerToAsk2 = (payerType2 == "Owner") and owner or activatingPlayer
+                return _requestPaymentAndExecute(playerToAsk2, cond.resource, cond.amount or 1, nextAction, j, actionsList, gameService, activatingPlayer, sourceNetwork, sourceNode)
+            elseif not cond or evaluateCondition(cond, gameService, activatingPlayer, sourceNetwork, sourceNode) then
+                print(string.format("[Callback] Continuing action '%s' after payment step...", nextAction.effect))
+                if nextAction.effects then
+                    for _, eff2 in ipairs(nextAction.effects) do
+                        CardEffects._executeSingleAction(eff2.effect, eff2.options or {}, gameService, activatingPlayer, sourceNetwork, sourceNode)
+                    end
+                else
+                    CardEffects._executeSingleAction(nextAction.effect, nextAction.options or {}, gameService, activatingPlayer, sourceNetwork, sourceNode)
+                end
             end
         end
         -- After processing remaining actions, resume the activation chain if paused
@@ -521,7 +534,9 @@ local function _requestPaymentAndExecute(playerToAsk, costResource, costAmount, 
 
     -- Request the input from the player via GameService, passing display options
     gameService:requestPlayerYesNo(playerToAsk, questionString, afterChoiceCallback, displayOptions)
-    print(string.format("[Effect] Requesting payment (%d %s) from player %d for action '%s'. Waiting for response...", costAmount, costResource, playerToAsk.id, actionToExecute.effect))
+    -- Use first effect name or fallback description when printing
+    local printEffect = actionToExecute.effect or (effList[1] and effList[1].effect) or "<multiple>"
+    print(string.format("[Effect] Requesting payment (%d %s) from player %d for effect '%s'. Waiting for response...", costAmount, costResource, playerToAsk.id, printEffect))
     -- Signal that we are now waiting for input
     return "waiting"
 
@@ -679,9 +694,30 @@ function CardEffects.generateEffectDescription(config, effectType)
     if effectType then
         context = { effectType = effectType }
     end
-    
-    local actions = config.actions or {}
-    if not actions or #actions == 0 then return "" end -- Handle empty actions
+
+    -- Flatten actions list to support 'effects' grouping
+    local originalActions = config.actions or {}
+    local actions = {}
+    for _, act in ipairs(originalActions) do
+        if act.effects then
+            for _, eff in ipairs(act.effects) do
+                table.insert(actions, {
+                    orig = act,
+                    condition = act.condition,
+                    effect = eff.effect,
+                    options = eff.options
+                })
+            end
+        else
+            table.insert(actions, {
+                orig = act,
+                condition = act.condition,
+                effect = act.effect,
+                options = act.options
+            })
+        end
+    end
+    if #actions == 0 then return "" end
 
     local finalDescriptions = {}
     local i = 1
@@ -705,16 +741,18 @@ function CardEffects.generateEffectDescription(config, effectType)
             while j <= #actions do
                 local nextAction = actions[j]
                 local nextCondition = nextAction.condition
-                
                 -- Check if conditions are the same (both non-nil and same description text)
                 local sameCondition = (nextCondition ~= nil and conditionText == generateConditionDescription(nextCondition, context))
-                                     
-                if sameCondition then
+                -- Only group multiple paymentOffer actions if they originate from the same original action
+                local isPaymentOffer = currentCondition and currentCondition.type == "paymentOffer"
+                local sameOrig = nextAction.orig == currentAction.orig
+                local groupAllowed = sameCondition and (not isPaymentOffer or sameOrig)
+                if groupAllowed then
                     table.insert(blockActionDescriptions, generateActionDescription(nextAction, context))
                     j = j + 1 -- Continue matching
                     blockHasMultipleActions = true
                 else
-                    break -- Condition changed or became nil, stop lookahead
+                    break -- Condition changed, grouping not allowed, or became nil, stop lookahead
                 end
             end
             i = j -- Move main index past the processed conditional block
@@ -742,7 +780,18 @@ end
 -- config = { actions = { {condition={...}, effect="...", options={...}}, ... } }
 -- Returns: The status of the activation (e.g., "waiting" or nil)
 function CardEffects.createActivationEffect(config)
-    local actions = config.actions or {}
+    -- Flatten actions to support per-condition multiple effects
+    local originalActions = config.actions or {}
+    local actions = {}
+    for _, act in ipairs(originalActions) do
+        if act.effects then
+            -- Group multiple effects under one condition
+            table.insert(actions, { condition = act.condition, effects = act.effects })
+        else
+            -- Single effect action
+            table.insert(actions, { condition = act.condition, effects = { { effect = act.effect, options = act.options } } })
+        end
+    end
 
     local activateFunction = function(gameService, activatingPlayer, sourceNetwork, sourceNode, targetNode)
         if not gameService then print("ERROR: Card effect executed without gameService!"); return nil end
@@ -751,38 +800,38 @@ function CardEffects.createActivationEffect(config)
         local overallStatus = nil 
         local owner = sourceNetwork.owner -- Defined once
 
-        for i, action in ipairs(actions) do
-            local conditionConfig = action.condition
-            local effectType = action.effect
-            local options = action.options or {}
+        -- Process each action group (condition + one or more effects)
+        for i, actionGroup in ipairs(actions) do
+            local conditionConfig = actionGroup.condition
+            local effList = actionGroup.effects
 
             -- Step 1: Evaluate the condition (if any)
             if evaluateCondition(conditionConfig, gameService, activatingPlayer, sourceNetwork, sourceNode) then
-                local actionStatus = nil 
+                local actionStatus = nil
 
                 -- Step 2: Check if the condition was a payment offer that just passed
                 if conditionConfig and conditionConfig.type == "paymentOffer" then
-                    -- Condition passed affordability check. Now, request payment and queue the action.
-                    print(string.format("Condition 'paymentOffer' passed for action '%s'. Requesting payment...", effectType))
+                    -- Payment offer: request payment then execute all effects in group
+                    print("Condition 'paymentOffer' passed for payment group. Requesting payment...")
                     local payerType = conditionConfig.payer
                     local playerToAsk = (payerType == "Owner") and owner or activatingPlayer
                     actionStatus = _requestPaymentAndExecute(
-                        playerToAsk, 
-                        conditionConfig.resource, 
+                        playerToAsk,
+                        conditionConfig.resource,
                         conditionConfig.amount or 1,
-                        action, -- Pass the whole action table {condition=..., effect=..., options=...}
-                        i, -- Pass the index of the action in the actions list
-                        actions, -- Pass the entire actions list
+                        actionGroup,
+                        i,
+                        actions,
                         gameService, activatingPlayer, sourceNetwork, sourceNode
                     )
                 else
-                    -- Condition passed (or no condition), and it wasn't a payment offer. Execute directly.
-                    print(string.format("Condition passed (or no condition) for action '%s'. Executing directly...", effectType))
-                    CardEffects._executeSingleAction(effectType, options, gameService, activatingPlayer, sourceNetwork, sourceNode)
-                    -- Note: Direct execution currently doesn't return a status. Assume nil for now.
-                    actionStatus = nil 
+                    -- Unconditional or non-payment: execute each effect in group immediately
+                    print("Condition passed (or no condition). Executing effects...")
+                    for _, effDef in ipairs(effList) do
+                        CardEffects._executeSingleAction(effDef.effect, effDef.options or {}, gameService, activatingPlayer, sourceNetwork, sourceNode)
+                    end
+                    actionStatus = nil
                 end
-
 
                 -- If this action caused a wait (only payment requests do), update overall status and stop processing further actions
                 if actionStatus == "waiting" then
@@ -791,7 +840,7 @@ function CardEffects.createActivationEffect(config)
                     break -- Stop processing further actions for this node activation
                 end
             else
-                 print(string.format("Condition failed for action '%s'. Skipping.", effectType))
+                print("Condition failed. Skipping effects for this group.")
             end
         end
 

@@ -13,7 +13,7 @@ definitions["NODE_CULT_001"] = {
   id = "NODE_CULT_001",
   title = "Community Forum",
   type = CardTypes.CULTURE,
-  resourceRatio = { material = 1, data = 1 },
+  resourceRatio = { material = 2, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { effect = "drawCardsForOwner", options = { amount = 1 } },
@@ -49,7 +49,7 @@ definitions["NODE_CULT_002"] = {
   id = "NODE_CULT_002",
   title = "Cultural Exchange",
   type = CardTypes.CULTURE,
-  resourceRatio = { material = 1, data = 1 },
+  resourceRatio = { material = 1, data = 0 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           {
@@ -90,12 +90,9 @@ definitions["NODE_CULT_003"] = {
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { 
-              effect = "gainResourcePerNodeOwner", 
-              options = { 
-                  resource = ResourceType.DATA, 
-                  nodeType = CardTypes.KNOWLEDGE, 
-                  amount = 1 
-              } 
+              condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.ENERGY, amount = 1 },
+              effect = "addResourceToOwner",
+              options = { resource = ResourceType.DATA, amount = 2 }
           },
           {
               condition = { type = "satisfiedInputs", count = 2 },
@@ -103,7 +100,7 @@ definitions["NODE_CULT_003"] = {
               options = { amount = 1 }
           }
       }
-      -- Description: "Owner gains 1 Data per Knowledge node in their network. If 2+ input ports are connected: Owner draws 1 card."
+      -- Description: "If Owner pays 1 Energy: Owner gains 2 Data. If 2+ input ports are connected: Owner draws 1 card."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
@@ -172,33 +169,25 @@ definitions["NODE_CULT_005"] = {
   id = "NODE_CULT_005",
   title = "Applied Aesthetics Studio",
   type = CardTypes.CULTURE,
-  resourceRatio = { material = 3, data = 2 },
+  resourceRatio = { material = 3, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           {
-              condition = { type = "adjacency", nodeType = CardTypes.TECHNOLOGY, count = 1 },
-              effect = "addResourceToOwner", 
-              options = { resource = ResourceType.DATA, amount = 1 }
-          },
-          {
               condition = { type = "adjacency", nodeType = CardTypes.TECHNOLOGY, count = 2 },
               effect = "gainVPForOwner", 
-              options = { amount = 2 }
+              options = { amount = 1 }
           }
       }
-      -- Description: "If adjacent to 1+ Technology node: Owner gains 1 Data. If adjacent to 2+ Technology nodes: Owner gains 2 VP."
+      -- Description: "If adjacent to 2+ Technology nodes: Owner gains 1 VP."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
            { 
                condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.ENERGY, amount = 1 },
-               effect = "gainVPForActivator",
-               options = { amount = 2 }
-           },
-           { 
-               condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.ENERGY, amount = 1 },
-               effect = "gainVPForOwner",
-               options = { amount = 1 }
+               effects = {
+                { effect = "gainVPForActivator", options = { amount = 2 } },
+                { effect = "gainVPForOwner", options = { amount = 1 } }
+               }
            }
       }
       -- Description: "If Activator pays 1 Energy: Activator gains 2 VP; Owner gains 1 VP."
@@ -263,7 +252,7 @@ definitions["NODE_CULT_007"] = {
   id = "NODE_CULT_007",
   title = "Artisan Guild Workshop",
   type = CardTypes.CULTURE,
-  resourceRatio = { material = 2, data = 1 },
+  resourceRatio = { material = 3, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { 
@@ -332,7 +321,7 @@ definitions["NODE_CULT_008"] = {
 }
 definitions["NODE_CULT_009"] = {
   id = "NODE_CULT_009", title = "Artisan Collective", type = CardTypes.CULTURE,
-  resourceRatio = { material = 2, data = 1 },
+  resourceRatio = { material = 3, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
@@ -361,7 +350,7 @@ definitions["NODE_CULT_009"] = {
 
 definitions["NODE_CULT_010"] = {
   id = "NODE_CULT_010", title = "Smuggler's Den", type = CardTypes.CULTURE,
-  resourceRatio = { material = 2, data = 1 },
+  resourceRatio = { material = 1, data = 0 },
   activationEffect = CardEffects.createActivationEffect({
       actions = { 
           { condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.DATA, amount = 1 },
@@ -417,7 +406,7 @@ definitions["NODE_CULT_011"] = {
 }
 definitions["NODE_CULT_012"] = {
   id = "NODE_CULT_012", title = "Propaganda Broadcaster", type = CardTypes.CULTURE,
-  resourceRatio = { material = 1, data = 3 },
+  resourceRatio = { material = 2, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           {
@@ -482,7 +471,7 @@ definitions["NODE_CULT_013"] = {
 
 definitions["NODE_CULT_014"] = {
   id = "NODE_CULT_014", title = "Cultural Artifact Factory", type = CardTypes.CULTURE,
-  resourceRatio = { material = 3, data = 2 },
+  resourceRatio = { material = 1, data = 0 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
@@ -569,7 +558,10 @@ definitions["NODE_CULT_017"] = {
   resourceRatio = { material = 1, data = 2 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
-          { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
+          { condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.MATERIAL, amount = 2 },
+            effect = "gainVPForOwner", options = { amount = 1 }
+          }
+          -- Description: "If Owner pays 2 Material: Owner gains 1 VP."
       }
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({

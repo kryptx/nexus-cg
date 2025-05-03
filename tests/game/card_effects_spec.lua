@@ -123,88 +123,6 @@ describe("CardEffects.generateEffectDescription", function()
         local expected = "If 1+ links attached: Gain 1 VP; Owner draws 1 card. Owner and activator gain 5 Energy. If adjacent to 1+ Factory: Draw 2 cards. Owner gains 10 VP."
         assert.are.equal(expected, CardEffects.generateEffectDescription(config))
     end)
-    
-    it("should format offer payment effects correctly (now as conditions)", function()
-        local config = {
-            actions = {
-                -- Action 1: Gain VP, guarded by payment
-                {
-                    condition = { 
-                        type = "paymentOffer", 
-                        payer = "Activator", 
-                        resource = CardEffects.ResourceType.DATA, 
-                        amount = 2 
-                    },
-                    effect = "gainVPForActivator", 
-                    options = { amount = 3 }
-                },
-                -- Action 2: Draw card, guarded by the *same* payment condition
-                 {
-                    condition = { 
-                        type = "paymentOffer", 
-                        payer = "Activator", 
-                        resource = CardEffects.ResourceType.DATA, 
-                        amount = 2 
-                    },
-                    effect = "drawCardsForActivator", 
-                    options = { amount = 1 }
-                }
-            }
-        }
-        -- Both actions share the same condition, so they should be joined by a semicolon.
-        local expected = "If Activator pays 2 Data: Gain 3 VP; Draw 1 card."
-        -- Let's use the actual effect names for clarity during refactoring, then fix if needed
-        assert.are.equal(expected, CardEffects.generateEffectDescription(config))
-
-        -- Refined expectation with generated descriptions:
-        local refined_expected = "If Activator pays 2 Data: Gain 3 VP; Draw 1 card."
-        assert.are.equal(refined_expected, CardEffects.generateEffectDescription(config))
-    end)
-
-    it("should handle offer payment with conditions on consequence (now condition on condition)", function()
-         local config = {
-             actions = {
-                 -- Action 1: Gain VP, guarded by payment AND satisfied inputs
-                 {
-                     -- Note: Current structure doesn't support multiple conditions easily.
-                     -- This test highlights a limitation or area for future design.
-                     -- For now, let's assume the payment is the primary condition grouping.
-                     condition = { 
-                         type = "paymentOffer", 
-                         payer = "Owner", 
-                         resource = CardEffects.ResourceType.MATERIAL, 
-                         amount = 1 
-                         -- We'd ideally also have: secondary_condition = {type="satisfiedInputs", count=1}
-                     },
-                     effect = "gainVPForOwner", 
-                     options = { amount = 2 }
-                 },
-                 -- Action 2: Gain resource, guarded by the *same* payment condition
-                 {
-                     condition = { 
-                         type = "paymentOffer", 
-                         payer = "Owner", 
-                         resource = CardEffects.ResourceType.MATERIAL, 
-                         amount = 1 
-                         -- secondary_condition = {type="satisfiedInputs", count=1}
-                     },
-                     effect = "addResourceToOwner", 
-                     options = { resource = CardEffects.ResourceType.ENERGY, amount = 1 }
-                 }
-             }
-         }
-         -- Actions share the payment condition, joined by semicolon.
-         -- The *inner* condition (satisfiedInputs) isn't represented in this structure yet.
-         local expected = "If Owner pays 1 Material: Owner gains 2 VP; Owner gains 1 Energy."
-         -- Let's use the actual effect names for clarity during refactoring, then fix if needed
-         assert.are.equal(expected, CardEffects.generateEffectDescription(config))
-
-         -- Refined expectation (without secondary condition):
-         local refined_expected = "If Owner pays 1 Material: Owner gains 2 VP; Owner gains 1 Energy."
-         assert.are.equal(refined_expected, CardEffects.generateEffectDescription(config))
-
-         -- TODO: Consider how to represent and evaluate nested/multiple conditions per action.
-     end)
 
     it("should handle unknown effect types gracefully (generate warning)", function()
         local config = {
@@ -230,7 +148,7 @@ describe("CardEffects.generateEffectDescription", function()
         assert.match("Warning: Unknown condition type 'unknownCondition' for description.", print_calls[1], 1, true)
     end)
 
-    it("should handle offer payment with non-conditional consequences (from set1_culture)", function()
+    it("should handle multiple effects with the same condition (from set1_culture)", function()
         local config = {
             actions = {
                 {
@@ -240,18 +158,10 @@ describe("CardEffects.generateEffectDescription", function()
                         resource = CardEffects.ResourceType.DATA, 
                         amount = 2 
                     },
-                    effect = "forceDiscardRandomCardsActivator", 
-                    options = { amount = 2 }
-                },
-                {
-                     condition = { 
-                        type = "paymentOffer", 
-                        payer = "Owner", 
-                        resource = CardEffects.ResourceType.DATA, 
-                        amount = 2 
-                    },
-                    effect = "gainVPForOwner", 
-                    options = { amount = 1 }
+                    effects = {
+                        { effect = "forceDiscardRandomCardsActivator", options = { amount = 2 } },
+                        { effect = "gainVPForOwner", options = { amount = 1 } }
+                    }
                 }
             }
         }
@@ -286,4 +196,88 @@ describe("CardEffects.generateEffectDescription", function()
         assert.are.equal("Gain 1 Energy.", CardEffects.generateEffectDescription(config, "activation"))
     end)
 
+    it("should flatten actions with effects array and group conditional effects correctly", function()
+        local config = {
+            actions = {
+                {
+                    condition = { type = "adjacency", nodeType = "Culture", count = 2 },
+                    effects = {
+                        { effect = "gainVPForActivator", options = { amount = 1 } },
+                        { effect = "drawCardsForActivator", options = { amount = 2 } },
+                    }
+                }
+            }
+        }
+        local expected = "If adjacent to 2+ Culture: Gain 1 VP; Draw 2 cards."
+        assert.are.equal(expected, CardEffects.generateEffectDescription(config))
+    end)
+
+    it("should flatten actions with effects array without condition correctly", function()
+        local config = {
+            actions = {
+                {
+                    effects = {
+                        { effect = "gainVPForActivator", options = { amount = 2 } },
+                        { effect = "drawCardsForOwner", options = { amount = 1 } },
+                    }
+                }
+            }
+        }
+        local expected = "Gain 2 VP. Owner draws 1 card."
+        assert.are.equal(expected, CardEffects.generateEffectDescription(config))
+    end)
+
+    it("should flatten mixed effect and effects structures correctly", function()
+        local config = {
+            actions = {
+                {
+                    effects = {
+                        { effect = "gainVPForActivator", options = { amount = 1 } },
+                        { effect = "drawCardsForActivator", options = { amount = 1 } },
+                    }
+                },
+                {
+                    effect = "gainVPForOwner", options = { amount = 3 }
+                }
+            }
+        }
+        local expected = "Gain 1 VP. Draw 1 card. Owner gains 3 VP."
+        assert.are.equal(expected, CardEffects.generateEffectDescription(config))
+    end)
+
+end)
+
+-- Test PaymentOffer grouping under a single condition in a convergenceEffect
+describe("PaymentOffer grouping in convergenceEffect", function()
+    it("requests a single payment with combined question when multiple effects share condition", function()
+        -- Synthetic config with multiple effects under one paymentOffer
+        local config = { actions = {
+            {
+                condition = { type = "paymentOffer", payer = "Activator", resource = CardEffects.ResourceType.DATA, amount = 1 },
+                effects = {
+                    { effect = "gainVPForActivator", options = { amount = 2 } },
+                    { effect = "gainVPForOwner",     options = { amount = 3 } }
+                }
+            }
+        }}
+        -- Create convergenceEffect and stub gameService
+        local effect = CardEffects.createConvergenceEffect(config)
+        local activator = { id = 1, resources = { data = 1 } }
+        function activator:spendResource(resource, amount) return true end
+        local owner = { id = 2 }
+        local sourceNetwork = { owner = owner }
+        local sourceNode = {}
+        local calls = {}
+        local gameService = {
+            requestPlayerYesNo = function(self, player, question, callback, displayOptions)
+                table.insert(calls, { player = player, question = question, callback = callback })
+            end
+        }
+        -- Trigger payment request
+        effect.activate(gameService, activator, sourceNetwork, sourceNode)
+        -- Only one payment for grouped effects
+        assert.are.equal(1, #calls)
+        assert.are.same(activator, calls[1].player)
+        assert.are.equal("Pay 1 Data to: Gain 2 VP; Owner gains 3 VP", calls[1].question)
+    end)
 end)

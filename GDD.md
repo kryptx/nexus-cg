@@ -116,7 +116,9 @@ A player's turn consists of the following phases, performed in order:
 ### 4.6 Convergence Mechanic
 
 *   **Link Components (Paired Markers):** Each player starts with a limited supply of **four Convergence Link sets**. Each set corresponds to a connection type (Technology, Culture, Resource, Knowledge) and consists of **two identical markers**. Using a set consumes this finite resource for the initiating player.
-*   **Initiation:** During their Converge Phase, a player may use **one** available (unused) `[Type] Convergence Link set` to connect their network to an opponent's.
+*   **Converge Actions:** During their Converge Phase, a player may choose one of the following actions:
+    *   **Create Link:** Spend **1 Data** and use one available (unused) `[Type] Convergence Link set` to connect their network to an opponent's (see Placement Requirements below).
+    *   **Destroy Link:** Spend **2 Data** to remove an existing Convergence Link created by an opponent, removing both paired markers from the involved ports.
 *   **Placement Requirements:** To use a `[Type] Convergence Link set`:
     *   The initiator must possess the corresponding unused `[Type] Link set`.
     *   The player chooses one of their nodes with a **present `[Type]` Output port** at the appropriate half-edge position (per convention 4.3). They may not choose a node from their Reactor.

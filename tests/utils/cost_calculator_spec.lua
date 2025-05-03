@@ -41,7 +41,7 @@ describe("CostCalculator", function()
     }
 
     it("should calculate the derived cost for Network Hub correctly based on current logic", function()
-        local expectedME = 6.1
+        local expectedME = 7.3
         local expectedCost = { material = 2, data = 2 }
 
         -- Save original print

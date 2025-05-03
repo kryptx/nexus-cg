@@ -20,11 +20,11 @@ definitions["NODE_TECH_001"] = {
             { condition = { type = "activationChainLength", count = 2 },
               effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 1 } }
         }
-        -- Description: "Owner gains 1 Data. If 2+ card(s) were activated in this chain: Owner gains 1 Energy."
+        -- Description: "Gain 1 Data. If 2+ card(s) were activated in this chain: Gain 1 Energy."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } } }
-        -- Description: "Grants 1 Data to the activator."
+        -- Description: "Gain 1 Data."
     }),
     vpValue = 0,
     imagePath = "assets/images/basic-processing-unit.png",
@@ -48,13 +48,13 @@ definitions["NODE_TECH_002"] = {
             { condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.ENERGY, amount = 1 },
               effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } }
         }
-        -- Description: "Owner gains 1 Data. If Owner pays 1 Energy: Owner gains 2 Data."
+        -- Description: "Gain 1 Data. If you pay 1 Energy: Gain 2 Data."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { 
             { effect = "addResourceToBoth", options = { resource = ResourceType.DATA, amount = 1 } }
         }
-        -- Description: "Grants 1 Data to both the owner and activator."
+        -- Description: "Owner and activator gain 1 Data."
     }),
     vpValue = 1,
     imagePath = "assets/images/advanced-processing-unit.png",
@@ -77,14 +77,14 @@ definitions["NODE_TECH_003"] = {
             { condition = { type = "satisfiedInputs", count = 2},
               effect = "gainResourcePerNodeOwner", options = { resource = ResourceType.DATA, amount = 1, nodeType = CardTypes.CULTURE } }
         }
-        -- Description: "Owner gains 1 Material. If 2+ input port(s) are connected: Owner gains 1 Data per Culture node in their network."
+        -- Description: "Gain 1 Material. If 2+ input port(s) are connected: Gain 1 Data per Culture node in your network."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
              { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
              { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
         }
-        -- Description: "Grants 1 Data to the activator. Grants 1 Material to the owner."
+        -- Description: "Gain 1 Data. Owner gains 1 Material."
     }),
     vpValue = 1, 
     imagePath = "assets/images/applied-arts-workshop.png",
@@ -103,14 +103,14 @@ definitions["NODE_TECH_004"] = {
     id = "NODE_TECH_004",
     title = "Automated Fabricator",
     type = CardTypes.TECHNOLOGY,
-    resourceRatio = { material = 2, data = 1 },
+    resourceRatio = { material = 1, data = 0 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
             { condition = { type = "adjacentEmptyCells", count = 2 },
               effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 2 } }
         }
-        -- Description: "Owner gains 1 Material. If adjacent to 2+ empty cell(s): Owner gains 2 Material."
+        -- Description: "Gain 1 Material. If adjacent to 2+ empty cell(s): Gain 2 Material."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
@@ -118,7 +118,7 @@ definitions["NODE_TECH_004"] = {
              { condition = { type = "convergenceLinks", count = 2 },
                effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 1 } }
         }
-        -- Description: "Activator gains 1 Material. If 2+ convergence link(s) attached: Owner gains 1 Energy."
+        -- Description: "Gain 1 Material. If 2+ convergence link(s) attached: Owner gains 1 Energy."
     }),
     vpValue = 1,
     imagePath = "assets/images/automated-fabricator.png",
@@ -143,15 +143,13 @@ definitions["NODE_TECH_005"] = {
             { condition = { type = "adjacency", nodeType = CardTypes.RESOURCE, count = 2 },
               effect = "gainResourcePerNodeOwner", options = { resource = ResourceType.ENERGY, amount = 1, nodeType = CardTypes.RESOURCE } }
         }
-        -- Description: "Owner gains 1 Energy. If adjacent to 1+ Resource node(s): Owner gains 1 Energy per Resource node in their network."
+        -- Description: "Gain 1 Energy. If adjacent to 1+ Resource node(s): Gain 1 Energy per Resource node in your network."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { 
             { effect = "addResourceToActivator", options = { resource = ResourceType.ENERGY, amount = 1 } },
-            { condition = { type = "activationChainLength", count = 3 },
-              effect = "gainVPForOwner", options = { amount = 1 } }
         }
-        -- Description: "Activator gains 1 Energy. If 3+ card(s) were activated in this chain: Owner gains 1 VP."
+        -- Description: "Gain 1 Energy."
     }),
     vpValue = 1, 
     imagePath = "assets/images/geothermal-tap.png",
@@ -283,7 +281,7 @@ definitions["NODE_TECH_009"] = {
              { condition = { type = "convergenceLinks", count = 1 },
                effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } }
         }
-        -- Description: "Activator gains 1 Data. If 1+ convergence link(s) attached: Activator gains 1 Data."
+        -- Description: "Gain 1 Data. If 1+ convergence link(s) attached: Gain 1 Data."
     }),
     vpValue = 1,
     imagePath = "assets/images/network-hub.png",
@@ -334,7 +332,7 @@ definitions["NODE_TECH_010"] = {
 }
 definitions["NODE_TECH_011"] = {
     id = "NODE_TECH_011", title = "Orbital Comm Relay", type = CardTypes.TECHNOLOGY,
-    resourceRatio = { material = 2, data = 1 },
+    resourceRatio = { material = 1, data = 0 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -359,7 +357,7 @@ definitions["NODE_TECH_011"] = {
 }
 definitions["NODE_TECH_012"] = {
     id = "NODE_TECH_012", title = "High-Frequency Trading Hub", type = CardTypes.TECHNOLOGY,
-    resourceRatio = { material = 1, data = 1 },
+    resourceRatio = { material = 3, data = 1 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -410,7 +408,7 @@ definitions["NODE_TECH_013"] = {
 }
 definitions["NODE_TECH_014"] = {
     id = "NODE_TECH_014", title = "Tunnel Bore Control", type = CardTypes.TECHNOLOGY,
-    resourceRatio = { material = 4, data = 1 },
+    resourceRatio = { material = 1, data = 0 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } },
@@ -436,7 +434,7 @@ definitions["NODE_TECH_014"] = {
 
 definitions["NODE_TECH_015"] = {
     id = "NODE_TECH_015", title = "Predictive Algorithm", type = CardTypes.TECHNOLOGY,
-    resourceRatio = { material = 2, data = 3 },
+    resourceRatio = { material = 1, data = 3 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
              { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
@@ -484,7 +482,7 @@ definitions["NODE_TECH_016"] = {
 }
 definitions["NODE_TECH_017"] = {
     id = "NODE_TECH_017", title = "Resource Scanner Drone", type = CardTypes.TECHNOLOGY,
-    resourceRatio = { material = 1, data = 1 },
+    resourceRatio = { material = 1, data = 0 },
     activationEffect = CardEffects.createActivationEffect({
         actions = {
             {
