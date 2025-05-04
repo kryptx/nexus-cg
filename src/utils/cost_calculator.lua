@@ -13,7 +13,7 @@ local MATERIAL_EQUIVALENT = {
     [ResourceType.MATERIAL] = 1.0,
     [ResourceType.DATA] = 2.0,
     [ResourceType.ENERGY] = 2.5,
-    CARD_DRAW = 2.0, -- what a deal!
+    CARD_DRAW = 2.5,
     VP = 3.0,
 }
 

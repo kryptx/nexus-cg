@@ -225,13 +225,10 @@ definitions["NODE_CULT_006"] = {
            { effect = "drawCardsForActivator", options = { amount = 1 } },
            { 
                condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.DATA, amount = 1 },
-               effect = "forceDiscardRandomCardsOwner", 
-               options = { amount = 1 }
-           },
-           { 
-               condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.DATA, amount = 1 },
-               effect = "gainVPForActivator", 
-               options = { amount = 1 }
+               effects = {
+                { effect = "forceDiscardRandomCardsOwner", options = { amount = 1 } },
+                { effect = "gainVPForActivator", options = { amount = 1 } }
+               }
            }
       }
       -- Description: "Activator draws 1 card. If Activator pays 1 Data: Owner discards 1 card; Activator gains 1 VP."
@@ -305,16 +302,12 @@ definitions["NODE_CULT_008"] = {
           { effect = "drawCardsForActivator", options = { amount = 1 } },
           {
               condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.DATA, amount = 1 },
-              effect = "drawCardsForActivator", 
-              options = { amount = 1 }
-          },
-          {
-              condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.DATA, amount = 1 },
-              effect = "drawCardsForOwner", 
-              options = { amount = 1 }
+              effects = {
+                { effect = "drawCardsForBoth", options = { amount = 1 } }
+              }
           }
       }
-      -- Description: "Activator draws 1 card. If activator pays 1 Data: Activator draws 1 additional card; Owner draws 1 card."
+      -- Description: "Draw 1 card. If you pay 1 Data: Owner and Activator draw 1 card."
   }),
   vpValue = 0, imagePath = "assets/images/historical-archive-access.png", flavorText = "Lessons from Old Earth.",
   definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.BOTTOM_LEFT] = true, [CardPorts.LEFT_TOP] = true },
@@ -411,13 +404,10 @@ definitions["NODE_CULT_012"] = {
       actions = {
           {
             condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.DATA, amount = 1 },
-            effect = "forceDiscardRandomCardsActivator", 
-            options = { amount = 1 } 
-          },
-          { 
-            condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.DATA, amount = 1 },
-            effect = "gainVPForOwner", 
-            options = { amount = 1 } 
+            effects = {
+              { effect = "forceDiscardRandomCardsActivator", options = { amount = 1 } },
+              { effect = "gainVPForOwner", options = { amount = 1 } }
+            }
           }
       }
       -- Description: "If you pay 1 Data: Discard 1 card; Gain 1 VP."
@@ -454,16 +444,13 @@ definitions["NODE_CULT_013"] = {
       actions = {
           {
               condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.ENERGY, amount = 1 },
-              effect = "addResourceToActivator", 
-              options = { resource = ResourceType.MATERIAL, amount = 2 } 
-          },
-          { 
-              condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.ENERGY, amount = 1 },
-              effect = "addResourceToOwner", 
-              options = { resource = ResourceType.DATA, amount = 1 } 
+              effects = {
+                { effect = "addResourceToActivator", options = { resource = ResourceType.MATERIAL, amount = 2 } },
+                { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } }
+              }
           }
       }
-      -- Description: "If Activator pays 1 Energy: Activator gains 2 Material; Owner gains 1 Data."
+      -- Description: "If you pay 1 Energy: Gain 2 Material; Owner gains 1 Data."
   }),
   vpValue = 0, imagePath = "assets/images/subterranean-market.png", flavorText = "Dealings conducted far from prying eyes.",
   definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.BOTTOM_LEFT] = true, [CardPorts.LEFT_BOTTOM] = true }, -- Cult Out, Cult In, Res In
@@ -583,7 +570,7 @@ definitions["NODE_CULT_018"] = {
   id = "NODE_CULT_018",
   title = "Cultural Archive",
   type = CardTypes.CULTURE,
-  resourceRatio = { material = 1, data = 3 },
+  resourceRatio = { material = 1, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { effect = "drawCardsForOwner", options = { amount = 2 } },

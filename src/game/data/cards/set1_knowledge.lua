@@ -180,7 +180,7 @@ definitions["NODE_KNOW_006"] = {
   id = "NODE_KNOW_006",
   title = "Historical Simulation Center",
   type = CardTypes.KNOWLEDGE,
-  resourceRatio = { material = 1, data = 2 },
+  resourceRatio = { material = 2, data = 1 },
   activationEffect = CardEffects.createActivationEffect({
       actions = {
           { effect = "gainVPForOwner", options = { amount = 1 } },
@@ -406,11 +406,11 @@ definitions["NODE_KNOW_012"] = {
       actions = {
           { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
           { 
-            condition = { type = "adjacency", nodeType = CardTypes.TECHNOLOGY, count = 1 },
-            effect = "gainResourcePerNodeOwner", options = { resource = ResourceType.DATA, amount = 1, nodeType = CardTypes.TECHNOLOGY } 
+            condition = { type = "activatedCardType", cardType = CardTypes.TECHNOLOGY, count = 2 },
+            effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } 
           }
       }
-      -- Description: "Owner gains 1 Data. If adjacent to 1+ Technology node(s): Owner gains 1 Data per Technology node in their network."
+      -- Description: "Gain 1 Data. If 2+ Technology card(s) were activated in this chain: Gain 1 Data."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
@@ -420,7 +420,7 @@ definitions["NODE_KNOW_012"] = {
             effect = "drawCardsForActivator", options = { amount = 1 } 
           }
       }
-      -- Description: "Activator gains 1 Data. If Activator pays 1 Data: Activator draws 1 card."
+      -- Description: "Gain 1 Data. If you pay 1 Data: Draw 1 card."
   }),
   vpValue = 0, 
   imagePath = "assets/images/ai-ethics-committee.png", 
@@ -441,17 +441,16 @@ definitions["NODE_KNOW_013"] = {
           effect = "drawCardsForOwner", options = { amount = 1 } 
         }
       }
-      -- Description: "Owner gains 1 Data. If adjacent to 1+ Knowledge node(s): Owner draws 1 card."
+      -- Description: "Gain 1 Data. If adjacent to 1+ Knowledge node(s): Draw 1 card."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
-          { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
           { 
             condition = { type = "convergenceLinks", count = 1 },
             effect = "gainResourcePerNodeActivator", options = { resource = ResourceType.DATA, amount = 1, nodeType = CardTypes.KNOWLEDGE } 
           }
       }
-      -- Description: "Activator gains 1 Data. If 1+ convergence links attached: Activator gains 1 Data per Knowledge node in the owner's network."
+      -- Description: "If 1+ convergence links attached: Gain 1 Data per Knowledge node in the owner's network."
   }),
   vpValue = 0, 
   imagePath = "assets/images/deep-space-observatory.png", 
@@ -515,13 +514,9 @@ definitions["NODE_KNOW_015"] = {
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
            { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
-           { effect = "drawCardsForOwner", options = { amount = 1 } },
-           { 
-             condition = { type = "convergenceLinks", count = 2 },
-             effect = "drawCardsForActivator", options = { amount = 1 } 
-           }
+           { effect = "drawCardsForOwner", options = { amount = 1 } }
       }
-      -- Description: "Activator gains 1 Data. Owner draws 1 card. If 2+ convergence link(s) attached: Activator draws 1 card."
+      -- Description: "Gain 1 Data. Owner draws 1 card."
   }),
   vpValue = 1, 
   imagePath = "assets/images/memorial-database.png", 
@@ -539,10 +534,10 @@ definitions["NODE_KNOW_016"] = {
         { effect = "drawCardsForOwner", options = { amount = 1 } },
         { 
           condition = { type = "adjacency", nodeType = CardTypes.RESOURCE, count = 1 },
-          effect = "gainResourcePerNodeOwner", options = { resource = ResourceType.DATA, amount = 1, nodeType = CardTypes.RESOURCE } 
+          effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } 
         }
       }
-      -- Description: "Owner draws 1 card. If adjacent to 1+ Resource node(s): Owner gains 1 Data per Resource node in their network."
+      -- Description: "Owner draws 1 card. If adjacent to 1+ Resource node(s): Owner gains 1 Data."
   }),
   convergenceEffect = CardEffects.createConvergenceEffect({
       actions = {
@@ -580,14 +575,10 @@ definitions["NODE_KNOW_017"] = {
           { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } },
           { 
             condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.DATA, amount = 1 },
-            effect = "drawCardsForActivator", options = { amount = 1 } 
-          },
-          { 
-            condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.DATA, amount = 1 },
-            effect = "drawCardsForOwner", options = { amount = 1 } 
+            effect = "drawCardsForBoth", options = { amount = 1 } 
           }
       }
-      -- Description: "Activator gains 1 Data. If Activator pays 1 Data: Activator draws 1 card. If Activator pays 1 Data: Owner draws 1 card."
+      -- Description: "Gain 1 Data. If you pay 1 Data: You and the owner draw 1 card."
   }),
   vpValue = 0, 
   imagePath = "assets/images/educational-network.png", 

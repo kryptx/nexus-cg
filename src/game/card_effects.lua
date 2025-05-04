@@ -48,18 +48,7 @@ local function generateResourceDescription(actionEffect, resource, amount, conte
         end
     elseif actionEffect == "addResourceToAllPlayers" then
         return string.format("All players gain %d %s", amount, resourceName)
-    elseif actionEffect == "gainResourcePerNodeOwner" then
-         local nodeType = "Any" -- Placeholder, actual type depends on options
-         if isImperative then
-             return string.format("Gain %d %s per %s in this network", amount, resourceName, nodeType)
-         else
-             return string.format("Owner gains %d %s per %s in this network", amount, resourceName, nodeType)
-         end
-    elseif actionEffect == "gainResourcePerNodeActivator" then
-         local nodeType = "Any" -- Placeholder
-         return string.format("Gain %d %s per %s in this network", amount, resourceName, nodeType)
-    elseif actionEffect == "stealResource" then
-        return string.format("Steal %d %s from the owner", amount, resourceName)
+    -- Removed redundant gainResourcePerNodeOwner, gainResourcePerNodeActivator, stealResource handlers
     end
     
     -- Return a generic description if no match, let generateOtherDescription handle specifics
@@ -89,6 +78,8 @@ local function generateOtherDescription(actionEffect, options, context)
         else
             return string.format("Owner draws %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
         end
+    elseif actionEffect == "drawCardsForBoth" then
+        return string.format("You and the owner each draw %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
     elseif actionEffect == "drawCardsForAllPlayers" then
         return string.format("All players draw %d card%s", options.amount or 1, options.amount == 1 and "" or "s")
     elseif actionEffect == "gainVPForActivator" then
@@ -620,9 +611,32 @@ function CardEffects._executeSingleAction(effectType, options, gameService, acti
     elseif effectType == "drawCardsForActivator" then
         local amount = options.amount or 1
         if gameService.playerDrawCards then gameService:playerDrawCards(activatingPlayer, amount) else print("Warning: gameService:playerDrawCards not found!") end
+    elseif effectType == "drawCardsForAllPlayers" then
+        local amount = options.amount or 1
+        if gameService.getAllPlayers and gameService.playerDrawCards then
+            local allPlayers = gameService:getAllPlayers()
+            for _, player in ipairs(allPlayers) do
+                gameService:playerDrawCards(player, amount)
+            end
+            print(string.format("Executed drawCardsForAllPlayers: %d card(s) for %d players.", amount, #allPlayers))
+        else
+            print("Warning: gameService:getAllPlayers or gameService:playerDrawCards not found for drawCardsForAllPlayers!")
+        end
     elseif effectType == "drawCardsForOwner" then
         local amount = options.amount or 1
-        if owner and gameService.playerDrawCards then gameService:playerDrawCards(owner, amount) else print("Warning: gameService:playerDrawCards not found or owner missing!") end
+        if owner and gameService.playerDrawCards then
+            gameService:playerDrawCards(owner, amount)
+        else
+            print("Warning: gameService:playerDrawCards not found or owner missing!")
+        end
+    elseif effectType == "drawCardsForBoth" then
+        local amount = options.amount or 1
+        if activatingPlayer and owner and gameService.playerDrawCards then
+            gameService:playerDrawCards(activatingPlayer, amount)
+            gameService:playerDrawCards(owner, amount)
+        else
+            print("Warning: gameService:playerDrawCards not found or activatingPlayer/owner missing!")
+        end
     elseif effectType == "gainVPForActivator" then
         local amount = options.amount or 1
         if gameService.awardVP then gameService:awardVP(activatingPlayer, amount) else print("Warning: gameService:awardVP not found!") end
