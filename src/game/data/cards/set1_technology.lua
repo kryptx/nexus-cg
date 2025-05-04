@@ -18,13 +18,13 @@ definitions["NODE_TECH_001"] = {
         actions = { 
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
             { condition = { type = "activationChainLength", count = 2 },
-              effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 1 } }
+              effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 } }
         }
-        -- Description: "Gain 1 Data. If 2+ card(s) were activated in this chain: Gain 1 Energy."
+        -- Description: "Gain 1 Material. If 2+ card(s) were activated in this chain: Gain 1 Data."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
-        actions = { { effect = "addResourceToActivator", options = { resource = ResourceType.DATA, amount = 1 } } }
-        -- Description: "Gain 1 Data."
+        actions = { { effect = "addResourceToBoth", options = { resource = ResourceType.MATERIAL, amount = 1 } } }
+        -- Description: "Gain 1 Material."
     }),
     vpValue = 0,
     imagePath = "assets/images/basic-processing-unit.png",
@@ -45,10 +45,10 @@ definitions["NODE_TECH_002"] = {
     activationEffect = CardEffects.createActivationEffect({
         actions = { 
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
-            { condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.ENERGY, amount = 1 },
-              effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 2 } }
+            { condition = { type = "activationChainLength", count = 2 },
+              effect = "addResourceToOwner", options = { resource = ResourceType.ENERGY, amount = 1 } }
         }
-        -- Description: "Gain 1 Data. If you pay 1 Energy: Gain 2 Data."
+        -- Description: "Gain 1 Data. If 2+ card(s) were activated in this chain: Gain 1 Energy."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = { 
@@ -62,6 +62,8 @@ definitions["NODE_TECH_002"] = {
         [CardPorts.BOTTOM_RIGHT] = true, -- Tech Output
         [CardPorts.TOP_RIGHT] = true,    -- Tech Input
         [CardPorts.LEFT_TOP] = true,     -- Knowledge Output
+        [CardPorts.LEFT_BOTTOM] = true, -- Resource Input
+        [CardPorts.RIGHT_BOTTOM] = true, -- Resource Output
     },
     art = nil,
     flavorText = "Adaptive processing core with dynamic resource allocation.",
@@ -187,7 +189,7 @@ definitions["NODE_TECH_006"] = {
     definedPorts = {
         [CardPorts.TOP_LEFT] = true,      -- 1: Culture Output
         [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
-        [CardPorts.BOTTOM_RIGHT] = true,  -- 4: Technology Output
+        [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
         [CardPorts.BOTTOM_LEFT] = true,   -- 3: Culture Input
     },
     art = nil,
@@ -257,6 +259,7 @@ definitions["NODE_TECH_008"] = {
         [CardPorts.BOTTOM_RIGHT] = true,  -- Tech Output
         [CardPorts.RIGHT_BOTTOM] = true,  -- Resource Output
         [CardPorts.LEFT_BOTTOM] = true,   -- Resource Input
+        [CardPorts.LEFT_TOP] = true,      -- Knowledge Output
     },
     art = nil,
     flavorText = "The power of a star, contained and channeled through technological synergy.",
@@ -309,7 +312,7 @@ definitions["NODE_TECH_010"] = {
                 options = { resource = ResourceType.MATERIAL, amount = 1 } 
             }
         }
-        -- Description: "If Owner pays 1 Energy: Activator steals 1 Material from each owner of nodes activated this chain."
+        -- Description: "If you pay 1 Energy: Steal 1 Material from each owner of nodes activated this chain."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
@@ -318,13 +321,12 @@ definitions["NODE_TECH_010"] = {
              { condition = { type = "convergenceLinks", count = 1 },
                effect = "forceDiscardRandomCardsOwner", options = { amount = 1 } }
         }
-        -- Description: "Activator gains 1 Data. Activator steals 1 Energy from the owner. If 1+ convergence link(s) attached: Owner discards 1 card."
+        -- Description: "Gain 1 Data. Steal 1 Energy from the owner. If 1+ links attached: Owner discards 1 card."
     }),
     vpValue = 0,
     imagePath = "assets/images/sabotage-drone-bay.png",
     definedPorts = {
         [CardPorts.TOP_RIGHT] = true,     -- Tech Input
-        [CardPorts.BOTTOM_RIGHT] = true,  -- Tech Output
         [CardPorts.RIGHT_BOTTOM] = true,  -- Resource Output
     },
     art = nil,
@@ -380,7 +382,13 @@ definitions["NODE_TECH_012"] = {
     }),
     vpValue = 0, imagePath = "assets/images/high-frequency-trading-hub.png", 
     flavorText = "Exploiting information asymmetry through aggressive data tactics.",
-    definedPorts = { [CardPorts.TOP_RIGHT] = true, [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.RIGHT_BOTTOM] = true, [CardPorts.BOTTOM_LEFT] = true },
+    definedPorts = {
+        [CardPorts.TOP_RIGHT] = true,
+        [CardPorts.BOTTOM_RIGHT] = true,
+        [CardPorts.RIGHT_BOTTOM] = true,
+        [CardPorts.BOTTOM_LEFT] = true,
+        [CardPorts.TOP_LEFT] = true,
+    },
 }
 definitions["NODE_TECH_013"] = {
     id = "NODE_TECH_013", title = "Planetary Defense Sensor", type = CardTypes.TECHNOLOGY,
@@ -404,7 +412,11 @@ definitions["NODE_TECH_013"] = {
     }),
     vpValue = 0, imagePath = "assets/images/planetary-defense-sensor.png", 
     flavorText = "Eyes on the sky, most effective with clear sight lines.",
-    definedPorts = { [CardPorts.TOP_RIGHT] = true, [CardPorts.LEFT_TOP] = true },
+    definedPorts = {
+        [CardPorts.LEFT_BOTTOM] = true,
+        [CardPorts.LEFT_TOP] = true,
+        [CardPorts.TOP_LEFT] = true,
+    },
 }
 definitions["NODE_TECH_014"] = {
     id = "NODE_TECH_014", title = "Tunnel Bore Control", type = CardTypes.TECHNOLOGY,
@@ -455,7 +467,12 @@ definitions["NODE_TECH_015"] = {
     }),
     vpValue = 1, imagePath = "assets/images/predictive-algorithm.png", 
     flavorText = "Forecasting the ebb and flow of the network, optimizing for long activation chains.",
-    definedPorts = { [CardPorts.TOP_RIGHT] = true, [CardPorts.TOP_LEFT] = true, [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.LEFT_TOP] = true },
+    definedPorts = {
+        [CardPorts.RIGHT_BOTTOM] = true,
+        [CardPorts.TOP_LEFT] = true,
+        [CardPorts.BOTTOM_RIGHT] = true,
+        [CardPorts.LEFT_TOP] = true,
+    },
 }
 definitions["NODE_TECH_016"] = {
     id = "NODE_TECH_016", title = "Automated Assembly Line", type = CardTypes.TECHNOLOGY,
@@ -478,7 +495,13 @@ definitions["NODE_TECH_016"] = {
     }),
     vpValue = 0, imagePath = "assets/images/automated-assembly-line.png", 
     flavorText = "Mass production optimized for technological supply chains.",
-    definedPorts = { [CardPorts.TOP_RIGHT] = true, [CardPorts.TOP_LEFT] = true, [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.RIGHT_BOTTOM] = true },
+    definedPorts = { 
+        [CardPorts.TOP_RIGHT] = true, -- Technology Input
+        [CardPorts.TOP_LEFT] = true, -- Technology Output
+        [CardPorts.BOTTOM_RIGHT] = true, -- Technology Output
+        [CardPorts.RIGHT_BOTTOM] = true, -- Resource Output
+        [CardPorts.LEFT_BOTTOM] = true, -- Resource Input
+    },
 }
 definitions["NODE_TECH_017"] = {
     id = "NODE_TECH_017", title = "Resource Scanner Drone", type = CardTypes.TECHNOLOGY,
@@ -532,6 +555,11 @@ definitions["NODE_TECH_018"] = {
     }),
     vpValue = 1, imagePath = "assets/images/experimental-fusion-injector.png", 
     flavorText = "Pushing the boundaries of energy conversion through complex integration.",
-    definedPorts = { [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.LEFT_BOTTOM] = true, [CardPorts.RIGHT_TOP] = true },
+    definedPorts = {
+        [CardPorts.BOTTOM_RIGHT] = true,
+        [CardPorts.LEFT_BOTTOM] = true,
+        [CardPorts.RIGHT_TOP] = true,
+        [CardPorts.RIGHT_BOTTOM] = true,
+    },
 }
 return definitions 

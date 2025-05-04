@@ -32,6 +32,7 @@ definitions["NODE_KNOW_001"] = {
       [CardPorts.LEFT_TOP] = true,    -- Knowledge Output
       [CardPorts.RIGHT_TOP] = true,   -- Knowledge Input
       [CardPorts.LEFT_BOTTOM] = true, -- Resource Input
+      [CardPorts.TOP_RIGHT] = true,   -- Technology Input
   },
   art = nil,
   flavorText = "Connecting streams of information.",
@@ -135,6 +136,7 @@ definitions["NODE_KNOW_004"] = {
       [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
       [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
       [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
+      [CardPorts.BOTTOM_LEFT] = true,   -- Culture Input
   },
   art = nil,
   flavorText = "Synthesizing intelligence, one cycle at a time.",
@@ -161,16 +163,17 @@ definitions["NODE_KNOW_005"] = {
            { condition = { type = "paymentOffer", payer = "Activator", resource = ResourceType.DATA, amount = 1 },
              effect = "drawCardsForActivator", options = { amount = 2 } }
       }
-      -- Description: "Activator gains 1 Data. Activator discards 1 card. If Activator pays 1 Data: Activator draws 2 cards."
+      -- Description: "Gain 1 Data. Discard 1 random card. If you pay 1 Data: Draw 2 cards."
   }),
   vpValue = 1,
   imagePath = "assets/images/bio-research-lab.png",
   definedPorts = {
-      [CardPorts.TOP_RIGHT] = true,     -- 2: Technology Input
-      [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
-      [CardPorts.LEFT_BOTTOM] = true,   -- 6: Resource Input
-      [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
-      [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
+      [CardPorts.TOP_LEFT] = true,
+      [CardPorts.TOP_RIGHT] = true,
+      [CardPorts.BOTTOM_LEFT] = true,
+      [CardPorts.BOTTOM_RIGHT] = true,
+      [CardPorts.LEFT_TOP] = true,
+      [CardPorts.RIGHT_TOP] = true,
   },
   art = nil,
   flavorText = "Unlocking the blueprints of life itself.",
@@ -282,6 +285,8 @@ definitions["NODE_KNOW_008"] = {
       [CardPorts.RIGHT_TOP] = true,     -- 7: Knowledge Input
       [CardPorts.RIGHT_BOTTOM] = true,  -- 8: Resource Output
       [CardPorts.LEFT_TOP] = true,      -- 5: Knowledge Output
+      [CardPorts.TOP_RIGHT] = true,
+      [CardPorts.BOTTOM_RIGHT] = true,
   },
   art = nil,
   flavorText = "Efficiency unlocked through understanding.",
@@ -363,7 +368,12 @@ definitions["NODE_KNOW_010"] = {
   vpValue = 0, 
   imagePath = "assets/images/xeno-linguistics-lab.png", 
   flavorText = "Attempting to understand the 'other'.",
-  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.RIGHT_TOP] = true, [CardPorts.BOTTOM_RIGHT] = true },
+  definedPorts = {
+      [CardPorts.TOP_LEFT] = true,
+      [CardPorts.BOTTOM_LEFT] = true,
+      [CardPorts.RIGHT_TOP] = true,
+      [CardPorts.BOTTOM_RIGHT] = true
+  },
 }
 
 definitions["NODE_KNOW_011"] = {
@@ -425,7 +435,12 @@ definitions["NODE_KNOW_012"] = {
   vpValue = 0, 
   imagePath = "assets/images/ai-ethics-committee.png", 
   flavorText = "Guiding the minds of the future.",
-  definedPorts = { [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.RIGHT_TOP] = true, [CardPorts.BOTTOM_LEFT] = true },
+  definedPorts = {
+    [CardPorts.BOTTOM_RIGHT] = true, -- Technology Output
+    [CardPorts.RIGHT_TOP] = true, -- Knowledge Input
+    [CardPorts.BOTTOM_LEFT] = true, -- Culture Input
+    [CardPorts.LEFT_TOP] = true, -- Knowledge Output
+  },
 }
 
 definitions["NODE_KNOW_013"] = {
@@ -493,7 +508,12 @@ definitions["NODE_KNOW_014"] = {
   vpValue = 1, 
   imagePath = "assets/images/quantum-entanglement-comms.png", 
   flavorText = "Instantaneous communication, unbound by distance.",
-  definedPorts = { [CardPorts.LEFT_TOP] = true, [CardPorts.RIGHT_TOP] = true, [CardPorts.BOTTOM_RIGHT] = true },
+  definedPorts = {
+    [CardPorts.LEFT_TOP] = true,
+    [CardPorts.RIGHT_TOP] = true,
+    [CardPorts.BOTTOM_RIGHT] = true,
+    [CardPorts.TOP_LEFT] = true,
+  },
 }
 
 definitions["NODE_KNOW_015"] = {
@@ -521,7 +541,12 @@ definitions["NODE_KNOW_015"] = {
   vpValue = 1, 
   imagePath = "assets/images/memorial-database.png", 
   flavorText = "Remembering those who came before.",
-  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.BOTTOM_LEFT] = true, [CardPorts.RIGHT_TOP] = true }, -- Cult Out, Cult In, Know In
+  definedPorts = {
+    [CardPorts.TOP_LEFT] = true,
+    [CardPorts.BOTTOM_LEFT] = true,
+    [CardPorts.RIGHT_TOP] = true,
+    [CardPorts.BOTTOM_RIGHT] = true,
+  },
 }
 
 definitions["NODE_KNOW_016"] = {
@@ -552,7 +577,13 @@ definitions["NODE_KNOW_016"] = {
   vpValue = 0, 
   imagePath = "assets/images/resource-cartographer.png", 
   flavorText = "Mapping the veins of the Jovian moons.",
-  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.LEFT_BOTTOM] = true, [CardPorts.RIGHT_TOP] = true }, -- Cult Out, Res In, Know In
+  definedPorts = {
+    [CardPorts.TOP_LEFT] = true, 
+    [CardPorts.LEFT_BOTTOM] = true, 
+    [CardPorts.RIGHT_TOP] = true, 
+    [CardPorts.BOTTOM_RIGHT] = true,
+    [CardPorts.LEFT_TOP] = true, -- Knowledge Output
+  },
 }
 
 definitions["NODE_KNOW_017"] = {
@@ -625,7 +656,12 @@ definitions["NODE_KNOW_018"] = {
   vpValue = 1, 
   imagePath = "assets/images/centralized-knowledge-bank.png", 
   flavorText = "The collective memory of the colony.",
-  definedPorts = { [CardPorts.LEFT_TOP] = true, [CardPorts.LEFT_BOTTOM] = true, [CardPorts.RIGHT_TOP] = true }, -- Know Out, Res In, Know In
+  definedPorts = {
+      [CardPorts.TOP_RIGHT] = true,
+      [CardPorts.LEFT_TOP] = true,
+      [CardPorts.RIGHT_TOP] = true,
+      [CardPorts.BOTTOM_LEFT] = true
+  },
 }
 
 definitions["NODE_KNOW_019"] = {
@@ -663,7 +699,11 @@ definitions["NODE_KNOW_019"] = {
   vpValue = 0, 
   imagePath = "assets/images/geological-data-analysis.png", 
   flavorText = "Translating seismic readings into resource maps.",
-  definedPorts = { [CardPorts.LEFT_TOP] = true, [CardPorts.RIGHT_TOP] = true, [CardPorts.RIGHT_BOTTOM] = true }, -- Know Out, Know In, Res Out
+  definedPorts = {
+    [CardPorts.LEFT_TOP] = true,
+    [CardPorts.RIGHT_TOP] = true,
+    [CardPorts.LEFT_BOTTOM] = true, -- Resource Input
+  },
 }
 
 definitions["NODE_KNOW_020"] = {
@@ -695,7 +735,13 @@ definitions["NODE_KNOW_020"] = {
   vpValue = 0, 
   imagePath = "assets/images/logistics-coordination-ai.png", 
   flavorText = "Optimizing the flow of goods across the network.",
-  definedPorts = { [CardPorts.LEFT_BOTTOM] = true, [CardPorts.RIGHT_TOP] = true, [CardPorts.RIGHT_BOTTOM] = true }, -- Res In, Know In, Res Out
+  definedPorts = {
+    [CardPorts.LEFT_BOTTOM] = true,
+    [CardPorts.TOP_RIGHT] = true,
+    [CardPorts.RIGHT_TOP] = true,
+    [CardPorts.RIGHT_BOTTOM] = true,
+    [CardPorts.BOTTOM_RIGHT] = true,
+  },
 }
 
 return definitions 

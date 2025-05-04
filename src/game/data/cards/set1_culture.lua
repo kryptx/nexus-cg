@@ -310,7 +310,12 @@ definitions["NODE_CULT_008"] = {
       -- Description: "Draw 1 card. If you pay 1 Data: Owner and Activator draw 1 card."
   }),
   vpValue = 0, imagePath = "assets/images/historical-archive-access.png", flavorText = "Lessons from Old Earth.",
-  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.BOTTOM_LEFT] = true, [CardPorts.LEFT_TOP] = true },
+  definedPorts = {
+      [CardPorts.TOP_LEFT] = true,     -- Culture Out
+      [CardPorts.BOTTOM_LEFT] = true,  -- Culture In
+      [CardPorts.LEFT_TOP] = true,     -- Knowledge Out
+      [CardPorts.RIGHT_TOP] = true,    -- Knowledge In
+  },
 }
 definitions["NODE_CULT_009"] = {
   id = "NODE_CULT_009", title = "Artisan Collective", type = CardTypes.CULTURE,
@@ -338,7 +343,13 @@ definitions["NODE_CULT_009"] = {
       -- Description: "Activator gains 1 Material. If adjacent to 1+ Culture node: Activator gains 1 VP."
   }),
   vpValue = 0, imagePath = "assets/images/artisan-collective.png", flavorText = "Beauty forged from necessity.",
-  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.LEFT_BOTTOM] = true, [CardPorts.RIGHT_BOTTOM] = true, [CardPorts.BOTTOM_RIGHT] = true },
+  definedPorts = {
+      [CardPorts.TOP_LEFT] = true, -- Culture Output
+      [CardPorts.LEFT_BOTTOM] = true, -- Resource Input
+      [CardPorts.RIGHT_BOTTOM] = true, -- Resource Output
+      [CardPorts.BOTTOM_RIGHT] = true, -- Technology Output
+      [CardPorts.BOTTOM_LEFT] = true -- Culture Input
+  },
 }
 
 definitions["NODE_CULT_010"] = {
@@ -424,7 +435,12 @@ definitions["NODE_CULT_012"] = {
       -- Description: "Activator gains 1 Data. If 1+ convergence link attached: Owner discards 1 card."
   }),
   vpValue = 0, imagePath = "assets/images/propaganda-broadcaster.png", flavorText = "Shaping minds, one broadcast at a time.",
-  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.TOP_RIGHT] = true, [CardPorts.RIGHT_TOP] = true }, -- Cult Out, Tech In, Know In
+  definedPorts = {
+      [CardPorts.TOP_LEFT] = true, -- Culture Output
+      [CardPorts.TOP_RIGHT] = true, -- Technology Input
+      [CardPorts.RIGHT_TOP] = true, -- Knowledge Input
+      [CardPorts.BOTTOM_LEFT] = true -- Culture Input
+  },
 }
 definitions["NODE_CULT_013"] = {
   id = "NODE_CULT_013", title = "Subterranean Market", type = CardTypes.CULTURE,
@@ -453,7 +469,13 @@ definitions["NODE_CULT_013"] = {
       -- Description: "If you pay 1 Energy: Gain 2 Material; Owner gains 1 Data."
   }),
   vpValue = 0, imagePath = "assets/images/subterranean-market.png", flavorText = "Dealings conducted far from prying eyes.",
-  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.BOTTOM_LEFT] = true, [CardPorts.LEFT_BOTTOM] = true }, -- Cult Out, Cult In, Res In
+  definedPorts = {
+    [CardPorts.TOP_LEFT] = true,
+    [CardPorts.TOP_RIGHT] = true,
+    [CardPorts.BOTTOM_LEFT] = true,
+    [CardPorts.LEFT_BOTTOM] = true,
+    [CardPorts.RIGHT_BOTTOM] = true,
+  }, -- Cult Out, Tech In, Cult In, Res In, Res Out
 }
 
 definitions["NODE_CULT_014"] = {
@@ -507,8 +529,10 @@ definitions["NODE_CULT_015"] = {
   flavorText = "Art that responds to its audience.",
   definedPorts = {
       [CardPorts.TOP_LEFT] = true,      -- Culture Output
+      [CardPorts.TOP_RIGHT] = true,     -- Technology Input
       [CardPorts.BOTTOM_LEFT] = true,   -- Culture Input
       [CardPorts.BOTTOM_RIGHT] = true,  -- Technology Output
+      [CardPorts.RIGHT_TOP] = true,     -- Knowledge Input
   },
 }
 

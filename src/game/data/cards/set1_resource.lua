@@ -281,7 +281,12 @@ definitions["NODE_RES_009"] = {
       -- Description: "Owner gains 1 Material."
   }),
   vpValue = 0, imagePath = "assets/images/hydroponics-bay.png", flavorText = "Sustenance grown under artificial suns.",
-  definedPorts = { [CardPorts.BOTTOM_RIGHT] = true, [CardPorts.LEFT_BOTTOM] = true, [CardPorts.BOTTOM_LEFT] = true },
+  definedPorts = { 
+    [CardPorts.BOTTOM_RIGHT] = true, -- Technology Output
+    [CardPorts.LEFT_BOTTOM] = true, -- Resource Input
+    [CardPorts.BOTTOM_LEFT] = true, -- Culture Input
+    [CardPorts.RIGHT_TOP] = true, -- Knowledge Input
+  },
 }
 
 definitions["NODE_RES_010"] = {
@@ -357,7 +362,13 @@ definitions["NODE_RES_012"] = {
       -- Description: "Activator gains 1 Material. If adjacent to 1+ Technology node(s): Owner gains 1 Data."
   }),
   vpValue = 0, imagePath = "assets/images/bio-printer-feedstock.png", flavorText = "Raw materials for engineered life.",
-  definedPorts = { [CardPorts.TOP_LEFT] = true, [CardPorts.TOP_RIGHT] = true, [CardPorts.LEFT_TOP] = true }, -- Cult Out, Tech In, Know Out
+  definedPorts = {
+    [CardPorts.TOP_LEFT] = true,
+    [CardPorts.TOP_RIGHT] = true,
+    [CardPorts.LEFT_TOP] = true,
+    [CardPorts.LEFT_BOTTOM] = true,
+    [CardPorts.RIGHT_BOTTOM] = true,
+  }, -- Cult Out, Tech In, Know Out, Res In, Res Out
 }
 
 definitions["NODE_RES_013"] = {
@@ -379,7 +390,11 @@ definitions["NODE_RES_013"] = {
       -- Description: "Activator gains 1 Material."
   }),
   vpValue = 0, imagePath = "assets/images/resource-distribution-hub.png", flavorText = "Facilitating the flow of vital goods.",
-  definedPorts = { [CardPorts.BOTTOM_LEFT] = true, [CardPorts.LEFT_TOP] = true, [CardPorts.RIGHT_BOTTOM] = true }, -- Cult In, Know Out, Res Out
+  definedPorts = { 
+    [CardPorts.BOTTOM_LEFT] = true, 
+    [CardPorts.LEFT_TOP] = true, 
+    [CardPorts.RIGHT_BOTTOM] = true,
+  }, -- Cult In, Know Out, Res Out
 }
 
 definitions["NODE_RES_014"] = {
@@ -404,7 +419,7 @@ definitions["NODE_RES_014"] = {
   vpValue = 0,
   imagePath = "assets/images/salvage-operation.png",
   definedPorts = {
-      [CardPorts.LEFT_TOP] = true,      -- Knowledge Output
+      [CardPorts.TOP_RIGHT] = true,      -- Technology Input ADDED
       [CardPorts.LEFT_BOTTOM] = true,   -- Resource Input
       [CardPorts.RIGHT_BOTTOM] = true,  -- Resource Output
   },
@@ -435,9 +450,9 @@ definitions["NODE_RES_015"] = {
   vpValue = 1,
   imagePath = "assets/images/alloy-foundry.png",
   definedPorts = {
-      [CardPorts.TOP_RIGHT] = true,
-      [CardPorts.LEFT_BOTTOM] = true,
-      [CardPorts.RIGHT_BOTTOM] = true,
+      [CardPorts.LEFT_BOTTOM] = true,  -- Resource Input
+      [CardPorts.RIGHT_BOTTOM] = true, -- Resource Output
+      [CardPorts.BOTTOM_RIGHT] = true, -- Technology Output
   },
   art = nil,
   flavorText = "Fusing raw elements into stronger compounds.",
