@@ -362,11 +362,11 @@ definitions["NODE_TECH_012"] = {
         actions = {
             { effect = "addResourceToOwner", options = { resource = ResourceType.DATA, amount = 1 } },
             {
-                condition = { type = "paymentOffer", payer = "Owner", resource = ResourceType.DATA, amount = 2 },
-                effect = "forceDiscardRandomCardsActivator", options = { amount = 1 }
+                condition = { type = "activatedCardType", cardType = CardTypes.RESOURCE, count = 2 },
+                effect = "addResourceToOwner", options = { resource = ResourceType.MATERIAL, amount = 1 }
             }
         }
-        -- Description: "Owner gains 1 Data. If Owner pays 2 Data: Activator discards 1 card."
+        -- Description: "Gain 1 Data. If 2+ Resource card(s) were activated in this chain: Gain 1 Material."
     }),
     convergenceEffect = CardEffects.createConvergenceEffect({
         actions = {
@@ -376,7 +376,7 @@ definitions["NODE_TECH_012"] = {
                 effect = "forceDiscardRandomCardsOwner", options = { amount = 1 }
             }
         }
-        -- Description: "Activator gains 1 Data. If Activator pays 1 Data: Owner discards 1 card."
+        -- Description: "Activator gains 1 Data. If Activator pays 1 Data: Owner discards 1 random card."
     }),
     vpValue = 0, imagePath = "assets/images/high-frequency-trading-hub.png", 
     flavorText = "Exploiting information asymmetry through aggressive data tactics.",

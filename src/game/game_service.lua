@@ -98,8 +98,8 @@ function GameService:initializeGame(playerCount)
         
         -- Set starting resources
         player:addResource('energy', 0)
-        player:addResource('data', 1)
-        player:addResource('material', 3)
+        player:addResource('data', 2)
+        player:addResource('material', 5)
         -- player:addResource('energy', 10)
         -- player:addResource('data', 10)
         -- player:addResource('material', 20)
